@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>inv fin — Dashboard Patrimonial</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f4; color: #1c1c1a; min-height: 100vh; }
+
+  .topbar { background: #fff; border-bottom: 1px solid #e5e5e3; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; height: 52px; position: sticky; top: 0; z-index: 10; }
+  .topbar-title { font-size: 15px; font-weight: 600; letter-spacing: -0.3px; }
+  .topbar-right { display: flex; align-items: center; gap: 8px; }
+  .badge { background: #f5f5f4; border: 1px solid #e5e5e3; border-radius: 6px; padding: 3px 8px; font-size: 12px; color: #6b6b68; }
+  .badge-warn { background: #fef9ec; border-color: #f5c842; color: #92600a; }
+
+  .nav { background: #fff; border-bottom: 1px solid #e5e5e3; padding: 0 24px; display: flex; gap: 2px; overflow-x: auto; }
+  .nav-tab { padding: 12px 14px; font-size: 13px; color: #6b6b68; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; user-select: none; transition: color .15s; }
+  .nav-tab:hover { color: #1c1c1a; }
+  .nav-tab.active { color: #1c1c1a; font-weight: 500; border-bottom-color: #1c1c1a; }
+
+  .content { padding: 20px; max-width: 1200px; margin: 0 auto; }
+  .section { display: none; }
+  .section.active { display: block; }
+
+  .cards { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 20px; }
+  @media (max-width: 768px) { .cards { grid-template-columns: repeat(2,1fr); } }
+  @media (max-width: 480px) { .cards { grid-template-columns: 1fr; } }
+
+  .card { background: #fff; border: 1px solid #e5e5e3; border-radius: 10px; padding: 16px 18px; }
+  .card-label { font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: .6px; color: #9b9b98; margin-bottom: 6px; }
+  .card-value { font-size: 22px; font-weight: 500; letter-spacing: -.5px; }
+  .card-sub { font-size: 12px; color: #6b6b68; margin-top: 4px; }
+  .pos { color: #1a7f4b; }
+  .neg { color: #c0392b; }
+
+  .panel { background: #fff; border: 1px solid #e5e5e3; border-radius: 10px; padding: 18px 20px; margin-bottom: 16px; }
+  .panel-title { font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: .5px; color: #9b9b98; margin-bottom: 16px; }
+
+  .bars { display: flex; align-items: flex-end; gap: 5px; height: 110px; }
+  .bar-col { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; min-width: 0; cursor: pointer; }
+  .bar { width: 100%; border-radius: 3px 3px 0 0; transition: opacity .15s; }
+  .bar:hover { opacity: .8; }
+  .bar-lbl { font-size: 9px; color: #9b9b98; white-space: nowrap; text-align: center; overflow: hidden; max-width: 100%; }
+  .bar-val { font-size: 9px; color: #6b6b68; white-space: nowrap; text-align: center; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+  @media (max-width: 600px) { .two-col { grid-template-columns: 1fr; } }
+
+  .corr-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f0f0ee; }
+  .corr-row:last-child { border-bottom: none; }
+  .corr-name { font-size: 13px; font-weight: 500; }
+  .corr-moeda { font-size: 11px; color: #9b9b98; }
+  .corr-val { font-size: 13px; font-weight: 500; text-align: right; }
+  .corr-pct { font-size: 11px; color: #9b9b98; text-align: right; }
+
+  .alloc-item { margin-bottom: 14px; }
+  .alloc-info { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 5px; }
+  .alloc-info span:last-child { font-weight: 500; }
+  .alloc-bg { height: 6px; background: #f0f0ee; border-radius: 3px; overflow: hidden; }
+  .alloc-fill { height: 100%; border-radius: 3px; transition: width .8s ease; }
+
+  .table-wrap { background: #fff; border: 1px solid #e5e5e3; border-radius: 10px; overflow: hidden; margin-bottom: 16px; }
+  .table-head { padding: 12px 18px; border-bottom: 1px solid #f0f0ee; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+  .table-title { font-size: 13px; font-weight: 500; }
+  .filters { display: flex; gap: 6px; flex-wrap: wrap; }
+  .fbtn { padding: 4px 10px; border-radius: 6px; border: 1px solid #e5e5e3; background: transparent; font-size: 12px; cursor: pointer; color: #6b6b68; transition: all .15s; }
+  .fbtn.on, .fbtn:hover { background: #1c1c1a; color: #fff; border-color: #1c1c1a; }
+
+  .tbl-scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; min-width: 600px; }
+  th { padding: 9px 14px; text-align: left; font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: .4px; color: #9b9b98; border-bottom: 1px solid #f0f0ee; background: #fafaf9; white-space: nowrap; }
+  td { padding: 10px 14px; font-size: 13px; border-bottom: 1px solid #f0f0ee; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #fafaf9; }
+  .tr { text-align: right; }
+  .ticker { font-weight: 500; }
+  .pill { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 500; }
+  .p-XP   { background: #e8f5e9; color: #2e7d32; }
+  .p-AV   { background: #e3f2fd; color: #1565c0; }
+  .p-R4   { background: #fff3e0; color: #e65100; }
+  .p-IBKR { background: #f3e5f5; color: #6a1b9a; }
+
+  .loading { padding: 40px; text-align: center; color: #9b9b98; font-size: 13px; }
+  .empty { padding: 40px; text-align: center; color: #9b9b98; font-size: 13px; }
+  .err { padding: 20px; color: #c0392b; font-size: 13px; }
+
+  .status-bar { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 10px 16px; margin-bottom: 16px; font-size: 12px; color: #166534; display: flex; align-items: center; gap: 8px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <span class="topbar-title">inv fin</span>
+  <div class="topbar-right">
+    <span id="badge-prov" class="badge badge-warn" style="display:none">⚠ provisório</span>
+    <span id="badge-mes" class="badge">carregando...</span>
+  </div>
+</div>
+
+<div class="nav">
+  <div class="nav-tab active" data-tab="geral">Visão geral</div>
+  <div class="nav-tab" data-tab="posicoes">Posições abertas</div>
+  <div class="nav-tab" data-tab="historico">Histórico</div>
+  <div class="nav-tab" data-tab="renda">Renda</div>
+  <div class="nav-tab" data-tab="custos">Custos</div>
+  <div class="nav-tab" data-tab="auditoria">Auditoria</div>
+</div>
+
+<div class="content">
+
+  <!-- VISÃO GERAL -->
+  <div id="tab-geral" class="section active">
+    <div class="cards">
+      <div class="card">
+        <div class="card-label">Patrimônio EUR</div>
+        <div class="card-value" id="k-total">—</div>
+        <div class="card-sub" id="k-mes">—</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Variação mensal</div>
+        <div class="card-value" id="k-var">—</div>
+        <div class="card-sub" id="k-var2">—</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Posições abertas</div>
+        <div class="card-value" id="k-pos">—</div>
+        <div class="card-sub">ativos investidos</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Renda 2026</div>
+        <div class="card-value" id="k-renda">—</div>
+        <div class="card-sub">líquido EUR</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Evolução patrimonial — EUR</div>
+      <div class="bars" id="chart"><div class="loading">carregando...</div></div>
+    </div>
+
+    <div class="two-col">
+      <div class="panel" style="margin-bottom:0">
+        <div class="panel-title">Por corretora — <span id="mes-ref">—</span></div>
+        <div id="corr-rows"><div class="loading">carregando...</div></div>
+      </div>
+      <div class="panel" style="margin-bottom:0">
+        <div class="panel-title">Alocação por moeda</div>
+        <div id="alloc-rows"><div class="loading">carregando...</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- POSIÇÕES -->
+  <div id="tab-posicoes" class="section">
+    <div class="table-wrap">
+      <div class="table-head">
+        <span class="table-title">Posições abertas</span>
+        <div class="filters">
+          <button class="fbtn on" onclick="filtPos('TODAS',this)">Todas</button>
+          <button class="fbtn" onclick="filtPos('XP',this)">XP</button>
+          <button class="fbtn" onclick="filtPos('AV',this)">Avenue</button>
+          <button class="fbtn" onclick="filtPos('IBKR',this)">IBKR</button>
+          <button class="fbtn" onclick="filtPos('R4',this)">R4</button>
+        </div>
+      </div>
+      <div class="tbl-scroll" id="pos-body"><div class="loading">carregando...</div></div>
+    </div>
+  </div>
+
+  <!-- HISTÓRICO -->
+  <div id="tab-historico" class="section">
+    <div class="table-wrap">
+      <div class="table-head"><span class="table-title">Operações fechadas</span></div>
+      <div class="tbl-scroll" id="hist-body"><div class="loading">carregando...</div></div>
+    </div>
+  </div>
+
+  <!-- RENDA -->
+  <div id="tab-renda" class="section">
+    <div class="table-wrap">
+      <div class="table-head">
+        <span class="table-title">Renda recebida</span>
+        <div class="filters">
+          <button class="fbtn on" onclick="filtRenda('TODAS',this)">Todas</button>
+          <button class="fbtn" onclick="filtRenda('XP',this)">XP</button>
+          <button class="fbtn" onclick="filtRenda('AV',this)">Avenue</button>
+          <button class="fbtn" onclick="filtRenda('IBKR',this)">IBKR</button>
+        </div>
+      </div>
+      <div class="tbl-scroll" id="renda-body"><div class="loading">carregando...</div></div>
+    </div>
+  </div>
+
+  <!-- AUDITORIA -->
+  <div id="tab-custos" class="section">
+    <div class="card" style="padding:0">
+      <div class="table-head">
+        <span class="table-title">Custos operacionais</span>
+        <div>
+          <button class="fbtn on" onclick="filtCustos('TODAS',this)">Todas</button>
+          <button class="fbtn" onclick="filtCustos('XP',this)">XP</button>
+          <button class="fbtn" onclick="filtCustos('AV',this)">Avenue</button>
+          <button class="fbtn" onclick="filtCustos('R4',this)">R4</button>
+          <button class="fbtn" onclick="filtCustos('IBKR',this)">IBKR</button>
+        </div>
+      </div>
+      <div class="tbl-scroll" id="custos-body"><div class="loading">carregando...</div></div>
+    </div>
+  </div>
+
+  <div id="tab-auditoria" class="section">
+    <div class="table-wrap">
+      <div class="table-head"><span class="table-title">Auditoria automática</span></div>
+      <div id="audit-body"><div class="loading">carregando...</div></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const BASE = 'https://ogkomoewpaxwmlbdlvfi.supabase.co/rest/v1';
+const KEY  = 'sb_publishable_pyg_WYhMnDi3mHcrK5e8Pg_pPG3mhA7';
+const H    = { 'apikey': KEY, 'Authorization': 'Bearer ' + KEY };
+
+async function get(path) {
+  const r = await fetch(BASE + path, { headers: H });
+  if (!r.ok) throw new Error(r.status + ': ' + await r.text());
+  return r.json();
+}
+
+const eur  = n => n==null ? '—' : '€' + Number(n).toLocaleString('pt-BR', {minimumFractionDigits:0,maximumFractionDigits:0});
+const num  = (n,d=2) => n==null ? '—' : Number(n).toLocaleString('pt-BR', {minimumFractionDigits:d,maximumFractionDigits:d});
+const dc   = n => n==null ? '' : Number(n)>=0 ? 'pos' : 'neg';
+const dt   = s => s ? new Date(s).toLocaleDateString('pt-BR') : '—';
+const sign = n => n==null ? '' : Number(n)>=0 ? '+' : '';
+
+let posData=[], rendaData=[];
+
+// Tabs
+document.querySelectorAll('.nav-tab').forEach(t => {
+  t.onclick = () => {
+    document.querySelectorAll('.nav-tab').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    const id = t.dataset.tab;
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.getElementById('tab-' + id).classList.add('active');
+    if (id === 'historico' && document.getElementById('hist-body').querySelector('.loading')) loadHistorico();
+    if (id === 'renda'     && document.getElementById('renda-body').querySelector('.loading')) loadRenda();
+    if (id === 'custos'    && document.getElementById('custos-body').querySelector('.loading')) loadCustos();
+    if (id === 'auditoria' && document.getElementById('audit-body').querySelector('.loading')) loadAuditoria();
+  };
+});
+
+// ── VISÃO GERAL ──────────────────────────────────────────────────────────────
+async function loadGeral() {
+  const [pat, pos, renda26] = await Promise.all([
+    get('/patrimonio_consolidado?select=mes,ordem,total_eur,xp_eur,av_eur,r4_eur,ibkr_eur,tem_provisorio&order=ordem.asc'),
+    get('/posicoes_abertas?select=id'),
+    get('/renda?select=valor_eur&data=gte.2026-01-01')
+  ]);
+
+  const last = pat[pat.length - 1];
+  const prev = pat[pat.length - 2];
+
+  document.getElementById('badge-mes').textContent = last.mes;
+  if (last.tem_provisorio) document.getElementById('badge-prov').style.display = '';
+  document.getElementById('k-total').textContent = eur(last.total_eur);
+  document.getElementById('k-mes').textContent   = last.mes + (last.tem_provisorio ? ' *provisório' : '');
+  document.getElementById('k-pos').textContent   = pos.length;
+
+  const totalRenda = renda26.reduce((s,r) => s + (r.valor_eur || 0), 0);
+  document.getElementById('k-renda').textContent = eur(totalRenda);
+
+  if (prev) {
+    const d = last.total_eur - prev.total_eur;
+    const p = d / prev.total_eur * 100;
+    document.getElementById('k-var').innerHTML  = `<span class="${dc(d)}">${eur(d)}</span>`;
+    document.getElementById('k-var2').innerHTML = `<span class="${dc(d)}">${sign(p)}${p.toFixed(1)}% vs ${prev.mes}</span>`;
+  }
+
+  // Gráfico
+  const max = Math.max(...pat.map(d => d.total_eur));
+  document.getElementById('chart').innerHTML = pat.map(d => {
+    const h = Math.round(d.total_eur / max * 100);
+    const isLast = d.mes === last.mes;
+    const color = isLast ? '#534AB7' : '#d4d4d0';
+    return `<div class="bar-col" title="${d.mes}: ${eur(d.total_eur)}">
+      <div class="bar-val" style="font-size:8px;color:${isLast?'#534AB7':'transparent'}">${isLast ? eur(d.total_eur) : ''}</div>
+      <div class="bar" style="height:${h}px;background:${color}"></div>
+      <div class="bar-lbl">${d.mes.split('/')[0]}</div>
+    </div>`;
+  }).join('');
+
+  // Corretoras
+  document.getElementById('mes-ref').textContent = last.mes;
+  const total = last.total_eur;
+  const corrs = [
+    { label: 'Interactive Brokers', moeda: 'EUR', v: last.ibkr_eur },
+    { label: 'Avenue',              moeda: 'USD', v: last.av_eur },
+    { label: 'XP Investimentos',    moeda: 'BRL', v: last.xp_eur },
+    { label: 'Renta 4',             moeda: 'EUR', v: last.r4_eur },
+  ].filter(c => c.v);
+
+  document.getElementById('corr-rows').innerHTML = corrs.map(c => `
+    <div class="corr-row">
+      <div><div class="corr-name">${c.label}</div><div class="corr-moeda">${c.moeda}</div></div>
+      <div><div class="corr-val">${eur(c.v)}</div><div class="corr-pct">${(c.v/total*100).toFixed(1)}%</div></div>
+    </div>`).join('');
+
+  // Alocação
+  const allocs = [
+    { l: 'EUR (IBKR + R4)', v: (last.ibkr_eur||0) + (last.r4_eur||0), c: '#534AB7' },
+    { l: 'USD (Avenue)',    v: last.av_eur || 0, c: '#185FA5' },
+    { l: 'BRL (XP)',        v: last.xp_eur || 0, c: '#0F6E56' },
+  ];
+  document.getElementById('alloc-rows').innerHTML = allocs.map(a => {
+    const p = (a.v / total * 100).toFixed(1);
+    return `<div class="alloc-item">
+      <div class="alloc-info"><span>${a.l}</span><span>${p}% · ${eur(a.v)}</span></div>
+      <div class="alloc-bg"><div class="alloc-fill" style="width:${p}%;background:${a.c}"></div></div>
+    </div>`;
+  }).join('');
+}
+
+// ── POSIÇÕES ─────────────────────────────────────────────────────────────────
+async function loadPosicoes() {
+  posData = await get('/posicoes_abertas?select=*&order=data_entrada.asc');
+  renderPos(posData);
+}
+
+function renderPos(rows) {
+  if (!rows.length) {
+    document.getElementById('pos-body').innerHTML = '<div class="empty">Nenhuma posição aberta</div>';
+    return;
+  }
+  document.getElementById('pos-body').innerHTML = `<table>
+    <thead><tr>
+      <th>Ativo</th><th>Corretora</th><th>Entrada</th>
+      <th class="tr">Quantidade</th><th class="tr">PM entrada</th>
+      <th class="tr">Custo total</th><th>Moeda</th><th>Status</th>
+    </tr></thead>
+    <tbody>${rows.map(r => `<tr>
+      <td class="ticker">${r.ticker}</td>
+      <td><span class="pill p-${r.corretora}">${r.corretora}</span></td>
+      <td>${dt(r.data_entrada)}</td>
+      <td class="tr">${num(r.quantidade, 4)}</td>
+      <td class="tr">${num(r.preco_entrada, 4)}</td>
+      <td class="tr">${num(r.custo_total, 2)}</td>
+      <td style="font-size:11px;color:#6b6b68">${r.moeda}</td>
+      <td style="font-size:11px;color:#9b9b98">${r.status}</td>
+    </tr>`).join('')}</tbody>
+  </table>`;
+}
+
+function filtPos(c, btn) {
+  document.querySelectorAll('#tab-posicoes .fbtn').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  renderPos(c === 'TODAS' ? posData : posData.filter(r => r.corretora === c));
+}
+
+// ── HISTÓRICO ────────────────────────────────────────────────────────────────
+async function loadHistorico() {
+  const data = await get('/resultado_fechado?select=*&order=data_saida.desc&limit=100');
+  if (!data.length) {
+    document.getElementById('hist-body').innerHTML = '<div class="empty">Nenhuma operação fechada</div>';
+    return;
+  }
+  document.getElementById('hist-body').innerHTML = `<table>
+    <thead><tr>
+      <th>Ativo</th><th>Corretora</th><th>Entrada</th><th>Saída</th>
+      <th class="tr">Qtd</th><th class="tr">PM entrada</th><th class="tr">PM saída</th>
+      <th class="tr">Resultado €</th><th class="tr">Dias</th>
+    </tr></thead>
+    <tbody>${data.map(r => `<tr>
+      <td class="ticker">${r.ticker}</td>
+      <td><span class="pill p-${r.corretora}">${r.corretora}</span></td>
+      <td>${dt(r.data_entrada)}</td>
+      <td>${dt(r.data_saida)}</td>
+      <td class="tr">${num(r.quantidade, 2)}</td>
+      <td class="tr">${num(r.preco_entrada, 4)}</td>
+      <td class="tr">${num(r.preco_saida, 4)}</td>
+      <td class="tr ${dc(r.resultado_eur)}">${eur(r.resultado_eur)}</td>
+      <td class="tr">${r.dias_posicao ?? '—'}</td>
+    </tr>`).join('')}</tbody>
+  </table>`;
+}
+
+// ── RENDA ────────────────────────────────────────────────────────────────────
+async function loadRenda() {
+  rendaData = await get('/renda?select=*&order=data.desc&limit=200');
+  renderRenda(rendaData);
+}
+
+function renderRenda(rows) {
+  if (!rows.length) {
+    document.getElementById('renda-body').innerHTML = '<div class="empty">Nenhum registro</div>';
+    return;
+  }
+  document.getElementById('renda-body').innerHTML = `<table>
+    <thead><tr>
+      <th>Data</th><th>Ativo</th><th>Tipo</th><th>Corretora</th>
+      <th class="tr">Bruto</th><th class="tr">Imposto</th>
+      <th class="tr">Líquido</th><th class="tr">EUR</th>
+    </tr></thead>
+    <tbody>${rows.map(r => `<tr>
+      <td>${dt(r.data)}</td>
+      <td class="ticker">${r.ticker || r.ativo_id || '—'}</td>
+      <td style="font-size:11px;color:#9b9b98">${r.tipo}</td>
+      <td><span class="pill p-${r.corretora}">${r.corretora}</span></td>
+      <td class="tr">${num(r.valor_bruto, 2)} ${r.moeda}</td>
+      <td class="tr neg">${r.imposto ? '-' + num(r.imposto, 2) : '—'}</td>
+      <td class="tr pos">${num(r.valor_liquido, 2)} ${r.moeda}</td>
+      <td class="tr">${eur(r.valor_eur)}</td>
+    </tr>`).join('')}</tbody>
+  </table>`;
+}
+
+function filtRenda(c, btn) {
+  document.querySelectorAll('#tab-renda .fbtn').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  renderRenda(c === 'TODAS' ? rendaData : rendaData.filter(r => r.corretora === c));
+}
+
+// ── CUSTOS ───────────────────────────────────────────────────────────────────
+let custosData = [];
+
+async function loadCustos() {
+  custosData = await get('/custos?select=*&order=data.desc&limit=200');
+  renderCustos(custosData);
+}
+
+function renderCustos(rows) {
+  if (!rows.length) {
+    document.getElementById('custos-body').innerHTML = '<div class="empty">Nenhum registro</div>';
+    return;
+  }
+  const total = rows.reduce((s, r) => s + (r.valor_eur || 0), 0);
+  document.getElementById('custos-body').innerHTML = `<table>
+    <thead><tr>
+      <th>Data</th><th>Corretora</th><th>Tipo</th><th>Descrição</th>
+      <th class="tr">Valor</th><th>Moeda</th><th class="tr">EUR</th>
+    </tr></thead>
+    <tbody>${rows.map(r => `<tr>
+      <td>${dt(r.data)}</td>
+      <td><span class="pill p-${r.corretora}">${r.corretora}</span></td>
+      <td style="font-size:11px;color:#9b9b98">${r.tipo}</td>
+      <td style="font-size:11px;max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.descricao || '—'}</td>
+      <td class="tr neg">${num(r.valor, 2)}</td>
+      <td style="font-size:11px">${r.moeda}</td>
+      <td class="tr neg">${eur(r.valor_eur)}</td>
+    </tr>`).join('')}</tbody>
+    <tfoot><tr>
+      <td colspan="6" style="text-align:right;font-weight:500;padding:10px 8px;font-size:12px">Total</td>
+      <td class="tr neg" style="font-weight:600">${eur(total)}</td>
+    </tr></tfoot>
+  </table>`;
+}
+
+function filtCustos(c, btn) {
+  document.querySelectorAll('#tab-custos .fbtn').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  renderCustos(c === 'TODAS' ? custosData : custosData.filter(r => r.corretora === c));
+}
+
+// ── AUDITORIA ────────────────────────────────────────────────────────────────
+async function loadAuditoria() {
+  const data = await get('/auditoria?select=*');
+  document.getElementById('audit-body').innerHTML = `<table>
+    <thead><tr><th>Verificação</th><th class="tr">Resultado</th><th>Status</th></tr></thead>
+    <tbody>${data.map(r => `<tr>
+      <td>${r.check_name.replace(/_/g, ' ')}</td>
+      <td class="tr">${r.resultado}</td>
+      <td style="font-size:18px;padding-left:8px">${r.status}</td>
+    </tr>`).join('')}</tbody>
+  </table>`;
+}
+
+// ── INIT ─────────────────────────────────────────────────────────────────────
+(async () => {
+  try {
+    await Promise.all([loadGeral(), loadPosicoes()]);
+  } catch(e) {
+    console.error(e);
+    document.querySelectorAll('.loading').forEach(el => {
+      el.className = 'err';
+      el.textContent = 'Erro ao conectar ao banco: ' + e.message;
+    });
+  }
+})();
+</script>
+</body>
+</html>
