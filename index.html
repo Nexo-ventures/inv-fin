@@ -1,5 +1,3 @@
-Saída
-
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -9,66 +7,54 @@ Saída
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f4; color: #1c1c1a; min-height: 100vh; }
-
   .topbar { background: #fff; border-bottom: 1px solid #e5e5e3; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; height: 52px; position: sticky; top: 0; z-index: 10; }
   .topbar-title { font-size: 15px; font-weight: 600; letter-spacing: -0.3px; }
   .topbar-right { display: flex; align-items: center; gap: 8px; }
   .badge { background: #f5f5f4; border: 1px solid #e5e5e3; border-radius: 6px; padding: 3px 8px; font-size: 12px; color: #6b6b68; }
   .badge-warn { background: #fef9ec; border-color: #f5c842; color: #92600a; }
-
   .nav { background: #fff; border-bottom: 1px solid #e5e5e3; padding: 0 24px; display: flex; gap: 2px; overflow-x: auto; }
   .nav-tab { padding: 12px 14px; font-size: 13px; color: #6b6b68; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; user-select: none; transition: color .15s; }
   .nav-tab:hover { color: #1c1c1a; }
   .nav-tab.active { color: #1c1c1a; font-weight: 500; border-bottom-color: #1c1c1a; }
-
   .content { padding: 20px; max-width: 1200px; margin: 0 auto; }
   .section { display: none; }
   .section.active { display: block; }
-
   .cards { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 20px; }
   @media (max-width: 768px) { .cards { grid-template-columns: repeat(2,1fr); } }
   @media (max-width: 480px) { .cards { grid-template-columns: 1fr; } }
-
   .card { background: #fff; border: 1px solid #e5e5e3; border-radius: 10px; padding: 16px 18px; }
   .card-label { font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: .6px; color: #9b9b98; margin-bottom: 6px; }
   .card-value { font-size: 22px; font-weight: 500; letter-spacing: -.5px; }
   .card-sub { font-size: 12px; color: #6b6b68; margin-top: 4px; }
   .pos { color: #1a7f4b; }
   .neg { color: #c0392b; }
-
   .panel { background: #fff; border: 1px solid #e5e5e3; border-radius: 10px; padding: 18px 20px; margin-bottom: 16px; }
   .panel-title { font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: .5px; color: #9b9b98; margin-bottom: 16px; }
-
   .bars { display: flex; align-items: flex-end; gap: 5px; height: 110px; }
   .bar-col { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; min-width: 0; cursor: pointer; }
   .bar { width: 100%; border-radius: 3px 3px 0 0; transition: opacity .15s; }
   .bar:hover { opacity: .8; }
   .bar-lbl { font-size: 9px; color: #9b9b98; white-space: nowrap; text-align: center; overflow: hidden; max-width: 100%; }
   .bar-val { font-size: 9px; color: #6b6b68; white-space: nowrap; text-align: center; }
-
   .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
   @media (max-width: 600px) { .two-col { grid-template-columns: 1fr; } }
-
   .corr-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f0f0ee; }
   .corr-row:last-child { border-bottom: none; }
   .corr-name { font-size: 13px; font-weight: 500; }
   .corr-moeda { font-size: 11px; color: #9b9b98; }
   .corr-val { font-size: 13px; font-weight: 500; text-align: right; }
   .corr-pct { font-size: 11px; color: #9b9b98; text-align: right; }
-
   .alloc-item { margin-bottom: 14px; }
   .alloc-info { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 5px; }
   .alloc-info span:last-child { font-weight: 500; }
   .alloc-bg { height: 6px; background: #f0f0ee; border-radius: 3px; overflow: hidden; }
   .alloc-fill { height: 100%; border-radius: 3px; transition: width .8s ease; }
-
   .table-wrap { background: #fff; border: 1px solid #e5e5e3; border-radius: 10px; overflow: hidden; margin-bottom: 16px; }
   .table-head { padding: 12px 18px; border-bottom: 1px solid #f0f0ee; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
   .table-title { font-size: 13px; font-weight: 500; }
   .filters { display: flex; gap: 6px; flex-wrap: wrap; }
   .fbtn { padding: 4px 10px; border-radius: 6px; border: 1px solid #e5e5e3; background: transparent; font-size: 12px; cursor: pointer; color: #6b6b68; transition: all .15s; }
   .fbtn.on, .fbtn:hover { background: #1c1c1a; color: #fff; border-color: #1c1c1a; }
-
   .tbl-scroll { overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; min-width: 600px; }
   th { padding: 9px 14px; text-align: left; font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: .4px; color: #9b9b98; border-bottom: 1px solid #f0f0ee; background: #fafaf9; white-space: nowrap; }
@@ -82,11 +68,9 @@ Saída
   .p-AV   { background: #e3f2fd; color: #1565c0; }
   .p-R4   { background: #fff3e0; color: #e65100; }
   .p-IBKR { background: #f3e5f5; color: #6a1b9a; }
-
   .loading { padding: 40px; text-align: center; color: #9b9b98; font-size: 13px; }
   .empty { padding: 40px; text-align: center; color: #9b9b98; font-size: 13px; }
   .err { padding: 20px; color: #c0392b; font-size: 13px; }
-
   .status-bar { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 10px 16px; margin-bottom: 16px; font-size: 12px; color: #166534; display: flex; align-items: center; gap: 8px; }
 </style>
 </head>
@@ -113,7 +97,6 @@ Saída
 
 <div class="content">
 
-  <!-- VISÃO GERAL -->
   <div id="tab-geral" class="section active">
     <div class="cards">
       <div class="card">
@@ -137,12 +120,10 @@ Saída
         <div class="card-sub">líquido EUR</div>
       </div>
     </div>
-
     <div class="panel">
       <div class="panel-title">Evolução patrimonial — EUR</div>
       <div class="bars" id="chart"><div class="loading">carregando...</div></div>
     </div>
-
     <div class="two-col">
       <div class="panel" style="margin-bottom:0">
         <div class="panel-title">Por corretora — <span id="mes-ref">—</span></div>
@@ -155,7 +136,6 @@ Saída
     </div>
   </div>
 
-  <!-- POSIÇÕES -->
   <div id="tab-posicoes" class="section">
     <div class="table-wrap">
       <div class="table-head">
@@ -172,15 +152,22 @@ Saída
     </div>
   </div>
 
-  <!-- HISTÓRICO -->
   <div id="tab-historico" class="section">
     <div class="table-wrap">
-      <div class="table-head"><span class="table-title">Operações fechadas</span></div>
+      <div class="table-head">
+        <span class="table-title">Operações fechadas</span>
+        <div class="filters">
+          <button class="fbtn on" onclick="filtHist('TODAS',this)">Todas</button>
+          <button class="fbtn" onclick="filtHist('XP',this)">XP</button>
+          <button class="fbtn" onclick="filtHist('AV',this)">Avenue</button>
+          <button class="fbtn" onclick="filtHist('IBKR',this)">IBKR</button>
+          <button class="fbtn" onclick="filtHist('R4',this)">R4</button>
+        </div>
+      </div>
       <div class="tbl-scroll" id="hist-body"><div class="loading">carregando...</div></div>
     </div>
   </div>
 
-  <!-- RENDA -->
   <div id="tab-renda" class="section">
     <div class="table-wrap">
       <div class="table-head">
@@ -196,7 +183,6 @@ Saída
     </div>
   </div>
 
-  <!-- AUDITORIA -->
   <div id="tab-custos" class="section">
     <div class="card" style="padding:0">
       <div class="table-head">
@@ -273,9 +259,8 @@ const dc   = n => n==null ? '' : Number(n)>=0 ? 'pos' : 'neg';
 const dt   = s => s ? new Date(s).toLocaleDateString('pt-BR') : '—';
 const sign = n => n==null ? '' : Number(n)>=0 ? '+' : '';
 
-let posData=[], rendaData=[];
+let posData=[], rendaData=[], histData=[];
 
-// Tabs
 document.querySelectorAll('.nav-tab').forEach(t => {
   t.onclick = () => {
     document.querySelectorAll('.nav-tab').forEach(x => x.classList.remove('active'));
@@ -292,34 +277,27 @@ document.querySelectorAll('.nav-tab').forEach(t => {
   };
 });
 
-// ── VISÃO GERAL ──────────────────────────────────────────────────────────────
 async function loadGeral() {
   const [pat, pos, renda26] = await Promise.all([
     get('/patrimonio_consolidado?select=mes,ordem,total_eur,xp_eur,av_eur,r4_eur,ibkr_eur,tem_provisorio&order=ordem.asc'),
     get('/posicoes_abertas?select=id'),
     get('/renda?select=valor_eur&data=gte.2026-01-01')
   ]);
-
   const last = pat[pat.length - 1];
   const prev = pat[pat.length - 2];
-
   document.getElementById('badge-mes').textContent = last.mes;
   if (last.tem_provisorio) document.getElementById('badge-prov').style.display = '';
   document.getElementById('k-total').textContent = eur(last.total_eur);
   document.getElementById('k-mes').textContent   = last.mes + (last.tem_provisorio ? ' *provisório' : '');
   document.getElementById('k-pos').textContent   = pos.length;
-
   const totalRenda = renda26.reduce((s,r) => s + (r.valor_eur || 0), 0);
   document.getElementById('k-renda').textContent = eur(totalRenda);
-
   if (prev) {
     const d = last.total_eur - prev.total_eur;
     const p = d / prev.total_eur * 100;
     document.getElementById('k-var').innerHTML  = `<span class="${dc(d)}">${eur(d)}</span>`;
     document.getElementById('k-var2').innerHTML = `<span class="${dc(d)}">${sign(p)}${p.toFixed(1)}% vs ${prev.mes}</span>`;
   }
-
-  // Gráfico
   const max = Math.max(...pat.map(d => d.total_eur));
   document.getElementById('chart').innerHTML = pat.map(d => {
     const h = Math.round(d.total_eur / max * 100);
@@ -331,8 +309,6 @@ async function loadGeral() {
       <div class="bar-lbl">${d.mes.split('/')[0]}</div>
     </div>`;
   }).join('');
-
-  // Corretoras
   document.getElementById('mes-ref').textContent = last.mes;
   const total = last.total_eur;
   const corrs = [
@@ -341,14 +317,11 @@ async function loadGeral() {
     { label: 'XP Investimentos',    moeda: 'BRL', v: last.xp_eur },
     { label: 'Renta 4',             moeda: 'EUR', v: last.r4_eur },
   ].filter(c => c.v);
-
   document.getElementById('corr-rows').innerHTML = corrs.map(c => `
     <div class="corr-row">
       <div><div class="corr-name">${c.label}</div><div class="corr-moeda">${c.moeda}</div></div>
       <div><div class="corr-val">${eur(c.v)}</div><div class="corr-pct">${(c.v/total*100).toFixed(1)}%</div></div>
     </div>`).join('');
-
-  // Alocação
   const allocs = [
     { l: 'EUR (IBKR + R4)', v: (last.ibkr_eur||0) + (last.r4_eur||0), c: '#534AB7' },
     { l: 'USD (Avenue)',    v: last.av_eur || 0, c: '#185FA5' },
@@ -363,17 +336,13 @@ async function loadGeral() {
   }).join('');
 }
 
-// ── POSIÇÕES ─────────────────────────────────────────────────────────────────
 async function loadPosicoes() {
   posData = await get('/posicoes_abertas?select=*&order=data_entrada.asc');
   renderPos(posData);
 }
 
 function renderPos(rows) {
-  if (!rows.length) {
-    document.getElementById('pos-body').innerHTML = '<div class="empty">Nenhuma posição aberta</div>';
-    return;
-  }
+  if (!rows.length) { document.getElementById('pos-body').innerHTML = '<div class="empty">Nenhuma posição aberta</div>'; return; }
   document.getElementById('pos-body').innerHTML = `<table>
     <thead><tr>
       <th>Ativo</th><th>Corretora</th><th>Entrada</th>
@@ -399,20 +368,20 @@ function filtPos(c, btn) {
   renderPos(c === 'TODAS' ? posData : posData.filter(r => r.corretora === c));
 }
 
-// ── HISTÓRICO ────────────────────────────────────────────────────────────────
 async function loadHistorico() {
-  const data = await get('/resultado_fechado?select=*&order=data_saida.desc&limit=100');
-  if (!data.length) {
-    document.getElementById('hist-body').innerHTML = '<div class="empty">Nenhuma operação fechada</div>';
-    return;
-  }
+  histData = await get('/resultado_fechado?select=*&order=data_saida.desc&limit=200');
+  renderHist(histData);
+}
+
+function renderHist(rows) {
+  if (!rows.length) { document.getElementById('hist-body').innerHTML = '<div class="empty">Nenhuma operação fechada</div>'; return; }
   document.getElementById('hist-body').innerHTML = `<table>
     <thead><tr>
       <th>Ativo</th><th>Corretora</th><th>Entrada</th><th>Saída</th>
       <th class="tr">Qtd</th><th class="tr">PM entrada</th><th class="tr">PM saída</th>
       <th class="tr">Resultado €</th><th class="tr">Dias</th>
     </tr></thead>
-    <tbody>${data.map(r => `<tr>
+    <tbody>${rows.map(r => `<tr>
       <td class="ticker">${r.ticker}</td>
       <td><span class="pill p-${r.corretora}">${r.corretora}</span></td>
       <td>${dt(r.data_entrada)}</td>
@@ -426,17 +395,19 @@ async function loadHistorico() {
   </table>`;
 }
 
-// ── RENDA ────────────────────────────────────────────────────────────────────
+function filtHist(c, btn) {
+  document.querySelectorAll('#tab-historico .fbtn').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  renderHist(c === 'TODAS' ? histData : histData.filter(r => r.corretora === c));
+}
+
 async function loadRenda() {
   rendaData = await get('/renda?select=*&order=data.desc&limit=200');
   renderRenda(rendaData);
 }
 
 function renderRenda(rows) {
-  if (!rows.length) {
-    document.getElementById('renda-body').innerHTML = '<div class="empty">Nenhum registro</div>';
-    return;
-  }
+  if (!rows.length) { document.getElementById('renda-body').innerHTML = '<div class="empty">Nenhum registro</div>'; return; }
   document.getElementById('renda-body').innerHTML = `<table>
     <thead><tr>
       <th>Data</th><th>Ativo</th><th>Tipo</th><th>Corretora</th>
@@ -462,19 +433,13 @@ function filtRenda(c, btn) {
   renderRenda(c === 'TODAS' ? rendaData : rendaData.filter(r => r.corretora === c));
 }
 
-// ── CUSTOS ───────────────────────────────────────────────────────────────────
 let custosData = [];
-
 async function loadCustos() {
   custosData = await get('/custos?select=*&order=data.desc&limit=200');
   renderCustos(custosData);
 }
-
 function renderCustos(rows) {
-  if (!rows.length) {
-    document.getElementById('custos-body').innerHTML = '<div class="empty">Nenhum registro</div>';
-    return;
-  }
+  if (!rows.length) { document.getElementById('custos-body').innerHTML = '<div class="empty">Nenhum registro</div>'; return; }
   const total = rows.reduce((s, r) => s + (r.valor_eur || 0), 0);
   document.getElementById('custos-body').innerHTML = `<table>
     <thead><tr>
@@ -496,23 +461,19 @@ function renderCustos(rows) {
     </tr></tfoot>
   </table>`;
 }
-
 function filtCustos(c, btn) {
   document.querySelectorAll('#tab-custos .fbtn').forEach(b => b.classList.remove('on'));
   btn.classList.add('on');
   renderCustos(c === 'TODAS' ? custosData : custosData.filter(r => r.corretora === c));
 }
 
-// ── CÂMBIO ───────────────────────────────────────────────────────────────────
 let wiseData = [];
-
 async function loadCambio() {
   const [cambio, wise] = await Promise.all([
     get('/cambio?select=*&order=mes.desc'),
     get('/cambio_wise?select=*&order=data.desc')
   ]);
   wiseData = wise;
-
   document.getElementById('cambio-body').innerHTML = `<table>
     <thead><tr>
       <th>Mês</th><th class="tr">EUR/BRL</th><th class="tr">EUR/USD</th>
@@ -526,10 +487,8 @@ async function loadCambio() {
       <td class="tr ${r.var_eur_usd > 0 ? 'pos' : 'neg'}">${r.var_eur_usd ? (r.var_eur_usd * 100).toFixed(2) + '%' : '—'}</td>
     </tr>`).join('')}</tbody>
   </table>`;
-
   renderWise(wiseData);
 }
-
 function renderWise(rows) {
   document.getElementById('wise-body').innerHTML = `<table>
     <thead><tr>
@@ -544,21 +503,17 @@ function renderWise(rows) {
     </tr>`).join('')}</tbody>
   </table>`;
 }
-
 function filtWise(par, btn) {
   document.querySelectorAll('#tab-cambio .fbtn').forEach(b => b.classList.remove('on'));
   btn.classList.add('on');
   renderWise(par === 'TODAS' ? wiseData : wiseData.filter(r => r.par === par));
 }
 
-// ── FLUXOS ───────────────────────────────────────────────────────────────────
 let fluxosData = [];
-
 async function loadFluxos() {
   fluxosData = await get('/fluxos_capital?select=*&order=data.desc&limit=200');
   renderFluxos(fluxosData);
 }
-
 function renderFluxos(rows) {
   const totalAporte = rows.filter(r => r.tipo === 'APORTE').reduce((s, r) => s + (r.valor_eur || 0), 0);
   const totalRetirada = rows.filter(r => r.tipo === 'RETIRADA').reduce((s, r) => s + (r.valor_eur || 0), 0);
@@ -580,14 +535,12 @@ function renderFluxos(rows) {
     </tfoot>
   </table>`;
 }
-
 function filtFluxos(c, btn) {
   document.querySelectorAll('#tab-fluxos .fbtn').forEach(b => b.classList.remove('on'));
   btn.classList.add('on');
   renderFluxos(c === 'TODAS' ? fluxosData : fluxosData.filter(r => r.corretora === c));
 }
 
-// ── AUDITORIA ────────────────────────────────────────────────────────────────
 async function loadAuditoria() {
   const data = await get('/auditoria?select=*');
   document.getElementById('audit-body').innerHTML = `<table>
@@ -600,7 +553,6 @@ async function loadAuditoria() {
   </table>`;
 }
 
-// ── INIT ─────────────────────────────────────────────────────────────────────
 (async () => {
   try {
     await Promise.all([loadGeral(), loadPosicoes()]);
@@ -615,4 +567,3 @@ async function loadAuditoria() {
 </script>
 </body>
 </html>
- 
