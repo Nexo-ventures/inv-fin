@@ -185,6 +185,7 @@
   </div>
 
   <div id="tab-custos" class="section">
+    <div id="custos-kpis" style="margin-bottom:16px"></div>
     <div class="card" style="padding:0">
       <div class="table-head">
         <span class="table-title">Custos operacionais</span>
@@ -456,23 +457,52 @@ async function loadCustos() {
 function renderCustos(rows) {
   if (!rows.length) { document.getElementById('custos-body').innerHTML = '<div class="empty">Nenhum registro</div>'; return; }
   const total = rows.reduce((s, r) => s + (r.valor_eur || 0), 0);
-  document.getElementById('custos-body').innerHTML = `<table>
+
+  // --- KPIs: total por tipo e por corretora ---
+  const porTipo = {};
+  const porCorretora = {};
+  rows.forEach(r => {
+    porTipo[r.tipo] = (porTipo[r.tipo] || 0) + (r.valor_eur || 0);
+    porCorretora[r.corretora] = (porCorretora[r.corretora] || 0) + (r.valor_eur || 0);
+  });
+  const tiposSorted = Object.entries(porTipo).sort((a,b) => b[1]-a[1]);
+  const corrSorted  = Object.entries(porCorretora).sort((a,b) => b[1]-a[1]);
+
+  document.getElementById('custos-kpis').innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:12px">
+      <div class="card"><div class="card-label">Total geral</div><div class="card-value neg">-${eur(total)}</div></div>
+      ${corrSorted.map(([c,v]) => `<div class="card"><div class="card-label">${c}</div><div class="card-value neg" style="font-size:16px">-${eur(v)}</div></div>`).join('')}
+    </div>
+    <div class="card" style="padding:14px 18px;margin-bottom:0">
+      <div class="card-label" style="margin-bottom:10px">Por tipo</div>
+      <div style="display:flex;flex-wrap:wrap;gap:12px">
+        ${tiposSorted.map(([t,v]) => `<div style="min-width:160px"><div style="font-size:11px;color:#6b6b68;margin-bottom:2px">${t.replace(/_/g,' ')}</div><div style="font-size:13px;font-weight:500;color:#c0392b">-${eur(v)}</div></div>`).join('')}
+      </div>
+    </div>`;
+
+  // --- Tabela ---
+  document.getElementById('custos-body').innerHTML = `<table style="font-size:12px">
     <thead><tr>
       <th>Data</th><th>Corretora</th><th>Tipo</th><th>Descrição</th>
       <th class="tr">Valor</th><th>Moeda</th><th class="tr">EUR</th>
+      <th class="tr" style="white-space:normal;min-width:70px">Valor<br>op. (€)</th>
+      <th class="tr" style="white-space:normal;min-width:55px">% Custo</th>
     </tr></thead>
     <tbody>${rows.map(r => `<tr>
       <td>${dt(r.data)}</td>
       <td><span class="pill p-${r.corretora}">${r.corretora}</span></td>
-      <td style="font-size:11px;color:#9b9b98">${r.tipo}</td>
-      <td style="font-size:11px;max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.descricao || '—'}</td>
-      <td class="tr neg">${num(r.valor, 2)}</td>
+      <td style="font-size:11px;color:#9b9b98">${r.tipo ? r.tipo.replace(/_/g,' ') : '—'}</td>
+      <td style="font-size:11px;max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.descricao || '—'}</td>
+      <td class="tr neg">-${num(r.valor, 2)}</td>
       <td style="font-size:11px">${r.moeda}</td>
-      <td class="tr neg">${eur(r.valor_eur)}</td>
+      <td class="tr neg">-${eur(r.valor_eur)}</td>
+      <td class="tr" style="color:#6b6b68">${r.valor_operacao_eur ? eur(r.valor_operacao_eur) : '—'}</td>
+      <td class="tr" style="font-size:11px;color:#9b9b98">${r.pct_custo ? (r.pct_custo * 100).toFixed(3) + '%' : '—'}</td>
     </tr>`).join('')}</tbody>
     <tfoot><tr>
       <td colspan="6" style="text-align:right;font-weight:500;padding:10px 8px;font-size:12px">Total</td>
-      <td class="tr neg" style="font-weight:600">${eur(total)}</td>
+      <td class="tr neg" style="font-weight:600">-${eur(total)}</td>
+      <td colspan="2"></td>
     </tr></tfoot>
   </table>`;
 }
