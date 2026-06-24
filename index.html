@@ -170,14 +170,19 @@
   </div>
 
   <div id="tab-renda" class="section">
-    <div class="table-wrap">
+    <div id="renda-kpis" style="margin-bottom:16px"></div>
+    <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:12px">Evolução mensal de renda (EUR)</div><div style="position:relative;height:220px"><canvas id="renda-chart"></canvas></div></div>
+    <div class="card" style="padding:0">
       <div class="table-head">
         <span class="table-title">Renda recebida</span>
-        <div class="filters">
-          <button class="fbtn on" onclick="filtRenda('TODAS',this)">Todas</button>
-          <button class="fbtn" onclick="filtRenda('XP',this)">XP</button>
-          <button class="fbtn" onclick="filtRenda('AV',this)">Avenue</button>
-          <button class="fbtn" onclick="filtRenda('IBKR',this)">IBKR</button>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <div style="display:flex;gap:4px;padding-right:8px;border-right:1px solid #e5e5e3">
+            <button class="fbtn on" onclick="filtRenda('corr','TODAS',this)">Todas</button>
+            <button class="fbtn" onclick="filtRenda('corr','XP',this)">XP</button>
+            <button class="fbtn" onclick="filtRenda('corr','AV',this)">Avenue</button>
+            <button class="fbtn" onclick="filtRenda('corr','IBKR',this)">IBKR</button>
+          </div>
+          <div id="renda-tipo-btns" style="display:flex;gap:4px"></div>
         </div>
       </div>
       <div class="tbl-scroll" id="renda-body"><div class="loading">carregando...</div></div>
@@ -280,6 +285,9 @@ const dt   = s => s ? new Date(s).toLocaleDateString('pt-BR') : '—';
 const sign = n => n==null ? '' : Number(n)>=0 ? '+' : '';
 
 let posData=[], rendaData=[], histData=[];
+let rendaChart = null;
+let rendaFiltCorr = 'TODAS';
+let rendaFiltTipo = 'TODOS';
 let rendaChart = null;
 let rendaFiltCorr = 'TODAS';
 let rendaFiltTipo = 'TODOS';
@@ -426,39 +434,35 @@ function filtHist(c, btn) {
 
 async function loadRenda() {
   rendaData = await get('/renda?select=*&order=data.desc&limit=200');
+  rendaFiltCorr = 'TODAS'; rendaFiltTipo = 'TODOS';
   renderRenda(rendaData);
 }
-
 function renderRenda(rows) {
   if (!rows.length) { document.getElementById('renda-body').innerHTML = '<div class="empty">Nenhum registro</div>'; return; }
   const totalEur = rows.reduce((s, r) => s + (r.valor_eur || 0), 0);
-  document.getElementById('renda-body').innerHTML = `<table style="font-size:12px">
-    <thead><tr>
-      <th>Data</th><th>Ativo</th><th>Tipo</th><th>Corretora</th>
-      <th class="tr">Bruto</th><th class="tr">Imposto</th>
-      <th class="tr">Líquido</th><th class="tr">EUR</th>
-    </tr></thead>
-    <tbody>${rows.map(r => `<tr>
-      <td>${dt(r.data)}</td>
-      <td class="ticker">${r.ticker || '—'}</td>
-      <td style="font-size:11px;color:#9b9b98">${r.tipo ? r.tipo.replace(/_/g,' ') : '—'}</td>
-      <td><span class="pill p-${r.corretora}">${r.corretora}</span></td>
-      <td class="tr">${num(r.valor_bruto, 2)} ${r.moeda}</td>
-      <td class="tr neg">${r.imposto ? '-' + num(r.imposto, 2) : '—'}</td>
-      <td class="tr pos">${num(r.valor_liquido, 2)} ${r.moeda}</td>
-      <td class="tr pos">${num(r.valor_eur, 2)}</td>
-    </tr>`).join('')}</tbody>
-    <tfoot><tr>
-      <td colspan="7" style="text-align:right;font-weight:500;padding:10px 8px;font-size:12px">Total EUR</td>
-      <td class="tr pos" style="font-weight:600">${num(totalEur, 2)}</td>
-    </tr></tfoot>
-  </table>`;
+  const TIPO_COLORS = ['#1a7f4b','#1565c0','#6a1b9a','#e65100','#c0392b','#0288d1','#558b2f','#f57f17'];
+  const porTipo = {};
+  rows.forEach(r => { if (r.tipo) porTipo[r.tipo] = (porTipo[r.tipo]||0) + (r.valor_eur||0); });
+  const tiposSorted = Object.entries(porTipo).sort((a,b) => b[1]-a[1]);
+  document.getElementById('renda-kpis').innerHTML = '<div class="card" style="padding:14px 18px"><div class="card-label" style="margin-bottom:12px">Por tipo</div><div style="display:flex;flex-wrap:wrap;gap:10px">'+tiposSorted.map(([t,v],i) => { const pct=(v/totalEur*100).toFixed(1); const color=TIPO_COLORS[i%TIPO_COLORS.length]; return '<div style="display:flex;align-items:center;gap:8px;background:#f9f9f8;border-radius:8px;padding:8px 12px;min-width:190px"><div style="width:10px;height:10px;border-radius:50%;background:'+color+';flex-shrink:0"></div><div><div style="font-size:11px;color:#6b6b68">'+t.replace(/_/g,' ')+'</div><div style="font-size:13px;font-weight:600;color:#1a7f4b">'+num(v,2)+'</div></div><div style="margin-left:auto;font-size:12px;font-weight:500;color:#9b9b98">'+pct+'%</div></div>'; }).join('')+'</div></div>';
+  const byMonth = {};
+  rows.forEach(r => { if (!r.data) return; const d=new Date(r.data); const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); if (!byMonth[key]) byMonth[key]={}; byMonth[key][r.tipo]=(byMonth[key][r.tipo]||0)+(r.valor_eur||0); });
+  const months = Object.keys(byMonth).sort();
+  const mlabels = months.map(m => { const [y,mo]=m.split('-'); const mn=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; return mn[+mo-1]+'/'+y.slice(2); });
+  if (rendaChart) rendaChart.destroy();
+  const ctx = document.getElementById('renda-chart');
+  if (ctx) { rendaChart = new Chart(ctx, { type:'bar', data:{ labels:mlabels, datasets:[...Object.keys(porTipo).map((t,i)=>({ label:t.replace(/_/g,' '), data:months.map(m=>byMonth[m][t]||0), backgroundColor:TIPO_COLORS[i%TIPO_COLORS.length]+'cc', stack:'renda' })),{ type:'line', label:'Total mensal', data:months.map(m=>Object.values(byMonth[m]).reduce((s,v)=>s+v,0)), borderColor:'#1c1c1a', backgroundColor:'transparent', borderWidth:2, pointRadius:3, tension:0.3, order:0 }]}, options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{labels:{font:{size:10},boxWidth:10}}}, scales:{ x:{stacked:true,grid:{display:false},ticks:{font:{size:9}}}, y:{stacked:true,grid:{color:'#f0f0ee'},ticks:{font:{size:9},callback:v=>'€'+v.toLocaleString('de-DE')}} } } }); }
+  const tiposUniq = ['TODOS',...Object.keys(porTipo).sort()];
+  document.getElementById('renda-tipo-btns').innerHTML = tiposUniq.map(t => '<button class="fbtn '+(t===rendaFiltTipo?'on':'')+'" onclick="filtRenda('tipo',''+t+'',this)">'+(t==='TODOS'?'Todos tipos':t.replace(/_/g,' '))+'</button>').join('');
+  document.getElementById('renda-body').innerHTML = '<table style="font-size:12px"><thead><tr><th>Data</th><th>Ativo</th><th>Tipo</th><th>Corretora</th><th class="tr">Bruto</th><th class="tr">Imposto</th><th class="tr">Líquido</th><th class="tr">EUR</th></tr></thead><tbody>'+rows.map(r=>'<tr><td>'+dt(r.data)+'</td><td class="ticker">'+(r.ticker||'—')+'</td><td style="font-size:11px;color:#9b9b98">'+(r.tipo?r.tipo.replace(/_/g,' '):'—')+'</td><td><span class="pill p-'+r.corretora+'">'+r.corretora+'</span></td><td class="tr">'+num(r.valor_bruto,2)+' '+r.moeda+'</td><td class="tr neg">'+(r.imposto?'-'+num(r.imposto,2):'—')+'</td><td class="tr pos">'+num(r.valor_liquido,2)+' '+r.moeda+'</td><td class="tr pos">'+num(r.valor_eur,2)+'</td></tr>').join('')+'</tbody><tfoot><tr><td colspan="7" style="text-align:right;font-weight:500;padding:10px 8px;font-size:12px">Total EUR</td><td class="tr pos" style="font-weight:600">'+num(totalEur,2)+'</td></tr></tfoot></table>';
 }
-
-function filtRenda(c, btn) {
-  document.querySelectorAll('#tab-renda .fbtn').forEach(b => b.classList.remove('on'));
-  btn.classList.add('on');
-  renderRenda(c === 'TODAS' ? rendaData : rendaData.filter(r => r.corretora === c));
+function filtRenda(dim, val, btn) {
+  if (dim==='corr') { rendaFiltCorr=val; document.querySelectorAll('#tab-renda .fbtn').forEach(b=>{if(b.onclick&&b.onclick.toString().includes("'corr'"))b.classList.remove('on');}); } else { rendaFiltTipo=val; }
+  if (btn) btn.classList.add('on');
+  let filtered=rendaData;
+  if (rendaFiltCorr!=='TODAS') filtered=filtered.filter(r=>r.corretora===rendaFiltCorr);
+  if (rendaFiltTipo!=='TODOS') filtered=filtered.filter(r=>r.tipo===rendaFiltTipo);
+  renderRenda(filtered);
 }
 
 let custosData = [];
