@@ -478,11 +478,44 @@ function renderCustos(rows) {
   // Cores para pizza de tipos
   const TIPO_COLORS = ['#1a7f4b','#1565c0','#6a1b9a','#e65100','#c0392b','#0288d1','#558b2f','#f57f17'];
 
+  // Matriz ano x corretora
+  const CORRETORAS = ['XP','AV','R4','IBKR'];
+  const matriz = {};
+  rows.forEach(r => {
+    if (!r.data) return;
+    const ano = new Date(r.data).getFullYear();
+    if (!matriz[ano]) matriz[ano] = {};
+    matriz[ano][r.corretora] = (matriz[ano][r.corretora] || 0) + (r.valor_eur || 0);
+  });
+  const anosM = Object.keys(matriz).sort((a,b) => b-a);
+
   document.getElementById('custos-kpis').innerHTML = `
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:12px">
-      <div class="card"><div class="card-label">Total geral</div><div class="card-value neg">-${eur(total)}</div></div>
-      ${anosSorted.map(([a,v]) => `<div class="card"><div class="card-label">${a}</div><div class="card-value neg" style="font-size:16px">-${eur(v)}</div></div>`).join('')}
-      ${corrSorted.map(([c,v]) => `<div class="card"><div class="card-label">${c}</div><div class="card-value neg" style="font-size:16px">-${eur(v)}</div></div>`).join('')}
+    <div class="card" style="padding:0;margin-bottom:12px;overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;min-width:400px">
+        <thead><tr style="background:#fafaf9">
+          <th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;border-bottom:1px solid #f0f0ee">Ano</th>
+          ${CORRETORAS.map(c => `<th style="padding:10px 14px;text-align:right;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;border-bottom:1px solid #f0f0ee">${c}</th>`).join('')}
+          <th style="padding:10px 14px;text-align:right;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;border-bottom:1px solid #f0f0ee">Total</th>
+        </tr></thead>
+        <tbody>
+          ${anosM.map(ano => {
+            const rowTotal = CORRETORAS.reduce((s,c) => s + (matriz[ano][c]||0), 0);
+            return `<tr>
+              <td style="padding:10px 14px;font-size:13px;font-weight:500;border-bottom:1px solid #f0f0ee">${ano}</td>
+              ${CORRETORAS.map(c => `<td style="padding:10px 14px;text-align:right;font-size:13px;border-bottom:1px solid #f0f0ee;color:${matriz[ano][c] ? '#c0392b' : '#9b9b98'}">${matriz[ano][c] ? '-'+num(matriz[ano][c],2) : '€0'}</td>`).join('')}
+              <td style="padding:10px 14px;text-align:right;font-size:13px;font-weight:600;color:#c0392b;border-bottom:1px solid #f0f0ee">-${num(rowTotal,2)}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+        <tfoot><tr style="background:#fafaf9">
+          <td style="padding:10px 14px;font-size:13px;font-weight:600;border-top:1px solid #e5e5e3">Total</td>
+          ${CORRETORAS.map(c => {
+            const v = anosM.reduce((s,a) => s+(matriz[a][c]||0),0);
+            return `<td style="padding:10px 14px;text-align:right;font-size:13px;font-weight:600;color:${v?'#c0392b':'#9b9b98'};border-top:1px solid #e5e5e3">${v?'-'+num(v,2):'€0'}</td>`;
+          }).join('')}
+          <td style="padding:10px 14px;text-align:right;font-size:13px;font-weight:700;color:#c0392b;border-top:1px solid #e5e5e3">-${num(total,2)}</td>
+        </tr></tfoot>
+      </table>
     </div>
     <div class="card" style="padding:14px 18px;margin-bottom:0">
       <div class="card-label" style="margin-bottom:12px">Por tipo</div>
