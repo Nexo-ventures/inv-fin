@@ -280,6 +280,9 @@ const dt   = s => s ? new Date(s).toLocaleDateString('pt-BR') : '—';
 const sign = n => n==null ? '' : Number(n)>=0 ? '+' : '';
 
 let posData=[], rendaData=[], histData=[];
+let rendaChart = null;
+let rendaFiltCorr = 'TODAS';
+let rendaFiltTipo = 'TODOS';
 
 document.querySelectorAll('.nav-tab').forEach(t => {
   t.onclick = () => {
