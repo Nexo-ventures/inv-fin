@@ -201,6 +201,15 @@
   </div>
 
   <div id="tab-cambio" class="section">
+    <!-- KPIs -->
+    <div id="cambio-kpis" style="margin-bottom:16px"></div>
+    <!-- Gráficos -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+      <div class="card"><div class="card-label" style="margin-bottom:12px">EUR/BRL — Evolução mensal</div><div style="position:relative;height:180px"><canvas id="chart-brl"></canvas></div></div>
+      <div class="card"><div class="card-label" style="margin-bottom:12px">EUR/USD — Evolução mensal</div><div style="position:relative;height:180px"><canvas id="chart-usd"></canvas></div></div>
+    </div>
+    <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:12px">% vs Máximo histórico — Histórico realizado</div><div style="position:relative;height:180px"><canvas id="chart-pct-max"></canvas></div></div>
+    <!-- Histórico realizado -->
     <div class="card" style="padding:0;margin-bottom:16px">
       <div class="table-head">
         <span class="table-title">Histórico realizado</span>
@@ -481,6 +490,8 @@ function mesSort(a, b) {
   return MES_ORDER.indexOf(mb) - MES_ORDER.indexOf(ma);
 }
 
+const MAX_BRL = 6.75, MAX_USD = 1.24;
+let cambioChartBRL = null, cambioChartUSD = null, cambioChartPct = null;
 async function loadCambio() {
   const [cambio, wise] = await Promise.all([
     get('/cambio?select=*'),
@@ -488,6 +499,81 @@ async function loadCambio() {
   ]);
   wiseData = wise;
   const sorted = [...cambio].sort(mesSort);
+
+  // --- KPIs ---
+  const latestBRL = sorted.find(r => r.eur_brl);
+  const latestUSD = sorted.find(r => r.eur_usd);
+  const curBRL = latestBRL?.eur_brl || 0;
+  const curUSD = latestUSD?.eur_usd || 0;
+  const pctBRL = ((curBRL - MAX_BRL) / MAX_BRL * 100).toFixed(1);
+  const pctUSD = ((curUSD - MAX_USD) / MAX_USD * 100).toFixed(1);
+  document.getElementById('cambio-kpis').innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(3,1fr) repeat(3,1fr);gap:12px">
+      <div class="card"><div class="card-label">EUR/BRL Atual</div><div class="card-value">${num(curBRL,4)}</div><div class="card-sub">${latestBRL?.mes || ''}</div></div>
+      <div class="card"><div class="card-label">EUR/BRL Máx histórico</div><div class="card-value">${num(MAX_BRL,2)}</div><div class="card-sub">Jan/2021</div></div>
+      <div class="card"><div class="card-label">% vs Máx BRL</div><div class="card-value ${pctBRL < 0 ? 'neg' : 'pos'}">${pctBRL}%</div><div class="card-sub">distância do máximo</div></div>
+      <div class="card"><div class="card-label">EUR/USD Atual</div><div class="card-value">${num(curUSD,4)}</div><div class="card-sub">${latestUSD?.mes || ''}</div></div>
+      <div class="card"><div class="card-label">EUR/USD Máx histórico</div><div class="card-value">${num(MAX_USD,2)}</div><div class="card-sub">Dez/2017</div></div>
+      <div class="card"><div class="card-label">% vs Máx USD</div><div class="card-value ${pctUSD < 0 ? 'neg' : 'pos'}">${pctUSD}%</div><div class="card-sub">distância do máximo</div></div>
+    </div>`;
+
+  // --- Gráficos mensais ---
+  const labelsM = sorted.map(r => r.mes).reverse();
+  const brlVals = sorted.map(r => r.eur_brl).reverse();
+  const usdVals = sorted.map(r => r.eur_usd).reverse();
+
+  const chartCfg = (vals, maxVal, color) => ({
+    type: 'line',
+    data: {
+      labels: labelsM,
+      datasets: [
+        { label: 'Valor mensal', data: vals, borderColor: color, backgroundColor: color+'22', borderWidth:2, pointRadius:3, tension:0.3, fill:true },
+        { label: 'Máx histórico', data: labelsM.map(() => maxVal), borderColor:'#c0392b', borderWidth:1.5, borderDash:[5,4], pointRadius:0 }
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ labels:{ font:{size:10}, boxWidth:10 } } },
+      scales:{
+        x:{ grid:{display:false}, ticks:{font:{size:9}, maxTicksLimit:8} },
+        y:{ grid:{color:'#f0f0ee'}, ticks:{ font:{size:9}, callback: v => v.toFixed(2) } }
+      }
+    }
+  });
+
+  if (cambioChartBRL) cambioChartBRL.destroy();
+  if (cambioChartUSD) cambioChartUSD.destroy();
+  cambioChartBRL = new Chart(document.getElementById('chart-brl'), chartCfg(brlVals, MAX_BRL, '#1a7f4b'));
+  cambioChartUSD = new Chart(document.getElementById('chart-usd'), chartCfg(usdVals, MAX_USD, '#1565c0'));
+
+  // --- Gráfico % vs Máx histórico (realizados) ---
+  const brlWise = [...wiseData].filter(r => r.par === 'EUR_BRL' && r.pct_vs_max_hist).sort((a,b) => a.data.localeCompare(b.data));
+  const usdWise = [...wiseData].filter(r => r.par === 'EUR_USD' && r.pct_vs_max_hist).sort((a,b) => a.data.localeCompare(b.data));
+  const allDates = [...new Set([...brlWise.map(r=>r.data), ...usdWise.map(r=>r.data)])].sort();
+  const brlPctMap = Object.fromEntries(brlWise.map(r => [r.data, r.pct_vs_max_hist * 100]));
+  const usdPctMap = Object.fromEntries(usdWise.map(r => [r.data, r.pct_vs_max_hist * 100]));
+
+  if (cambioChartPct) cambioChartPct.destroy();
+  cambioChartPct = new Chart(document.getElementById('chart-pct-max'), {
+    type: 'line',
+    data: {
+      labels: allDates.map(d => dt(d)),
+      datasets: [
+        { label: 'EUR/BRL % vs Máx', data: allDates.map(d => brlPctMap[d] ?? null), borderColor:'#1a7f4b', backgroundColor:'#1a7f4b22', borderWidth:2, pointRadius:4, tension:0.3, spanGaps:false },
+        { label: 'EUR/USD % vs Máx', data: allDates.map(d => usdPctMap[d] ?? null), borderColor:'#1565c0', backgroundColor:'#1565c022', borderWidth:2, pointRadius:4, tension:0.3, spanGaps:false }
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ labels:{ font:{size:10}, boxWidth:10 } } },
+      scales:{
+        x:{ grid:{display:false}, ticks:{font:{size:9}} },
+        y:{ grid:{color:'#f0f0ee'}, ticks:{ font:{size:9}, callback: v => v.toFixed(1)+'%' } }
+      }
+    }
+  });
+
+  // --- Tabela mensal ---
   document.getElementById('cambio-body').innerHTML = `<table>
     <thead><tr>
       <th>Mês</th><th class="tr">EUR/BRL</th><th class="tr">EUR/USD</th>
@@ -504,13 +590,22 @@ async function loadCambio() {
   renderWise(wiseData);
 }
 function renderWise(rows) {
-  document.getElementById('wise-body').innerHTML = `<table>
+  document.getElementById('wise-body').innerHTML = `<table style="font-size:12px">
     <thead><tr>
-      <th>Data</th><th>Par</th><th class="tr">€ Enviado</th><th class="tr">Recebido</th>
-      <th class="tr">Câmbio realizado</th><th class="tr">Taxa %</th><th class="tr">Google rate</th>
-      <th class="tr">Spread total</th><th class="tr">% vs Máx hist.</th>
-      <th class="tr">Perda vs Máx (€)</th><th class="tr">% vs Atual</th>
-      <th class="tr">Ganho/Perda vs Atual (€)</th><th>Nota</th>
+      <th style="white-space:normal;min-width:70px">Data</th>
+      <th style="white-space:normal;min-width:60px">Par</th>
+      <th class="tr" style="white-space:normal;min-width:60px">€<br>Enviado</th>
+      <th class="tr" style="white-space:normal;min-width:70px">Recebido</th>
+      <th class="tr" style="white-space:normal;min-width:70px">Câmbio<br>realizado</th>
+      <th class="tr" style="white-space:normal;min-width:55px">Tarifa<br>€</th>
+      <th class="tr" style="white-space:normal;min-width:55px">Taxa<br>%</th>
+      <th class="tr" style="white-space:normal;min-width:65px">Google<br>rate</th>
+      <th class="tr" style="white-space:normal;min-width:60px">Spread<br>total</th>
+      <th class="tr" style="white-space:normal;min-width:60px">% vs<br>Máx hist.</th>
+      <th class="tr" style="white-space:normal;min-width:70px">Perda vs<br>Máx (€)</th>
+      <th class="tr" style="white-space:normal;min-width:60px">% vs<br>Atual</th>
+      <th class="tr" style="white-space:normal;min-width:80px">Ganho/Perda<br>vs Atual (€)</th>
+      <th style="white-space:normal;min-width:120px">Nota</th>
     </tr></thead>
     <tbody>${rows.map(r => `<tr>
       <td>${dt(r.data)}</td>
@@ -518,7 +613,8 @@ function renderWise(rows) {
       <td class="tr">${r.valor_eur ? num(r.valor_eur, 0) : '—'}</td>
       <td class="tr">${r.valor_recebido ? num(r.valor_recebido, 2) : '—'}</td>
       <td class="tr" style="font-weight:500">${num(r.taxa, 4)}</td>
-      <td class="tr" style="font-size:11px;color:#9b9b98">${r.custo_pct ? (r.custo_pct * 100).toFixed(2) + '%' : '—'}</td>
+      <td class="tr" style="color:#6b6b68">${r.custo_pct && r.valor_eur ? '€' + num(r.custo_pct * r.valor_eur, 2) : '—'}</td>
+      <td class="tr" style="color:#9b9b98">${r.custo_pct ? (r.custo_pct * 100).toFixed(2) + '%' : '—'}</td>
       <td class="tr" style="color:#6b6b68">${r.google_rate ? num(r.google_rate, 4) : '—'}</td>
       <td class="tr ${r.spread_google < 0 ? 'neg' : 'pos'}">${r.spread_google ? (r.spread_google * 100).toFixed(2) + '%' : '—'}</td>
       <td class="tr ${r.pct_vs_max_hist < 0 ? 'neg' : 'pos'}">${r.pct_vs_max_hist ? (r.pct_vs_max_hist * 100).toFixed(2) + '%' : '—'}</td>
