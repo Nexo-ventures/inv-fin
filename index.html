@@ -450,7 +450,7 @@ function renderHist(rows) {
       const mesS = getMesKey(r.data_saida);
       const custoEur = r.moeda === 'EUR' ? r.custo_total : toEur(r.custo_total, r.moeda, mesE);
       const receitaEur = r.moeda === 'EUR' ? r.receita_total : toEur(r.receita_total, r.moeda, mesS);
-      const rent = r.resultado_moeda && r.custo_total ? (r.resultado_moeda / r.custo_total * 100) : null;
+      const rent = r.resultado_moeda != null && r.custo_total ? (r.resultado_moeda / r.custo_total * 100) : null;
       return `<tr>
         <td class="ticker">${r.ticker}</td>
         <td><span class="pill p-${r.corretora}">${r.corretora}</span></td>
@@ -464,7 +464,7 @@ function renderHist(rows) {
         <td class="tr">${r.receita_total ? num(r.receita_total, 2) : '—'}</td>
         <td class="tr" style="color:#6b6b68">${custoEur ? num(custoEur, 2) : '—'}</td>
         <td class="tr" style="color:#6b6b68">${receitaEur ? num(receitaEur, 2) : '—'}</td>
-        <td class="tr ${dc(r.resultado_moeda)}">${r.resultado_moeda ? num(r.resultado_moeda, 2) : '—'}</td>
+        <td class="tr ${dc(r.resultado_moeda)}">${r.resultado_moeda != null ? num(r.resultado_moeda, 2) : '—'}</td>
         <td class="tr ${dc(r.resultado_eur)}">${num(r.resultado_eur, 2)}</td>
         <td class="tr ${rent != null ? (rent >= 0 ? 'pos' : 'neg') : ''}">${rent != null ? rent.toFixed(2) + '%' : '—'}</td>
         <td class="tr">${r.dias_posicao ?? '—'}</td>
