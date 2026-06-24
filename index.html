@@ -540,9 +540,9 @@ function renderFluxos(rows) {
       <td>${dt(r.data)}</td>
       <td><span class="pill p-${r.corretora}">${r.corretora}</span></td>
       <td style="font-size:11px;color:${r.tipo === 'APORTE' ? '#2d7a4f' : '#c0392b'}">${r.tipo}</td>
-      <td class="tr">${num(r.valor, 2)}</td>
+      <td class="tr ${r.tipo === 'APORTE' ? 'pos' : 'neg'}">${r.tipo === 'RETIRADA' ? '-' : ''}${num(r.valor, 2)}</td>
       <td style="font-size:11px">${r.moeda}</td>
-      <td class="tr ${r.tipo === 'APORTE' ? 'pos' : 'neg'}">${eur(r.valor_eur)}</td>
+      <td class="tr ${r.tipo === 'APORTE' ? 'pos' : 'neg'}">${r.tipo === 'RETIRADA' ? '-' : ''}${eur(r.valor_eur)}</td>
     </tr>`).join('')}</tbody>
     <tfoot>
       <tr><td colspan="5" style="text-align:right;font-size:12px;padding:8px">Total aportes</td><td class="tr pos" style="font-weight:600">${eur(totalAporte)}</td></tr>
