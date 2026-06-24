@@ -533,7 +533,7 @@ async function loadCambio() {
     },
     options: {
       responsive:true, maintainAspectRatio:false,
-      plugins:{ legend:{ labels:{ font:{size:10}, boxWidth:10 } }, tooltip:{ callbacks:{ afterLabel: (ctx) => ctx.datasetIndex === 0 ? ((ctx.parsed.y - maxVal) / maxVal * 100).toFixed(1) + '% vs máx histórico' : '' } } },
+      plugins:{ legend:{ labels:{ font:{size:10}, boxWidth:10 } }, tooltip:{ callbacks:{ afterLabel: (ctx) => { if (ctx.datasetIndex !== 0) return ''; const i = ctx.dataIndex; const prev = ctx.dataset.data[i-1]; if (!prev) return ''; const pct = ((ctx.parsed.y - prev) / prev * 100).toFixed(1); return (pct > 0 ? '+' : '') + pct + '% vs mês anterior'; } } } },
       scales:{
         x:{ grid:{display:false}, ticks:{font:{size:9}, maxTicksLimit:8} },
         y:{ grid:{color:'#f0f0ee'}, ticks:{ font:{size:9}, callback: v => v.toFixed(2) } }
