@@ -397,9 +397,33 @@ function filtPos(c, btn) {
   renderPos(c === 'TODAS' ? posData : posData.filter(r => r.corretora === c));
 }
 
+let cambioRates = {};
 async function loadHistorico() {
-  histData = await get('/resultado_fechado?select=*&order=data_saida.desc&limit=200');
+  const [hist, cambio] = await Promise.all([
+    get('/resultado_fechado?select=*&order=data_saida.desc&limit=200'),
+    get('/cambio?select=mes,eur_brl,eur_usd')
+  ]);
+  histData = hist;
+  cambioRates = {};
+  cambio.forEach(c => { cambioRates[c.mes] = { brl: c.eur_brl, usd: c.eur_usd }; });
   renderHist(histData);
+}
+
+function getMesKey(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  const mn = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return mn[d.getMonth()] + '/' + d.getFullYear();
+}
+
+function toEur(val, moeda, mesKey) {
+  if (!val || !mesKey) return null;
+  const r = cambioRates[mesKey];
+  if (!r) return null;
+  if (moeda === 'EUR') return val;
+  if (moeda === 'BRL') return r.brl ? val / r.brl : null;
+  if (moeda === 'USD') return r.usd ? val / r.usd : null;
+  return null;
 }
 
 function renderHist(rows) {
@@ -413,6 +437,8 @@ function renderHist(rows) {
       <th class="tr" style="white-space:normal;min-width:70px">Valor<br>entrada</th>
       <th class="tr" style="white-space:normal;min-width:60px">Moeda</th>
       <th class="tr" style="white-space:normal;min-width:70px">Valor<br>saída</th>
+      <th class="tr" style="white-space:normal;min-width:55px">V.entrada<br>EUR</th>
+      <th class="tr" style="white-space:normal;min-width:55px">V.saída<br>EUR</th>
       <th class="tr" style="white-space:normal;min-width:70px">Resultado<br>moeda</th>
       <th class="tr" style="white-space:normal;min-width:70px">Resultado<br>EUR</th>
       <th class="tr" style="white-space:normal;min-width:55px">Rent.<br>%</th>
@@ -420,6 +446,10 @@ function renderHist(rows) {
       <th style="white-space:normal;min-width:80px">Nota</th>
     </tr></thead>
     <tbody>${rows.map(r => {
+      const mesE = getMesKey(r.data_entrada);
+      const mesS = getMesKey(r.data_saida);
+      const custoEur = r.moeda === 'EUR' ? r.custo_total : toEur(r.custo_total, r.moeda, mesE);
+      const receitaEur = r.moeda === 'EUR' ? r.receita_total : toEur(r.receita_total, r.moeda, mesS);
       const rent = r.resultado_moeda && r.custo_total ? (r.resultado_moeda / r.custo_total * 100) : null;
       return `<tr>
         <td class="ticker">${r.ticker}</td>
@@ -432,6 +462,8 @@ function renderHist(rows) {
         <td class="tr">${r.custo_total ? num(r.custo_total, 2) : '—'}</td>
         <td style="font-size:11px;color:#6b6b68">${r.moeda || '—'}</td>
         <td class="tr">${r.receita_total ? num(r.receita_total, 2) : '—'}</td>
+        <td class="tr" style="color:#6b6b68">${custoEur ? num(custoEur, 2) : '—'}</td>
+        <td class="tr" style="color:#6b6b68">${receitaEur ? num(receitaEur, 2) : '—'}</td>
         <td class="tr ${dc(r.resultado_moeda)}">${r.resultado_moeda ? num(r.resultado_moeda, 2) : '—'}</td>
         <td class="tr ${dc(r.resultado_eur)}">${num(r.resultado_eur, 2)}</td>
         <td class="tr ${rent != null ? (rent >= 0 ? 'pos' : 'neg') : ''}">${rent != null ? rent.toFixed(2) + '%' : '—'}</td>
