@@ -202,12 +202,8 @@
 
   <div id="tab-cambio" class="section">
     <div class="card" style="padding:0;margin-bottom:16px">
-      <div class="table-head"><span class="table-title">Taxas mensais EUR/BRL e EUR/USD</span></div>
-      <div class="tbl-scroll" id="cambio-body"><div class="loading">carregando...</div></div>
-    </div>
-    <div class="card" style="padding:0">
       <div class="table-head">
-        <span class="table-title">Histórico Wise</span>
+        <span class="table-title">Histórico realizado</span>
         <div>
           <button class="fbtn on" onclick="filtWise('TODAS',this)">Todas</button>
           <button class="fbtn" onclick="filtWise('EUR_BRL',this)">EUR→BRL</button>
@@ -215,6 +211,10 @@
         </div>
       </div>
       <div class="tbl-scroll" id="wise-body"><div class="loading">carregando...</div></div>
+    </div>
+    <div class="card" style="padding:0">
+      <div class="table-head"><span class="table-title">Taxas mensais EUR/BRL e EUR/USD</span></div>
+      <div class="tbl-scroll" id="cambio-body"><div class="loading">carregando...</div></div>
     </div>
   </div>
 
@@ -507,19 +507,24 @@ function renderWise(rows) {
   document.getElementById('wise-body').innerHTML = `<table>
     <thead><tr>
       <th>Data</th><th>Par</th><th class="tr">€ Enviado</th><th class="tr">Recebido</th>
-      <th class="tr">Taxa</th><th class="tr">Google</th><th class="tr">Spread</th>
-      <th class="tr">Perda vs Máx</th><th class="tr">Custo %</th><th>Nota</th>
+      <th class="tr">Câmbio realizado</th><th class="tr">Taxa %</th><th class="tr">Google rate</th>
+      <th class="tr">Spread total</th><th class="tr">% vs Máx hist.</th>
+      <th class="tr">Perda vs Máx (€)</th><th class="tr">% vs Atual</th>
+      <th class="tr">Ganho/Perda vs Atual (€)</th><th>Nota</th>
     </tr></thead>
     <tbody>${rows.map(r => `<tr>
       <td>${dt(r.data)}</td>
       <td><span class="pill" style="background:#e8f4fd;color:#1a6ea8;font-size:10px;padding:2px 6px;border-radius:4px">${r.par}</span></td>
-      <td class="tr">${num(r.valor_eur, 0)}</td>
+      <td class="tr">${r.valor_eur ? num(r.valor_eur, 0) : '—'}</td>
       <td class="tr">${r.valor_recebido ? num(r.valor_recebido, 2) : '—'}</td>
       <td class="tr" style="font-weight:500">${num(r.taxa, 4)}</td>
+      <td class="tr" style="font-size:11px;color:#9b9b98">${r.custo_pct ? (r.custo_pct * 100).toFixed(2) + '%' : '—'}</td>
       <td class="tr" style="color:#6b6b68">${r.google_rate ? num(r.google_rate, 4) : '—'}</td>
-      <td class="tr ${r.spread_google < 0 ? 'neg' : ''}">${r.spread_google ? (r.spread_google * 100).toFixed(2) + '%' : '—'}</td>
+      <td class="tr ${r.spread_google < 0 ? 'neg' : 'pos'}">${r.spread_google ? (r.spread_google * 100).toFixed(2) + '%' : '—'}</td>
+      <td class="tr ${r.pct_vs_max_hist < 0 ? 'neg' : 'pos'}">${r.pct_vs_max_hist ? (r.pct_vs_max_hist * 100).toFixed(2) + '%' : '—'}</td>
       <td class="tr neg">${r.perda_vs_max_eur ? '€' + num(r.perda_vs_max_eur, 0) : '—'}</td>
-      <td class="tr" style="font-size:11px;color:#9b9b98">${(r.custo_pct * 100).toFixed(2)}%</td>
+      <td class="tr ${r.pct_vs_atual < 0 ? 'neg' : 'pos'}">${r.pct_vs_atual ? (r.pct_vs_atual * 100).toFixed(2) + '%' : '—'}</td>
+      <td class="tr ${r.ganho_vs_atual_eur < 0 ? 'neg' : 'pos'}">${r.ganho_vs_atual_eur ? '€' + num(r.ganho_vs_atual_eur, 0) : '—'}</td>
       <td style="font-size:11px;color:#6b6b68">${r.nota || '—'}</td>
     </tr>`).join('')}</tbody>
   </table>`;
