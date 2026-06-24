@@ -419,7 +419,7 @@ function renderHist(rows) {
       <th style="white-space:normal;min-width:80px">Nota</th>
     </tr></thead>
     <tbody>${rows.map(r => {
-      const rent = r.custo_total && r.resultado_eur ? (r.resultado_eur / r.custo_total * 100) : null;
+      const rent = r.resultado_moeda && r.custo_total ? (r.resultado_moeda / r.custo_total * 100) : null;
       return `<tr>
         <td class="ticker">${r.ticker}</td>
         <td><span class="pill p-${r.corretora}">${r.corretora}</span></td>
