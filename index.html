@@ -455,28 +455,50 @@ async function loadCustos() {
   renderCustos(custosData);
 }
 function renderCustos(rows) {
+  // Filtrar linhas sem corretora (lixo)
+  rows = rows.filter(r => r.corretora && r.corretora !== 'nan');
   if (!rows.length) { document.getElementById('custos-body').innerHTML = '<div class="empty">Nenhum registro</div>'; return; }
   const total = rows.reduce((s, r) => s + (r.valor_eur || 0), 0);
 
-  // --- KPIs: total por tipo e por corretora ---
+  // --- Totais por ano ---
+  const porAno = {};
   const porTipo = {};
   const porCorretora = {};
   rows.forEach(r => {
-    porTipo[r.tipo] = (porTipo[r.tipo] || 0) + (r.valor_eur || 0);
-    porCorretora[r.corretora] = (porCorretora[r.corretora] || 0) + (r.valor_eur || 0);
+    if (!r.data) return;
+    const ano = new Date(r.data).getFullYear();
+    porAno[ano] = (porAno[ano] || 0) + (r.valor_eur || 0);
+    if (r.tipo) porTipo[r.tipo] = (porTipo[r.tipo] || 0) + (r.valor_eur || 0);
+    if (r.corretora) porCorretora[r.corretora] = (porCorretora[r.corretora] || 0) + (r.valor_eur || 0);
   });
   const tiposSorted = Object.entries(porTipo).sort((a,b) => b[1]-a[1]);
   const corrSorted  = Object.entries(porCorretora).sort((a,b) => b[1]-a[1]);
+  const anosSorted  = Object.entries(porAno).sort((a,b) => b[0]-a[0]);
+
+  // Cores para pizza de tipos
+  const TIPO_COLORS = ['#1a7f4b','#1565c0','#6a1b9a','#e65100','#c0392b','#0288d1','#558b2f','#f57f17'];
 
   document.getElementById('custos-kpis').innerHTML = `
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:12px">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:12px">
       <div class="card"><div class="card-label">Total geral</div><div class="card-value neg">-${eur(total)}</div></div>
+      ${anosSorted.map(([a,v]) => `<div class="card"><div class="card-label">${a}</div><div class="card-value neg" style="font-size:16px">-${eur(v)}</div></div>`).join('')}
       ${corrSorted.map(([c,v]) => `<div class="card"><div class="card-label">${c}</div><div class="card-value neg" style="font-size:16px">-${eur(v)}</div></div>`).join('')}
     </div>
     <div class="card" style="padding:14px 18px;margin-bottom:0">
-      <div class="card-label" style="margin-bottom:10px">Por tipo</div>
-      <div style="display:flex;flex-wrap:wrap;gap:12px">
-        ${tiposSorted.map(([t,v]) => `<div style="min-width:160px"><div style="font-size:11px;color:#6b6b68;margin-bottom:2px">${t.replace(/_/g,' ')}</div><div style="font-size:13px;font-weight:500;color:#c0392b">-${eur(v)}</div></div>`).join('')}
+      <div class="card-label" style="margin-bottom:12px">Por tipo</div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px">
+        ${tiposSorted.map(([t,v], i) => {
+          const pct = (v / total * 100).toFixed(1);
+          const color = TIPO_COLORS[i % TIPO_COLORS.length];
+          return `<div style="display:flex;align-items:center;gap:8px;background:#f9f9f8;border-radius:8px;padding:8px 12px;min-width:190px">
+            <div style="width:10px;height:10px;border-radius:50%;background:${color};flex-shrink:0"></div>
+            <div>
+              <div style="font-size:11px;color:#6b6b68">${t.replace(/_/g,' ')}</div>
+              <div style="font-size:13px;font-weight:600;color:#c0392b">-${eur(v)}</div>
+            </div>
+            <div style="margin-left:auto;font-size:12px;font-weight:500;color:#9b9b98">${pct}%</div>
+          </div>`;
+        }).join('')}
       </div>
     </div>`;
 
@@ -495,13 +517,13 @@ function renderCustos(rows) {
       <td style="font-size:11px;max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.descricao || '—'}</td>
       <td class="tr neg">-${num(r.valor, 2)}</td>
       <td style="font-size:11px">${r.moeda}</td>
-      <td class="tr neg">-${eur(r.valor_eur)}</td>
+      <td class="tr neg">-${num(r.valor_eur, 2)}</td>
       <td class="tr" style="color:#6b6b68">${r.valor_operacao_eur ? eur(r.valor_operacao_eur) : '—'}</td>
-      <td class="tr" style="font-size:11px;color:#9b9b98">${r.pct_custo ? (r.pct_custo * 100).toFixed(3) + '%' : '—'}</td>
+      <td class="tr" style="font-size:11px;color:#9b9b98">${r.pct_custo ? (r.pct_custo * 100).toFixed(2) + '%' : '—'}</td>
     </tr>`).join('')}</tbody>
     <tfoot><tr>
       <td colspan="6" style="text-align:right;font-weight:500;padding:10px 8px;font-size:12px">Total</td>
-      <td class="tr neg" style="font-weight:600">-${eur(total)}</td>
+      <td class="tr neg" style="font-weight:600">-${num(total, 2)}</td>
       <td colspan="2"></td>
     </tr></tfoot>
   </table>`;
