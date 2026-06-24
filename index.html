@@ -88,7 +88,7 @@
 <div class="nav">
   <div class="nav-tab active" data-tab="geral">Visão geral</div>
   <div class="nav-tab" data-tab="posicoes">Posições abertas</div>
-  <div class="nav-tab" data-tab="historico">Histórico</div>
+  <div class="nav-tab" data-tab="historico">Posições fechadas</div>
   <div class="nav-tab" data-tab="renda">Renda</div>
   <div class="nav-tab" data-tab="custos">Custos</div>
   <div class="nav-tab" data-tab="cambio">Câmbio</div>
@@ -156,7 +156,7 @@
   <div id="tab-historico" class="section">
     <div class="table-wrap">
       <div class="table-head">
-        <span class="table-title">Operações fechadas</span>
+        <span class="table-title">Posições fechadas</span>
         <div class="filters">
           <button class="fbtn on" onclick="filtHist('TODAS',this)">Todas</button>
           <button class="fbtn" onclick="filtHist('XP',this)">XP</button>
@@ -403,24 +403,40 @@ async function loadHistorico() {
 }
 
 function renderHist(rows) {
-  if (!rows.length) { document.getElementById('hist-body').innerHTML = '<div class="empty">Nenhuma operação fechada</div>'; return; }
-  document.getElementById('hist-body').innerHTML = `<table>
+  if (!rows.length) { document.getElementById('hist-body').innerHTML = '<div class="empty">Nenhuma posição fechada</div>'; return; }
+  document.getElementById('hist-body').innerHTML = `<table style="font-size:12px">
     <thead><tr>
       <th>Ativo</th><th>Corretora</th><th>Entrada</th><th>Saída</th>
-      <th class="tr">Qtd</th><th class="tr">PM entrada</th><th class="tr">PM saída</th>
-      <th class="tr">Resultado €</th><th class="tr">Dias</th>
+      <th class="tr">Qtd</th>
+      <th class="tr" style="white-space:normal;min-width:60px">PM<br>entrada</th>
+      <th class="tr" style="white-space:normal;min-width:60px">PM<br>saída</th>
+      <th class="tr" style="white-space:normal;min-width:70px">Valor<br>entrada</th>
+      <th class="tr" style="white-space:normal;min-width:60px">Moeda</th>
+      <th class="tr" style="white-space:normal;min-width:70px">Valor<br>saída</th>
+      <th class="tr" style="white-space:normal;min-width:70px">Resultado<br>EUR</th>
+      <th class="tr" style="white-space:normal;min-width:55px">Rent.<br>%</th>
+      <th class="tr" style="white-space:normal;min-width:40px">Dias</th>
+      <th style="white-space:normal;min-width:80px">Nota</th>
     </tr></thead>
-    <tbody>${rows.map(r => `<tr>
-      <td class="ticker">${r.ticker}</td>
-      <td><span class="pill p-${r.corretora}">${r.corretora}</span></td>
-      <td>${dt(r.data_entrada)}</td>
-      <td>${dt(r.data_saida)}</td>
-      <td class="tr">${num(r.quantidade, 2)}</td>
-      <td class="tr">${num(r.preco_entrada, 4)}</td>
-      <td class="tr">${num(r.preco_saida, 4)}</td>
-      <td class="tr ${dc(r.resultado_eur)}">${eur(r.resultado_eur)}</td>
-      <td class="tr">${r.dias_posicao ?? '—'}</td>
-    </tr>`).join('')}</tbody>
+    <tbody>${rows.map(r => {
+      const rent = r.custo_total && r.resultado_eur ? (r.resultado_eur / r.custo_total * 100) : null;
+      return `<tr>
+        <td class="ticker">${r.ticker}</td>
+        <td><span class="pill p-${r.corretora}">${r.corretora}</span></td>
+        <td>${dt(r.data_entrada)}</td>
+        <td>${dt(r.data_saida)}</td>
+        <td class="tr">${num(r.quantidade, 2)}</td>
+        <td class="tr">${num(r.preco_entrada, 2)}</td>
+        <td class="tr">${num(r.preco_saida, 2)}</td>
+        <td class="tr">${r.custo_total ? num(r.custo_total, 2) : '—'}</td>
+        <td style="font-size:11px;color:#6b6b68">${r.moeda || '—'}</td>
+        <td class="tr">${r.receita_total ? num(r.receita_total, 2) : '—'}</td>
+        <td class="tr ${dc(r.resultado_eur)}">${num(r.resultado_eur, 2)}</td>
+        <td class="tr ${rent != null ? (rent >= 0 ? 'pos' : 'neg') : ''}">${rent != null ? rent.toFixed(2) + '%' : '—'}</td>
+        <td class="tr">${r.dias_posicao ?? '—'}</td>
+        <td style="font-size:11px;color:#9b9b98">${r.nota || '—'}</td>
+      </tr>`;
+    }).join('')}</tbody>
   </table>`;
 }
 
