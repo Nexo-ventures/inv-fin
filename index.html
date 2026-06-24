@@ -288,9 +288,6 @@ let posData=[], rendaData=[], histData=[];
 let rendaChart = null;
 let rendaFiltCorr = 'TODAS';
 let rendaFiltTipo = 'TODOS';
-let rendaChart = null;
-let rendaFiltCorr = 'TODAS';
-let rendaFiltTipo = 'TODOS';
 
 document.querySelectorAll('.nav-tab').forEach(t => {
   t.onclick = () => {
@@ -453,7 +450,7 @@ function renderRenda(rows) {
   const ctx = document.getElementById('renda-chart');
   if (ctx) { rendaChart = new Chart(ctx, { type:'bar', data:{ labels:mlabels, datasets:[...Object.keys(porTipo).map((t,i)=>({ label:t.replace(/_/g,' '), data:months.map(m=>byMonth[m][t]||0), backgroundColor:TIPO_COLORS[i%TIPO_COLORS.length]+'cc', stack:'renda' })),{ type:'line', label:'Total mensal', data:months.map(m=>Object.values(byMonth[m]).reduce((s,v)=>s+v,0)), borderColor:'#1c1c1a', backgroundColor:'transparent', borderWidth:2, pointRadius:3, tension:0.3, order:0 }]}, options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{labels:{font:{size:10},boxWidth:10}}}, scales:{ x:{stacked:true,grid:{display:false},ticks:{font:{size:9}}}, y:{stacked:true,grid:{color:'#f0f0ee'},ticks:{font:{size:9},callback:v=>'€'+v.toLocaleString('de-DE')}} } } }); }
   const tiposUniq = ['TODOS',...Object.keys(porTipo).sort()];
-  document.getElementById('renda-tipo-btns').innerHTML = tiposUniq.map(t => '<button class="fbtn '+(t===rendaFiltTipo?'on':'')+'" onclick="filtRenda('tipo',''+t+'',this)">'+(t==='TODOS'?'Todos tipos':t.replace(/_/g,' '))+'</button>').join('');
+  document.getElementById('renda-tipo-btns').innerHTML = tiposUniq.map(function(t){ var on=t===rendaFiltTipo?'on':''; var label=t==='TODOS'?'Todos tipos':t.replace(/_/g,' '); return '<button class="fbtn '+on+'" data-v="'+t+'" onclick="var b=this;filtRenda(\'tipo\',b.dataset.v,b)">'+label+'</button>'; }).join('');
   document.getElementById('renda-body').innerHTML = '<table style="font-size:12px"><thead><tr><th>Data</th><th>Ativo</th><th>Tipo</th><th>Corretora</th><th class="tr">Bruto</th><th class="tr">Imposto</th><th class="tr">Líquido</th><th class="tr">EUR</th></tr></thead><tbody>'+rows.map(r=>'<tr><td>'+dt(r.data)+'</td><td class="ticker">'+(r.ticker||'—')+'</td><td style="font-size:11px;color:#9b9b98">'+(r.tipo?r.tipo.replace(/_/g,' '):'—')+'</td><td><span class="pill p-'+r.corretora+'">'+r.corretora+'</span></td><td class="tr">'+num(r.valor_bruto,2)+' '+r.moeda+'</td><td class="tr neg">'+(r.imposto?'-'+num(r.imposto,2):'—')+'</td><td class="tr pos">'+num(r.valor_liquido,2)+' '+r.moeda+'</td><td class="tr pos">'+num(r.valor_eur,2)+'</td></tr>').join('')+'</tbody><tfoot><tr><td colspan="7" style="text-align:right;font-weight:500;padding:10px 8px;font-size:12px">Total EUR</td><td class="tr pos" style="font-weight:600">'+num(totalEur,2)+'</td></tr></tfoot></table>';
 }
 function filtRenda(dim, val, btn) {
