@@ -142,6 +142,7 @@
   </div>
 
   <div id="tab-posicoes" class="section">
+    <div id="pos-kpis"></div>
     <div class="card" style="padding:0">
       <div class="table-head">
         <span class="table-title">Posições abertas</span>
@@ -394,19 +395,100 @@ async function loadGeral() {
 }
 
 let posFiltCorr = 'TODAS', posFiltClasse = 'TODAS';
+let posCambio = {};
 
 async function loadPosicoes() {
-  posData = await get('/posicoes_abertas?select=*&order=data_entrada.asc');
+  const [pos, cambio] = await Promise.all([
+    get('/posicoes_abertas?select=*&order=data_entrada.asc'),
+    get('/cambio?select=mes,eur_brl,eur_usd&order=ordem.desc&limit=1')
+  ]);
+  posData = pos;
+  if (cambio && cambio.length) {
+    posCambio = { brl: cambio[0].eur_brl, usd: cambio[0].eur_usd };
+  }
   posFiltCorr = 'TODAS'; posFiltClasse = 'TODAS';
   renderPos(posData);
+}
+
+function posToEur(val, moeda) {
+  if (val == null) return null;
+  if (moeda === 'EUR') return val;
+  if (moeda === 'BRL' && posCambio.brl) return val / posCambio.brl;
+  if (moeda === 'USD' && posCambio.usd) return val / posCambio.usd;
+  return null;
 }
 
 function renderPos(rows) {
   let filtered = rows;
   if (posFiltCorr !== 'TODAS') filtered = filtered.filter(r => r.corretora === posFiltCorr);
   if (posFiltClasse !== 'TODAS') filtered = filtered.filter(r => r.classe_ativo === posFiltClasse);
+
+  // KPIs
+  let totalCustoEur = 0, totalMercadoEur = 0, countComPreco = 0;
+  filtered.forEach(r => {
+    const custoEur = posToEur(r.custo_total, r.moeda);
+    if (custoEur) totalCustoEur += custoEur;
+    if (r.preco_atual && r.quantidade && r.preco_atual > 0) {
+      const valorMercado = r.preco_atual * r.quantidade;
+      const mercadoEur = posToEur(valorMercado, r.moeda);
+      if (mercadoEur) { totalMercadoEur += mercadoEur; countComPreco++; }
+    }
+  });
+  const totalResultEur = totalMercadoEur - totalCustoEur;
+  const rentPct = totalCustoEur > 0 ? (totalResultEur / totalCustoEur * 100) : null;
+
+  document.getElementById('pos-kpis').innerHTML = `
+    <div class="cards" style="margin-bottom:16px">
+      <div class="card">
+        <div class="card-label">Valor a mercado</div>
+        <div class="card-value">${eur(totalMercadoEur || null)}</div>
+        <div class="card-sub">${countComPreco} de ${filtered.length} com cotação</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Custo total</div>
+        <div class="card-value">${eur(totalCustoEur || null)}</div>
+        <div class="card-sub">base de entrada</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Resultado não realizado</div>
+        <div class="card-value ${dc(totalResultEur)}">${totalMercadoEur ? (totalResultEur >= 0 ? '+' : '') + eur(totalResultEur) : '—'}</div>
+        <div class="card-sub ${dc(rentPct)}">${rentPct != null ? (rentPct >= 0 ? '+' : '') + rentPct.toFixed(1) + '% sobre custo' : '—'}</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Câmbio referência</div>
+        <div class="card-value" style="font-size:16px">BRL ${posCambio.brl ? num(posCambio.brl,4) : '—'}</div>
+        <div class="card-sub">USD ${posCambio.usd ? num(posCambio.usd,4) : '—'}</div>
+      </div>
+    </div>`;
+
   if (!filtered.length) { document.getElementById('pos-body').innerHTML = '<div class="empty">Nenhuma posição encontrada</div>'; return; }
-  document.getElementById('pos-body').innerHTML = '<table style="font-size:12px"><thead><tr><th>Ativo</th><th>Corretora</th><th>Classe</th><th>Setor</th><th>Entrada</th><th class="tr">Qtd</th><th class="tr">PM entrada</th><th class="tr">Custo total</th><th>Moeda</th><th>Status</th></tr></thead><tbody>'+filtered.map(r=>'<tr><td class="ticker" style="cursor:pointer;text-decoration:underline dotted" onclick="abrirModal(\''+ r.ticker +'\')">'+r.ticker+'</td><td><span class="pill p-'+r.corretora+'">'+r.corretora+'</span></td><td style="font-size:11px;color:#9b9b98">'+(r.classe_ativo||r.categoria||'—')+'</td><td style="font-size:11px;color:#9b9b98">'+(r.setor||'—')+'</td><td>'+dt(r.data_entrada)+'</td><td class="tr">'+(r.quantidade?num(r.quantidade,2):'—')+'</td><td class="tr">'+(r.preco_entrada?num(r.preco_entrada,2):'—')+'</td><td class="tr">'+num(r.custo_total,2)+'</td><td style="font-size:11px;color:#6b6b68">'+r.moeda+'</td><td style="font-size:11px;color:#6b6b68">'+(r.tese_curta||r.tese||r.status||'—')+'</td></tr>').join('')+'</tbody></table>';
+
+  document.getElementById('pos-body').innerHTML = '<table style="font-size:12px"><thead><tr>' +
+    '<th>Ativo</th><th>Corretora</th><th>Classe</th><th>Setor</th><th>Entrada</th>' +
+    '<th class="tr">Qtd</th><th class="tr">PM entrada</th><th class="tr">Preço atual</th>' +
+    '<th class="tr">Valor mercado</th><th class="tr">Result. não real.</th><th class="tr">Rent. %</th><th>Moeda</th>' +
+    '</tr></thead><tbody>' +
+    filtered.map(r => {
+      const temPreco = r.preco_atual && r.preco_atual > 0 && r.quantidade;
+      const valorMercado = temPreco ? r.preco_atual * r.quantidade : null;
+      const resultado = (valorMercado != null && r.custo_total) ? valorMercado - r.custo_total : null;
+      const rentPctRow = (resultado != null && r.custo_total) ? (resultado / r.custo_total * 100) : null;
+      const resultEur = posToEur(resultado, r.moeda);
+      return '<tr>' +
+        '<td class="ticker" style="cursor:pointer;text-decoration:underline dotted" onclick="abrirModal(\'' + r.ticker + '\')">' + r.ticker + '</td>' +
+        '<td><span class="pill p-' + r.corretora + '">' + r.corretora + '</span></td>' +
+        '<td style="font-size:11px;color:#9b9b98">' + (r.classe_ativo || '—') + '</td>' +
+        '<td style="font-size:11px;color:#9b9b98">' + (r.setor || '—') + '</td>' +
+        '<td>' + dt(r.data_entrada) + '</td>' +
+        '<td class="tr">' + (r.quantidade ? num(r.quantidade, 3) : '—') + '</td>' +
+        '<td class="tr">' + (r.preco_entrada ? num(r.preco_entrada, 2) : '—') + '</td>' +
+        '<td class="tr" style="font-weight:500">' + (r.preco_atual ? num(r.preco_atual, 2) : '—') + '</td>' +
+        '<td class="tr">' + (valorMercado != null ? num(valorMercado, 0) : '—') + '</td>' +
+        '<td class="tr ' + dc(resultado) + '">' + (resultado != null ? (resultado >= 0 ? '+' : '') + (resultEur != null ? eur(resultEur) : num(resultado, 0)) : '—') + '</td>' +
+        '<td class="tr ' + dc(rentPctRow) + '" style="font-size:11px">' + (rentPctRow != null ? (rentPctRow >= 0 ? '+' : '') + rentPctRow.toFixed(1) + '%' : '—') + '</td>' +
+        '<td style="font-size:11px;color:#6b6b68">' + r.moeda + '</td>' +
+        '</tr>';
+    }).join('') + '</tbody></table>';
 }
 
 function filtPos(btn) {
