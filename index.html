@@ -503,8 +503,7 @@ function renderHist(rows) {
       '<div class="card" style="padding:14px 18px"><div class="card-label">Resultado total</div><div style="font-size:20px;font-weight:700;color:'+(totalEur>=0?'#1a7f4b':'#c0392b')+'">'+num(totalEur,2)+'</div></div>'+
       '<div class="card" style="padding:14px 18px"><div class="card-label">Rentabilidade total</div><div style="font-size:20px;font-weight:700;color:'+(rentTotal!=null?(rentTotal>=0?'#1a7f4b':'#c0392b'):'#9b9b98')+'">'+(rentTotal!=null?rentTotal.toFixed(2)+'%':'—')+'</div><div style="font-size:11px;color:#9b9b98">sobre capital investido</div></div>'+
       '<div class="card" style="padding:14px 18px"><div class="card-label">Taxa de acerto</div><div style="font-size:20px;font-weight:700;color:#1c1c1a">'+taxaAcerto+'%</div><div style="font-size:11px;color:#9b9b98">'+positivas.length+' de '+comResult.length+' operações</div></div>'+
-      '<div class="card" style="padding:14px 18px"><div class="card-label">Maior ganho</div><div style="font-size:16px;font-weight:700;color:#1a7f4b">'+(top5g[0]?num(top5g[0].resultado_eur,2):'—')+'</div><div style="font-size:11px;color:#9b9b98">'+(top5g[0]?top5g[0].ticker:'')+'</div></div>'+
-      '<div class="card" style="padding:14px 18px"><div class="card-label">Maior perda</div><div style="font-size:16px;font-weight:700;color:#c0392b">'+(top5p[0]?num(top5p[0].resultado_eur,2):'—')+'</div><div style="font-size:11px;color:#9b9b98">'+(top5p[0]?top5p[0].ticker:'')+'</div></div>'+
+
       '</div>'+
       // Linha 2: por classe
       '<div class="card" style="padding:14px 18px;margin-bottom:16px"><div class="card-label" style="margin-bottom:12px">Resultado por classe (EUR)</div><div style="display:flex;flex-wrap:wrap;gap:10px">'+
@@ -515,18 +514,58 @@ function renderHist(rows) {
       '<div class="card" style="padding:14px 18px"><div class="card-label" style="margin-bottom:10px">Top 5 Ganhos</div>'+top5g.map((r,i)=>'<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #f0f0ee"><div style="font-size:12px;font-weight:500">'+(i+1)+'. '+r.ticker+'<span style="font-size:10px;color:#9b9b98;margin-left:6px">'+dt(r.data_saida)+'</span></div><div style="font-size:12px;font-weight:600;color:#1a7f4b">'+num(r.resultado_eur,2)+'</div></div>').join('')+'</div>'+
       '<div class="card" style="padding:14px 18px"><div class="card-label" style="margin-bottom:10px">Top 5 Perdas</div>'+top5p.map((r,i)=>'<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #f0f0ee"><div style="font-size:12px;font-weight:500">'+(i+1)+'. '+r.ticker+'<span style="font-size:10px;color:#9b9b98;margin-left:6px">'+dt(r.data_saida)+'</span></div><div style="font-size:12px;font-weight:600;color:#c0392b">'+num(r.resultado_eur,2)+'</div></div>').join('')+'</div>'+
       '</div>'+
-      // Linha 4: pizza por setor
-      '<div style="display:grid;grid-template-columns:240px 1fr;gap:12px;margin-bottom:16px">'+
-      '<div class="card"><div class="card-label" style="margin-bottom:8px">Volume por setor</div><div style="position:relative;height:200px"><canvas id="hist-pizza"></canvas></div></div>'+
-      '<div class="card" style="padding:14px 18px"><div class="card-label" style="margin-bottom:10px">Por setor</div><div style="display:flex;flex-direction:column;gap:6px">'+setoresSorted.map(([s,v],i)=>'<div style="display:flex;align-items:center;gap:8px"><div style="width:8px;height:8px;border-radius:50%;background:'+SETOR_COLORS[i%SETOR_COLORS.length]+';flex-shrink:0"></div><div style="font-size:12px;flex:1">'+s+'</div><div style="font-size:12px;font-weight:500;color:#9b9b98">'+num(v,2)+'</div></div>').join('')+'</div></div>'+
-      '</div>';
+      // Linha 4: rentabilidade acumulada
+      '<div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Rentabilidade acumulada mês a mês (%)</div><div style="position:relative;height:200px"><canvas id="hist-rent-chart"></canvas></div></div>'+
+      // Linha 5: resultado por setor barras
+      '<div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Resultado por setor (EUR)</div><div style="position:relative;height:240px"><canvas id="hist-setor-chart"></canvas></div></div>';
 
-    // Pizza
-    setTimeout(()=>{
-      if (histPizzaChart) histPizzaChart.destroy();
-      const pc=document.getElementById('hist-pizza');
-      if(pc) histPizzaChart=new Chart(pc,{type:'doughnut',data:{labels:setoresSorted.map(([s])=>s),datasets:[{data:setoresSorted.map(([,v])=>v),backgroundColor:setoresSorted.map((_,i)=>SETOR_COLORS[i%SETOR_COLORS.length]),borderWidth:2,borderColor:'#fff'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}});
-    },50);
+    // Gráfico rentabilidade acumulada
+    const byMonthRent = {};
+    rows.forEach(r => {
+      if (!r.data_saida || !r.resultado_eur || !r.custo_total) return;
+      const d=new Date(r.data_saida);
+      const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+      if (!byMonthRent[key]) byMonthRent[key]={res:0,custo:0};
+      byMonthRent[key].res += r.resultado_eur;
+      const mes=getMesKey(r.data_saida);
+      const rate=cambioRates[mes];
+      let custoE=0;
+      if (r.moeda==='EUR') custoE=r.custo_total;
+      else if (r.moeda==='BRL'&&rate?.brl) custoE=r.custo_total/rate.brl;
+      else if (r.moeda==='USD'&&rate?.usd) custoE=r.custo_total/rate.usd;
+      byMonthRent[key].custo += custoE;
+    });
+    const rentMonths=Object.keys(byMonthRent).sort();
+    let cumRes=0, cumCusto=0;
+    const rentAcum=rentMonths.map(m=>{ cumRes+=byMonthRent[m].res; cumCusto+=byMonthRent[m].custo; return cumCusto?+(cumRes/cumCusto*100).toFixed(2):0; });
+    const rentLabels=rentMonths.map(m=>{const [y,mo]=m.split('-');const mn=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];return mn[+mo-1]+'/'+y.slice(2);});
+
+    if (histChart) histChart.destroy();
+    // (histChart já é o gráfico mensal de resultado, não conflita)
+    if (histPizzaChart) histPizzaChart.destroy();
+    // Resultado acumulado EUR
+    let cumResAcum=0;
+    const resAcum=rentMonths.map(m=>{ cumResAcum+=byMonthRent[m].res; return +cumResAcum.toFixed(2); });
+
+    const rc=document.getElementById('hist-rent-chart');
+    if(rc) histPizzaChart=new Chart(rc,{type:'line',data:{labels:rentLabels,datasets:[
+      {label:'Resultado acumulado (EUR)',data:resAcum,borderColor:'#1a7f4b',backgroundColor:'rgba(26,127,75,0.06)',borderWidth:2,pointRadius:3,tension:0.3,fill:true,yAxisID:'yEur'},
+      {label:'Rentabilidade acumulada (%)',data:rentAcum,borderColor:'#1565c0',backgroundColor:'transparent',borderWidth:2,pointRadius:3,tension:0.3,borderDash:[],yAxisID:'yPct'},
+      {label:'Zero',data:rentMonths.map(()=>0),borderColor:'#e5e5e3',borderWidth:1,pointRadius:0,borderDash:[4,4],yAxisID:'yPct'}
+    ]},options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{font:{size:10},boxWidth:10}}},
+      scales:{
+        x:{grid:{display:false},ticks:{font:{size:9}}},
+        yEur:{position:'left',grid:{color:'#f0f0ee'},ticks:{font:{size:9},callback:v=>'€'+v.toLocaleString('de-DE')}},
+        yPct:{position:'right',grid:{display:false},ticks:{font:{size:9},callback:v=>v.toFixed(1)+'%'}}
+      }}});
+
+    // Barras por setor
+    const porSetorRes={};
+    rows.forEach(r=>{ if(r.resultado_eur==null) return; const s=r.setor||'Outro'; porSetorRes[s]=(porSetorRes[s]||0)+r.resultado_eur; });
+    const setoresRes=Object.entries(porSetorRes).sort((a,b)=>b[1]-a[1]);
+    const sc=document.getElementById('hist-setor-chart');
+    if(sc) { if(sc._chartInst) sc._chartInst.destroy(); sc._chartInst=new Chart(sc,{type:'bar',data:{labels:setoresRes.map(([s])=>s),datasets:[{data:setoresRes.map(([,v])=>v),backgroundColor:setoresRes.map(([,v])=>v>=0?'#1a7f4b99':'#c0392b99'),borderRadius:4}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'#f0f0ee'},ticks:{font:{size:9},callback:v=>'€'+v.toLocaleString('de-DE')}},y:{grid:{display:false},ticks:{font:{size:10}}}}}});}
   }
 
   // --- Gráfico mensal ---
