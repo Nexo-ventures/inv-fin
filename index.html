@@ -138,42 +138,52 @@
   </div>
 
   <div id="tab-posicoes" class="section">
-    <div class="card" style="padding:0;margin-bottom:16px">
+    <div class="card" style="padding:0">
       <div class="table-head">
-        <span class="table-title">Renda variável</span>
-        <div class="filters">
-          <button class="fbtn on" onclick="filtPos('TODAS',this)">Todas</button>
-          <button class="fbtn" onclick="filtPos('XP',this)">XP</button>
-          <button class="fbtn" onclick="filtPos('AV',this)">Avenue</button>
-          <button class="fbtn" onclick="filtPos('IBKR',this)">IBKR</button>
-          <button class="fbtn" onclick="filtPos('R4',this)">R4</button>
+        <span class="table-title">Posições abertas</span>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <div style="display:flex;gap:4px;padding-right:8px;border-right:1px solid #e5e5e3">
+            <button class="fbtn on" data-dim="corr" data-v="TODAS" onclick="filtPos(this)">Todas</button>
+            <button class="fbtn" data-dim="corr" data-v="XP" onclick="filtPos(this)">XP</button>
+            <button class="fbtn" data-dim="corr" data-v="AV" onclick="filtPos(this)">Avenue</button>
+            <button class="fbtn" data-dim="corr" data-v="IBKR" onclick="filtPos(this)">IBKR</button>
+            <button class="fbtn" data-dim="corr" data-v="R4" onclick="filtPos(this)">R4</button>
+          </div>
+          <div style="display:flex;gap:4px">
+            <button class="fbtn on" data-dim="cat" data-v="TODAS" onclick="filtPos(this)">Todos</button>
+            <button class="fbtn" data-dim="cat" data-v="ACAO" onclick="filtPos(this)">Ação</button>
+            <button class="fbtn" data-dim="cat" data-v="ETF" onclick="filtPos(this)">ETF</button>
+            <button class="fbtn" data-dim="cat" data-v="FUNDO" onclick="filtPos(this)">Fundo</button>
+            <button class="fbtn" data-dim="cat" data-v="RF" onclick="filtPos(this)">Renda Fixa</button>
+          </div>
         </div>
       </div>
       <div class="tbl-scroll" id="pos-body"><div class="loading">carregando...</div></div>
     </div>
-    <div class="card" style="padding:0">
-      <div class="table-head"><span class="table-title">Renda fixa</span></div>
-      <div class="tbl-scroll" id="pos-rf-body"><div class="loading">carregando...</div></div>
-    </div>
   </div>
 
   <div id="tab-historico" class="section">
-    <div class="card" style="padding:0;margin-bottom:16px">
+    <div class="card" style="padding:0">
       <div class="table-head">
-        <span class="table-title">Renda variável — fechadas</span>
-        <div class="filters">
-          <button class="fbtn on" onclick="filtHist('TODAS',this)">Todas</button>
-          <button class="fbtn" onclick="filtHist('XP',this)">XP</button>
-          <button class="fbtn" onclick="filtHist('AV',this)">Avenue</button>
-          <button class="fbtn" onclick="filtHist('IBKR',this)">IBKR</button>
-          <button class="fbtn" onclick="filtHist('R4',this)">R4</button>
+        <span class="table-title">Posições fechadas</span>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <div style="display:flex;gap:4px;padding-right:8px;border-right:1px solid #e5e5e3">
+            <button class="fbtn on" data-dim="corr" data-v="TODAS" onclick="filtHist(this)">Todas</button>
+            <button class="fbtn" data-dim="corr" data-v="XP" onclick="filtHist(this)">XP</button>
+            <button class="fbtn" data-dim="corr" data-v="AV" onclick="filtHist(this)">Avenue</button>
+            <button class="fbtn" data-dim="corr" data-v="IBKR" onclick="filtHist(this)">IBKR</button>
+            <button class="fbtn" data-dim="corr" data-v="R4" onclick="filtHist(this)">R4</button>
+          </div>
+          <div style="display:flex;gap:4px">
+            <button class="fbtn on" data-dim="cat" data-v="TODAS" onclick="filtHist(this)">Todos</button>
+            <button class="fbtn" data-dim="cat" data-v="ACAO" onclick="filtHist(this)">Ação</button>
+            <button class="fbtn" data-dim="cat" data-v="ETF" onclick="filtHist(this)">ETF</button>
+            <button class="fbtn" data-dim="cat" data-v="FUNDO" onclick="filtHist(this)">Fundo</button>
+            <button class="fbtn" data-dim="cat" data-v="RF" onclick="filtHist(this)">Renda Fixa</button>
+          </div>
         </div>
       </div>
       <div class="tbl-scroll" id="hist-body"><div class="loading">carregando...</div></div>
-    </div>
-    <div class="card" style="padding:0">
-      <div class="table-head"><span class="table-title">Renda fixa — fechadas</span></div>
-      <div class="tbl-scroll" id="hist-rf-body"><div class="loading">carregando...</div></div>
     </div>
   </div>
 
@@ -373,44 +383,33 @@ async function loadGeral() {
   }).join('');
 }
 
-async function loadPosicoes() {
-  posData = await get('/posicoes_abertas?select=*&order=data_entrada.asc');
-  renderPos(posData);
-  renderPosRF();
-}
+let posFiltCorr = 'TODAS', posFiltCat = 'TODAS';
 
-async function renderPosRF() {
-  const rf = await get('/operacoes?select=ticker,corretora,data_entrada,custo_total,receita_total,moeda,tese,status,categoria&categoria=eq.RF&status=eq.ABERTO&order=data_entrada.asc');
-  if (!rf.length) { document.getElementById('pos-rf-body').innerHTML = '<div class="empty">Nenhuma posição de renda fixa aberta</div>'; return; }
-  document.getElementById('pos-rf-body').innerHTML = '<table style="font-size:12px"><thead><tr><th>Ativo</th><th>Corretora</th><th>Aplicação</th><th class="tr">Valor aplicado</th><th>Moeda</th><th>Taxa</th></tr></thead><tbody>'+rf.map(r=>'<tr><td class="ticker">'+r.ticker+'</td><td><span class="pill p-'+r.corretora+'">'+r.corretora+'</span></td><td>'+dt(r.data_entrada)+'</td><td class="tr">'+num(r.custo_total,2)+'</td><td style="font-size:11px;color:#6b6b68">'+r.moeda+'</td><td style="font-size:11px;color:#6b6b68">'+(r.tese||'—')+'</td></tr>').join('')+'</tbody></table>';
+async function loadPosicoes() {
+  const [rv, rf] = await Promise.all([
+    get('/posicoes_abertas?select=*&order=data_entrada.asc'),
+    get('/operacoes?select=ticker,corretora,data_entrada,custo_total,moeda,tese,status,categoria,quantidade,preco_entrada&categoria=eq.RF&status=eq.ABERTO&order=data_entrada.asc')
+  ]);
+  posData = [...rv, ...rf.map(r => ({...r, categoria: r.categoria || 'RF'}))];
+  posFiltCorr = 'TODAS'; posFiltCat = 'TODAS';
+  renderPos(posData);
 }
 
 function renderPos(rows) {
-  const rv = rows.filter(r => r.categoria !== 'RF');
-  if (!rv.length) { document.getElementById('pos-body').innerHTML = '<div class="empty">Nenhuma posição aberta</div>'; return; }
-  document.getElementById('pos-body').innerHTML = `<table>
-    <thead><tr>
-      <th>Ativo</th><th>Corretora</th><th>Entrada</th>
-      <th class="tr">Quantidade</th><th class="tr">PM entrada</th>
-      <th class="tr">Custo total</th><th>Moeda</th><th>Status</th>
-    </tr></thead>
-    <tbody>${rv.map(r => `<tr>
-      <td class="ticker">${r.ticker}</td>
-      <td><span class="pill p-${r.corretora}">${r.corretora}</span></td>
-      <td>${dt(r.data_entrada)}</td>
-      <td class="tr">${num(r.quantidade, 4)}</td>
-      <td class="tr">${num(r.preco_entrada, 4)}</td>
-      <td class="tr">${num(r.custo_total, 2)}</td>
-      <td style="font-size:11px;color:#6b6b68">${r.moeda}</td>
-      <td style="font-size:11px;color:#9b9b98">${r.status}</td>
-    </tr>`).join('')}</tbody>
-  </table>`;
+  let filtered = rows;
+  if (posFiltCorr !== 'TODAS') filtered = filtered.filter(r => r.corretora === posFiltCorr);
+  if (posFiltCat !== 'TODAS') filtered = filtered.filter(r => r.categoria === posFiltCat);
+  if (!filtered.length) { document.getElementById('pos-body').innerHTML = '<div class="empty">Nenhuma posição encontrada</div>'; return; }
+  document.getElementById('pos-body').innerHTML = '<table style="font-size:12px"><thead><tr><th>Ativo</th><th>Corretora</th><th>Tipo</th><th>Entrada</th><th class="tr">Qtd</th><th class="tr">PM entrada</th><th class="tr">Custo total</th><th>Moeda</th><th>Taxa/Status</th></tr></thead><tbody>'+filtered.map(r=>'<tr><td class="ticker">'+r.ticker+'</td><td><span class="pill p-'+r.corretora+'">'+r.corretora+'</span></td><td style="font-size:11px;color:#9b9b98">'+(r.categoria||'—')+'</td><td>'+dt(r.data_entrada)+'</td><td class="tr">'+(r.quantidade?num(r.quantidade,2):'—')+'</td><td class="tr">'+(r.preco_entrada?num(r.preco_entrada,2):'—')+'</td><td class="tr">'+num(r.custo_total,2)+'</td><td style="font-size:11px;color:#6b6b68">'+r.moeda+'</td><td style="font-size:11px;color:#6b6b68">'+(r.tese||r.status||'—')+'</td></tr>').join('')+'</tbody></table>';
 }
 
-function filtPos(c, btn) {
-  document.querySelectorAll('#tab-posicoes .fbtn').forEach(b => b.classList.remove('on'));
+function filtPos(btn) {
+  const dim = btn.dataset.dim, val = btn.dataset.v;
+  document.querySelectorAll('#tab-posicoes [data-dim="'+dim+'"]').forEach(b => b.classList.remove('on'));
   btn.classList.add('on');
-  renderPos(c === 'TODAS' ? posData : posData.filter(r => r.corretora === c));
+  if (dim === 'corr') posFiltCorr = val;
+  else posFiltCat = val;
+  renderPos(posData);
 }
 
 let cambioRates = {};
@@ -422,14 +421,34 @@ async function loadHistorico() {
   histData = hist;
   cambioRates = {};
   cambio.forEach(c => { cambioRates[c.mes] = { brl: c.eur_brl, usd: c.eur_usd }; });
-  renderHist(histData);
-  renderHistRF();
+  histFiltCorr = 'TODAS'; histFiltCat = 'TODAS';
+  await loadHistoricoRF();
+  renderHistAll();
 }
 
-async function renderHistRF() {
-  const rf = await get('/operacoes?select=ticker,corretora,data_entrada,data_saida,custo_total,receita_total,resultado_moeda,resultado_eur,moeda,tese,nota,categoria&categoria=eq.RF&status=eq.FECHADO&order=data_saida.desc');
-  if (!rf.length) { document.getElementById('hist-rf-body').innerHTML = '<div class="empty">Nenhuma renda fixa fechada</div>'; return; }
-  document.getElementById('hist-rf-body').innerHTML = '<table style="font-size:12px"><thead><tr><th>Ativo</th><th>Corretora</th><th>Aplicação</th><th>Resgate</th><th class="tr">Valor aplicado</th><th class="tr">Valor resgatado</th><th class="tr">Resultado</th><th class="tr">Rent. %</th><th>Taxa</th><th>Nota</th></tr></thead><tbody>'+rf.map(r=>{ const rent=r.resultado_moeda!=null&&r.custo_total?(r.resultado_moeda/r.custo_total*100):null; return '<tr><td class="ticker">'+r.ticker+'</td><td><span class="pill p-'+r.corretora+'">'+r.corretora+'</span></td><td>'+dt(r.data_entrada)+'</td><td>'+dt(r.data_saida)+'</td><td class="tr">'+num(r.custo_total,2)+'</td><td class="tr">'+num(r.receita_total,2)+'</td><td class="tr '+( r.resultado_moeda>=0?'pos':'neg')+'">'+num(r.resultado_moeda,2)+'</td><td class="tr '+(rent!=null?(rent>=0?'pos':'neg'):'')+'">'+(rent!=null?rent.toFixed(2)+'%':'—')+'</td><td style="font-size:11px;color:#6b6b68">'+(r.tese||'—')+'</td><td style="font-size:11px;color:#9b9b98">'+(r.nota||'—')+'</td></tr>'; }).join('')+'</tbody></table>';
+let histFiltCorr = 'TODAS', histFiltCat = 'TODAS';
+let histDataRF = [];
+
+async function loadHistoricoRF() {
+  histDataRF = await get('/operacoes?select=ticker,corretora,data_entrada,data_saida,custo_total,receita_total,resultado_moeda,resultado_eur,moeda,tese,nota,categoria,quantidade,preco_entrada,preco_saida,dias_posicao&categoria=eq.RF&status=eq.FECHADO&order=data_saida.desc');
+  histDataRF = histDataRF.map(r => ({...r, categoria: 'RF'}));
+}
+
+function renderHistAll() {
+  const all = [...histData, ...histDataRF];
+  let filtered = all;
+  if (histFiltCorr !== 'TODAS') filtered = filtered.filter(r => r.corretora === histFiltCorr);
+  if (histFiltCat !== 'TODAS') filtered = filtered.filter(r => r.categoria === histFiltCat);
+  renderHist(filtered);
+}
+
+function filtHist(btn) {
+  const dim = btn.dataset.dim, val = btn.dataset.v;
+  document.querySelectorAll('#tab-historico [data-dim="'+dim+'"]').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  if (dim === 'corr') histFiltCorr = val;
+  else histFiltCat = val;
+  renderHistAll();
 }
 
 function getMesKey(dateStr) {
