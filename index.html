@@ -169,6 +169,9 @@
   </div>
 
   <div id="tab-historico" class="section">
+    <div id="hist-kpis" style="margin-bottom:16px"></div>
+    <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:12px">Resultado mensal realizado (EUR)</div><div style="position:relative;height:220px"><canvas id="hist-chart"></canvas></div></div>
+    <div id="hist-anual" style="margin-bottom:16px"></div>
     <div class="card" style="padding:0">
       <div class="table-head">
         <span class="table-title">Posições fechadas</span>
@@ -453,8 +456,60 @@ function toEur(val, moeda, mesKey) {
   return null;
 }
 
+let histChart = null;
+
 function renderHist(rows) {
   if (!rows.length) { document.getElementById('hist-body').innerHTML = '<div class="empty">Nenhuma posição fechada</div>'; return; }
+
+  // --- KPIs por classe ---
+  const CLASS_COLORS = {'Ação':'#1a7f4b','ETF':'#1565c0','FII':'#6a1b9a','Fundo':'#e65100','Renda Fixa':'#c0392b','Caixa':'#0288d1'};
+  const porClasse = {};
+  rows.forEach(r => { const c=r.classe_ativo||'Outro'; porClasse[c]=(porClasse[c]||0)+(r.resultado_eur||0); });
+  const totalEur = rows.reduce((s,r)=>s+(r.resultado_eur||0),0);
+  const klassesSorted = Object.entries(porClasse).sort((a,b)=>b[1]-a[1]);
+
+  if (document.getElementById('hist-kpis')) {
+    document.getElementById('hist-kpis').innerHTML = '<div class="card" style="padding:14px 18px"><div class="card-label" style="margin-bottom:12px">Resultado por classe (EUR)</div><div style="display:flex;flex-wrap:wrap;gap:10px">'+
+      klassesSorted.map(([c,v])=>{
+        const color=CLASS_COLORS[c]||'#9b9b98';
+        return '<div style="display:flex;align-items:center;gap:8px;background:#f9f9f8;border-radius:8px;padding:8px 12px;min-width:160px"><div style="width:10px;height:10px;border-radius:50%;background:'+color+';flex-shrink:0"></div><div><div style="font-size:11px;color:#6b6b68">'+c+'</div><div style="font-size:13px;font-weight:600;color:'+(v>=0?'#1a7f4b':'#c0392b')+'">'+num(v,2)+'</div></div><div style="margin-left:auto;font-size:11px;color:#9b9b98">'+(totalEur?((v/totalEur)*100).toFixed(1)+'%':'—')+'</div></div>';
+      }).join('')+
+      '<div style="display:flex;align-items:center;gap:8px;background:#1c1c1a;border-radius:8px;padding:8px 12px;min-width:160px"><div><div style="font-size:11px;color:#9b9b98">Total</div><div style="font-size:13px;font-weight:700;color:'+(totalEur>=0?'#4ade80':'#f87171')+'">'+num(totalEur,2)+'</div></div></div>'+
+      '</div></div>';
+  }
+
+  // --- Gráfico mensal ---
+  const byMonth = {};
+  rows.forEach(r => {
+    if (!r.data_saida) return;
+    const d=new Date(r.data_saida);
+    const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    if (!byMonth[key]) byMonth[key]={};
+    const c=r.classe_ativo||'Outro';
+    byMonth[key][c]=(byMonth[key][c]||0)+(r.resultado_eur||0);
+  });
+  const months=Object.keys(byMonth).sort();
+  const mlabels=months.map(m=>{const [y,mo]=m.split('-');const mn=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];return mn[+mo-1]+'/'+y.slice(2);});
+  const classes=Object.keys(CLASS_COLORS);
+  if (histChart) histChart.destroy();
+  const ctx=document.getElementById('hist-chart');
+  if (ctx) {
+    histChart=new Chart(ctx,{type:'bar',data:{labels:mlabels,datasets:[
+      ...classes.map(c=>({label:c,data:months.map(m=>byMonth[m]?.[c]||0),backgroundColor:(CLASS_COLORS[c]||'#9b9b98')+'cc',stack:'res'})),
+      {type:'line',label:'Total mensal',data:months.map(m=>Object.values(byMonth[m]||{}).reduce((s,v)=>s+v,0)),borderColor:'#1c1c1a',backgroundColor:'transparent',borderWidth:2,pointRadius:3,tension:0.3,order:0}
+    ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{font:{size:10},boxWidth:10}}},scales:{x:{stacked:true,grid:{display:false},ticks:{font:{size:9}}},y:{stacked:true,grid:{color:'#f0f0ee'},ticks:{font:{size:9},callback:v=>'€'+v.toLocaleString('de-DE')}}}}});
+  }
+
+  // --- Tabela anual ---
+  const CORRS=['XP','AV','R4','IBKR'];
+  const byYear={};
+  rows.forEach(r=>{if(!r.data_saida)return;const y=new Date(r.data_saida).getFullYear();if(!byYear[y])byYear[y]={};byYear[y][r.corretora]=(byYear[y][r.corretora]||0)+(r.resultado_eur||0);});
+  const years=Object.keys(byYear).sort((a,b)=>b-a);
+  if (document.getElementById('hist-anual')) {
+    document.getElementById('hist-anual').innerHTML='<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:400px"><thead><tr style="background:#fafaf9"><th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;border-bottom:1px solid #f0f0ee">Ano</th>'+CORRS.map(c=>'<th style="padding:10px 14px;text-align:right;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;border-bottom:1px solid #f0f0ee">'+c+'</th>').join('')+'<th style="padding:10px 14px;text-align:right;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;border-bottom:1px solid #f0f0ee">Total</th></tr></thead><tbody>'+years.map(y=>{const rowTot=CORRS.reduce((s,c)=>s+(byYear[y][c]||0),0);return'<tr><td style="padding:10px 14px;font-size:13px;font-weight:500;border-bottom:1px solid #f0f0ee">'+y+'</td>'+CORRS.map(c=>'<td style="padding:10px 14px;text-align:right;font-size:13px;border-bottom:1px solid #f0f0ee;color:'+(byYear[y][c]?(byYear[y][c]>=0?'#1a7f4b':'#c0392b'):'#9b9b98')+'">'+(byYear[y][c]?num(byYear[y][c],2):'€0')+'</td>').join('')+'<td style="padding:10px 14px;text-align:right;font-size:13px;font-weight:600;color:'+(rowTot>=0?'#1a7f4b':'#c0392b')+';border-bottom:1px solid #f0f0ee">'+num(rowTot,2)+'</td></tr>';}).join('')+'</tbody><tfoot><tr style="background:#fafaf9"><td style="padding:10px 14px;font-size:13px;font-weight:600;border-top:1px solid #e5e5e3">Total</td>'+CORRS.map(c=>{const v=years.reduce((s,y)=>s+(byYear[y][c]||0),0);return'<td style="padding:10px 14px;text-align:right;font-size:13px;font-weight:600;color:'+(v?(v>=0?'#1a7f4b':'#c0392b'):'#9b9b98')+';border-top:1px solid #e5e5e3">'+(v?num(v,2):'€0')+'</td>';}).join('')+'<td style="padding:10px 14px;text-align:right;font-size:13px;font-weight:700;color:'+(totalEur>=0?'#1a7f4b':'#c0392b')+';border-top:1px solid #e5e5e3">'+num(totalEur,2)+'</td></tr></tfoot></table></div>';
+  }
+
+  // --- Tabela ---
   document.getElementById('hist-body').innerHTML = `<table style="font-size:12px">
     <thead><tr>
       <th>Ativo</th><th>Corretora</th><th>Classe</th><th>Setor</th><th>Entrada</th><th>Saída</th>
@@ -470,7 +525,6 @@ function renderHist(rows) {
       <th class="tr" style="white-space:normal;min-width:70px">Resultado<br>EUR</th>
       <th class="tr" style="white-space:normal;min-width:55px">Rent.<br>%</th>
       <th class="tr" style="white-space:normal;min-width:40px">Dias</th>
-      <th style="white-space:normal;min-width:80px">Nota</th>
     </tr></thead>
     <tbody>${rows.map(r => {
       const mesE = getMesKey(r.data_entrada);
@@ -497,7 +551,6 @@ function renderHist(rows) {
         <td class="tr ${dc(r.resultado_eur)}">${num(r.resultado_eur, 2)}</td>
         <td class="tr ${rent != null ? (rent >= 0 ? 'pos' : 'neg') : ''}">${rent != null ? rent.toFixed(2) + '%' : '—'}</td>
         <td class="tr">${r.dias_posicao ?? '—'}</td>
-        <td style="font-size:11px;color:#9b9b98">${r.nota || '—'}</td>
       </tr>`;
     }).join('')}</tbody>
   </table>`;
