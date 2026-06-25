@@ -150,11 +150,13 @@
             <button class="fbtn" data-dim="corr" data-v="R4" onclick="filtPos(this)">R4</button>
           </div>
           <div style="display:flex;gap:4px">
-            <button class="fbtn on" data-dim="cat" data-v="TODAS" onclick="filtPos(this)">Todos</button>
-            <button class="fbtn" data-dim="cat" data-v="ACAO" onclick="filtPos(this)">Ação</button>
-            <button class="fbtn" data-dim="cat" data-v="ETF" onclick="filtPos(this)">ETF</button>
-            <button class="fbtn" data-dim="cat" data-v="FUNDO" onclick="filtPos(this)">Fundo</button>
-            <button class="fbtn" data-dim="cat" data-v="RF" onclick="filtPos(this)">Renda Fixa</button>
+            <button class="fbtn on" data-dim="classe" data-v="TODAS" onclick="filtPos(this)">Todos</button>
+            <button class="fbtn" data-dim="classe" data-v="Ação" onclick="filtPos(this)">Ação</button>
+            <button class="fbtn" data-dim="classe" data-v="ETF" onclick="filtPos(this)">ETF</button>
+            <button class="fbtn" data-dim="classe" data-v="FII" onclick="filtPos(this)">FII</button>
+            <button class="fbtn" data-dim="classe" data-v="Fundo" onclick="filtPos(this)">Fundo</button>
+            <button class="fbtn" data-dim="classe" data-v="Renda Fixa" onclick="filtPos(this)">Renda Fixa</button>
+            <button class="fbtn" data-dim="classe" data-v="Caixa" onclick="filtPos(this)">Caixa</button>
           </div>
         </div>
       </div>
@@ -175,11 +177,12 @@
             <button class="fbtn" data-dim="corr" data-v="R4" onclick="filtHist(this)">R4</button>
           </div>
           <div style="display:flex;gap:4px">
-            <button class="fbtn on" data-dim="cat" data-v="TODAS" onclick="filtHist(this)">Todos</button>
-            <button class="fbtn" data-dim="cat" data-v="ACAO" onclick="filtHist(this)">Ação</button>
-            <button class="fbtn" data-dim="cat" data-v="ETF" onclick="filtHist(this)">ETF</button>
-            <button class="fbtn" data-dim="cat" data-v="FUNDO" onclick="filtHist(this)">Fundo</button>
-            <button class="fbtn" data-dim="cat" data-v="RF" onclick="filtHist(this)">Renda Fixa</button>
+            <button class="fbtn on" data-dim="classe" data-v="TODAS" onclick="filtHist(this)">Todos</button>
+            <button class="fbtn" data-dim="classe" data-v="Ação" onclick="filtHist(this)">Ação</button>
+            <button class="fbtn" data-dim="classe" data-v="ETF" onclick="filtHist(this)">ETF</button>
+            <button class="fbtn" data-dim="classe" data-v="FII" onclick="filtHist(this)">FII</button>
+            <button class="fbtn" data-dim="classe" data-v="Fundo" onclick="filtHist(this)">Fundo</button>
+            <button class="fbtn" data-dim="classe" data-v="Renda Fixa" onclick="filtHist(this)">Renda Fixa</button>
           </div>
         </div>
       </div>
@@ -383,32 +386,32 @@ async function loadGeral() {
   }).join('');
 }
 
-let posFiltCorr = 'TODAS', posFiltCat = 'TODAS';
+let posFiltCorr = 'TODAS', posFiltClasse = 'TODAS';
 
 async function loadPosicoes() {
   posData = await get('/posicoes_abertas?select=*&order=data_entrada.asc');
-  posFiltCorr = 'TODAS'; posFiltCat = 'TODAS';
+  posFiltCorr = 'TODAS'; posFiltClasse = 'TODAS';
   renderPos(posData);
 }
 
 function renderPos(rows) {
   let filtered = rows;
   if (posFiltCorr !== 'TODAS') filtered = filtered.filter(r => r.corretora === posFiltCorr);
-  if (posFiltCat !== 'TODAS') filtered = filtered.filter(r => r.categoria === posFiltCat);
+  if (posFiltClasse !== 'TODAS') filtered = filtered.filter(r => r.classe_ativo === posFiltClasse);
   if (!filtered.length) { document.getElementById('pos-body').innerHTML = '<div class="empty">Nenhuma posição encontrada</div>'; return; }
-  document.getElementById('pos-body').innerHTML = '<table style="font-size:12px"><thead><tr><th>Ativo</th><th>Corretora</th><th>Tipo</th><th>Entrada</th><th class="tr">Qtd</th><th class="tr">PM entrada</th><th class="tr">Custo total</th><th>Moeda</th><th>Taxa/Status</th></tr></thead><tbody>'+filtered.map(r=>'<tr><td class="ticker">'+r.ticker+'</td><td><span class="pill p-'+r.corretora+'">'+r.corretora+'</span></td><td style="font-size:11px;color:#9b9b98">'+(r.categoria||'—')+'</td><td>'+dt(r.data_entrada)+'</td><td class="tr">'+(r.quantidade?num(r.quantidade,2):'—')+'</td><td class="tr">'+(r.preco_entrada?num(r.preco_entrada,2):'—')+'</td><td class="tr">'+num(r.custo_total,2)+'</td><td style="font-size:11px;color:#6b6b68">'+r.moeda+'</td><td style="font-size:11px;color:#6b6b68">'+(r.tese||r.status||'—')+'</td></tr>').join('')+'</tbody></table>';
+  document.getElementById('pos-body').innerHTML = '<table style="font-size:12px"><thead><tr><th>Ativo</th><th>Corretora</th><th>Classe</th><th>Setor</th><th>Entrada</th><th class="tr">Qtd</th><th class="tr">PM entrada</th><th class="tr">Custo total</th><th>Moeda</th><th>Status</th></tr></thead><tbody>'+filtered.map(r=>'<tr><td class="ticker">'+r.ticker+'</td><td><span class="pill p-'+r.corretora+'">'+r.corretora+'</span></td><td style="font-size:11px;color:#9b9b98">'+(r.classe_ativo||r.categoria||'—')+'</td><td style="font-size:11px;color:#9b9b98">'+(r.setor||'—')+'</td><td>'+dt(r.data_entrada)+'</td><td class="tr">'+(r.quantidade?num(r.quantidade,2):'—')+'</td><td class="tr">'+(r.preco_entrada?num(r.preco_entrada,2):'—')+'</td><td class="tr">'+num(r.custo_total,2)+'</td><td style="font-size:11px;color:#6b6b68">'+r.moeda+'</td><td style="font-size:11px;color:#6b6b68">'+(r.tese_curta||r.tese||r.status||'—')+'</td></tr>').join('')+'</tbody></table>';
 }
 
 function filtPos(btn) {
   const dim = btn.dataset.dim, val = btn.dataset.v;
   document.querySelectorAll('#tab-posicoes [data-dim="'+dim+'"]').forEach(b => b.classList.remove('on'));
   btn.classList.add('on');
-  if (dim === 'corr') posFiltCorr = val; else posFiltCat = val;
+  if (dim === 'corr') posFiltCorr = val; else posFiltClasse = val;
   renderPos(posData);
 }
 
 let cambioRates = {};
-let histFiltCorr = 'TODAS', histFiltCat = 'TODAS';
+let histFiltCorr = 'TODAS', histFiltClasse = 'TODAS';
 
 async function loadHistorico() {
   const [hist, cambio] = await Promise.all([
@@ -418,14 +421,14 @@ async function loadHistorico() {
   histData = hist.map(r => ({...r, categoria: r.categoria || (r.tipo === 'RF' ? 'RF' : (r.tipo === 'ETF' ? 'ETF' : (r.tipo === 'FUNDO' ? 'FUNDO' : 'ACAO')))}));
   cambioRates = {};
   cambio.forEach(c => { cambioRates[c.mes] = { brl: c.eur_brl, usd: c.eur_usd }; });
-  histFiltCorr = 'TODAS'; histFiltCat = 'TODAS';
+  histFiltCorr = 'TODAS'; histFiltClasse = 'TODAS';
   renderHistAll();
 }
 
 function renderHistAll() {
   let filtered = histData;
   if (histFiltCorr !== 'TODAS') filtered = filtered.filter(r => r.corretora === histFiltCorr);
-  if (histFiltCat !== 'TODAS') filtered = filtered.filter(r => r.categoria === histFiltCat);
+  if (histFiltClasse !== 'TODAS') filtered = filtered.filter(r => r.classe_ativo === histFiltClasse);
   renderHist(filtered);
 }
 
@@ -498,7 +501,7 @@ function filtHist(btn) {
   const dim = btn.dataset.dim, val = btn.dataset.v;
   document.querySelectorAll('#tab-historico [data-dim="'+dim+'"]').forEach(b => b.classList.remove('on'));
   btn.classList.add('on');
-  if (dim === 'corr') histFiltCorr = val; else histFiltCat = val;
+  if (dim === 'corr') histFiltCorr = val; else histFiltClasse = val;
   renderHistAll();
 }
 
