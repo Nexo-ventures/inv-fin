@@ -453,7 +453,7 @@ function renderHist(rows) {
   if (!rows.length) { document.getElementById('hist-body').innerHTML = '<div class="empty">Nenhuma posição fechada</div>'; return; }
   document.getElementById('hist-body').innerHTML = `<table style="font-size:12px">
     <thead><tr>
-      <th>Ativo</th><th>Corretora</th><th>Entrada</th><th>Saída</th>
+      <th>Ativo</th><th>Corretora</th><th>Classe</th><th>Setor</th><th>Entrada</th><th>Saída</th>
       <th class="tr">Qtd</th>
       <th class="tr" style="white-space:normal;min-width:60px">PM<br>entrada</th>
       <th class="tr" style="white-space:normal;min-width:60px">PM<br>saída</th>
@@ -477,6 +477,8 @@ function renderHist(rows) {
       return `<tr>
         <td class="ticker">${r.ticker}</td>
         <td><span class="pill p-${r.corretora}">${r.corretora}</span></td>
+        <td style="font-size:11px;color:#9b9b98">${r.classe_ativo||'—'}</td>
+        <td style="font-size:11px;color:#9b9b98">${r.setor||'—'}</td>
         <td>${dt(r.data_entrada)}</td>
         <td>${dt(r.data_saida)}</td>
         <td class="tr">${num(r.quantidade, 2)}</td>
