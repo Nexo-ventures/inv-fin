@@ -390,7 +390,7 @@ async function loadPosicoes() {
     get('/posicoes_abertas?select=*&order=data_entrada.asc'),
     get('/operacoes?select=ticker,corretora,data_entrada,custo_total,moeda,tese,status,categoria,quantidade,preco_entrada&categoria=eq.RF&status=eq.ABERTO&order=data_entrada.asc')
   ]);
-  posData = [...rv, ...rf.map(r => ({...r, categoria: r.categoria || 'RF'}))];
+  posData = [...rv, ...rf.map(r => ({...r, categoria: 'RF'}))];
   posFiltCorr = 'TODAS'; posFiltCat = 'TODAS';
   renderPos(posData);
 }
@@ -407,48 +407,34 @@ function filtPos(btn) {
   const dim = btn.dataset.dim, val = btn.dataset.v;
   document.querySelectorAll('#tab-posicoes [data-dim="'+dim+'"]').forEach(b => b.classList.remove('on'));
   btn.classList.add('on');
-  if (dim === 'corr') posFiltCorr = val;
-  else posFiltCat = val;
+  if (dim === 'corr') posFiltCorr = val; else posFiltCat = val;
   renderPos(posData);
 }
 
 let cambioRates = {};
+let histDataRF = [];
+let histFiltCorr = 'TODAS', histFiltCat = 'TODAS';
+
 async function loadHistorico() {
-  const [hist, cambio] = await Promise.all([
+  const [hist, cambio, rf] = await Promise.all([
     get('/resultado_fechado?select=*&order=data_saida.desc&limit=200'),
-    get('/cambio?select=mes,eur_brl,eur_usd')
+    get('/cambio?select=mes,eur_brl,eur_usd'),
+    get('/operacoes?select=ticker,corretora,data_entrada,data_saida,custo_total,receita_total,resultado_moeda,resultado_eur,moeda,tese,nota,categoria,quantidade,preco_entrada,preco_saida&categoria=eq.RF&status=eq.FECHADO&order=data_saida.desc')
   ]);
   histData = hist;
+  histDataRF = rf.map(r => ({...r, categoria: 'RF', dias_posicao: r.data_entrada && r.data_saida ? Math.round((new Date(r.data_saida)-new Date(r.data_entrada))/86400000) : null}));
   cambioRates = {};
   cambio.forEach(c => { cambioRates[c.mes] = { brl: c.eur_brl, usd: c.eur_usd }; });
   histFiltCorr = 'TODAS'; histFiltCat = 'TODAS';
-  await loadHistoricoRF();
   renderHistAll();
 }
 
-let histFiltCorr = 'TODAS', histFiltCat = 'TODAS';
-let histDataRF = [];
-
-async function loadHistoricoRF() {
-  histDataRF = await get('/operacoes?select=ticker,corretora,data_entrada,data_saida,custo_total,receita_total,resultado_moeda,resultado_eur,moeda,tese,nota,categoria,quantidade,preco_entrada,preco_saida,dias_posicao&categoria=eq.RF&status=eq.FECHADO&order=data_saida.desc');
-  histDataRF = histDataRF.map(r => ({...r, categoria: 'RF'}));
-}
-
 function renderHistAll() {
-  const all = [...histData, ...histDataRF];
+  const all = [...histData, ...histDataRF].sort((a,b) => (b.data_saida||'').localeCompare(a.data_saida||''));
   let filtered = all;
   if (histFiltCorr !== 'TODAS') filtered = filtered.filter(r => r.corretora === histFiltCorr);
   if (histFiltCat !== 'TODAS') filtered = filtered.filter(r => r.categoria === histFiltCat);
   renderHist(filtered);
-}
-
-function filtHist(btn) {
-  const dim = btn.dataset.dim, val = btn.dataset.v;
-  document.querySelectorAll('#tab-historico [data-dim="'+dim+'"]').forEach(b => b.classList.remove('on'));
-  btn.classList.add('on');
-  if (dim === 'corr') histFiltCorr = val;
-  else histFiltCat = val;
-  renderHistAll();
 }
 
 function getMesKey(dateStr) {
@@ -516,10 +502,12 @@ function renderHist(rows) {
   </table>`;
 }
 
-function filtHist(c, btn) {
-  document.querySelectorAll('#tab-historico .fbtn').forEach(b => b.classList.remove('on'));
+function filtHist(btn) {
+  const dim = btn.dataset.dim, val = btn.dataset.v;
+  document.querySelectorAll('#tab-historico [data-dim="'+dim+'"]').forEach(b => b.classList.remove('on'));
   btn.classList.add('on');
-  renderHist(c === 'TODAS' ? histData : histData.filter(r => r.corretora === c));
+  if (dim === 'corr') histFiltCorr = val; else histFiltCat = val;
+  renderHistAll();
 }
 
 async function loadRenda() {
