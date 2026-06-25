@@ -72,6 +72,10 @@
   .empty { padding: 40px; text-align: center; color: #9b9b98; font-size: 13px; }
   .err { padding: 20px; color: #c0392b; font-size: 13px; }
   .status-bar { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 10px 16px; margin-bottom: 16px; font-size: 12px; color: #166534; display: flex; align-items: center; gap: 8px; }
+.modal-item { background:#f9f9f8; border-radius:8px; padding:10px 12px; }
+.modal-label { font-size:10px; color:#9b9b98; text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px; }
+.modal-value { font-size:13px; font-weight:500; color:#1c1c1a; }
+.modal-tese { grid-column:1/-1; }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 </head>
@@ -399,7 +403,7 @@ function renderPos(rows) {
   if (posFiltCorr !== 'TODAS') filtered = filtered.filter(r => r.corretora === posFiltCorr);
   if (posFiltClasse !== 'TODAS') filtered = filtered.filter(r => r.classe_ativo === posFiltClasse);
   if (!filtered.length) { document.getElementById('pos-body').innerHTML = '<div class="empty">Nenhuma posição encontrada</div>'; return; }
-  document.getElementById('pos-body').innerHTML = '<table style="font-size:12px"><thead><tr><th>Ativo</th><th>Corretora</th><th>Classe</th><th>Setor</th><th>Entrada</th><th class="tr">Qtd</th><th class="tr">PM entrada</th><th class="tr">Custo total</th><th>Moeda</th><th>Status</th></tr></thead><tbody>'+filtered.map(r=>'<tr><td class="ticker">'+r.ticker+'</td><td><span class="pill p-'+r.corretora+'">'+r.corretora+'</span></td><td style="font-size:11px;color:#9b9b98">'+(r.classe_ativo||r.categoria||'—')+'</td><td style="font-size:11px;color:#9b9b98">'+(r.setor||'—')+'</td><td>'+dt(r.data_entrada)+'</td><td class="tr">'+(r.quantidade?num(r.quantidade,2):'—')+'</td><td class="tr">'+(r.preco_entrada?num(r.preco_entrada,2):'—')+'</td><td class="tr">'+num(r.custo_total,2)+'</td><td style="font-size:11px;color:#6b6b68">'+r.moeda+'</td><td style="font-size:11px;color:#6b6b68">'+(r.tese_curta||r.tese||r.status||'—')+'</td></tr>').join('')+'</tbody></table>';
+  document.getElementById('pos-body').innerHTML = '<table style="font-size:12px"><thead><tr><th>Ativo</th><th>Corretora</th><th>Classe</th><th>Setor</th><th>Entrada</th><th class="tr">Qtd</th><th class="tr">PM entrada</th><th class="tr">Custo total</th><th>Moeda</th><th>Status</th></tr></thead><tbody>'+filtered.map(r=>'<tr><td class="ticker" style="cursor:pointer;text-decoration:underline dotted" onclick="abrirModal(\''+ r.ticker +'\')">'+r.ticker+'</td><td><span class="pill p-'+r.corretora+'">'+r.corretora+'</span></td><td style="font-size:11px;color:#9b9b98">'+(r.classe_ativo||r.categoria||'—')+'</td><td style="font-size:11px;color:#9b9b98">'+(r.setor||'—')+'</td><td>'+dt(r.data_entrada)+'</td><td class="tr">'+(r.quantidade?num(r.quantidade,2):'—')+'</td><td class="tr">'+(r.preco_entrada?num(r.preco_entrada,2):'—')+'</td><td class="tr">'+num(r.custo_total,2)+'</td><td style="font-size:11px;color:#6b6b68">'+r.moeda+'</td><td style="font-size:11px;color:#6b6b68">'+(r.tese_curta||r.tese||r.status||'—')+'</td></tr>').join('')+'</tbody></table>';
 }
 
 function filtPos(btn) {
@@ -475,7 +479,7 @@ function renderHist(rows) {
       const receitaEur = r.moeda === 'EUR' ? r.receita_total : toEur(r.receita_total, r.moeda, mesS);
       const rent = r.resultado_moeda != null && r.custo_total ? (r.resultado_moeda / r.custo_total * 100) : null;
       return `<tr>
-        <td class="ticker">${r.ticker}</td>
+        <td class="ticker" style="cursor:pointer;text-decoration:underline dotted" onclick="abrirModal('${r.ticker}')">${r.ticker}</td>
         <td><span class="pill p-${r.corretora}">${r.corretora}</span></td>
         <td style="font-size:11px;color:#9b9b98">${r.classe_ativo||'—'}</td>
         <td style="font-size:11px;color:#9b9b98">${r.setor||'—'}</td>
@@ -1011,7 +1015,42 @@ async function loadAuditoria() {
       el.textContent = 'Erro ao conectar ao banco: ' + e.message;
     });
   }
+function abrirModal(ticker) {
+  const all = [...(posData||[]), ...(histData||[])];
+  const r = all.find(x => x.ticker === ticker);
+  if (!r) return;
+  document.getElementById('modal-ticker').textContent = r.ticker;
+  document.getElementById('modal-classe').textContent = [r.classe_ativo, r.tipo_ativo].filter(Boolean).join(' · ');
+  const fields = [
+    ['Setor', r.setor], ['Subsetor', r.subsetor],
+    ['Bolsa', r.bolsa], ['País', r.pais],
+    ['Região', r.regiao_macro], ['Moeda negoc.', r.moeda_negociacao],
+    ['Moeda exp.', r.moeda_exposicao], ['Benchmark', r.benchmark],
+    ['Emissor', r.emissor], ['Driver econômico', r.driver_economico],
+    ['Status', r.status], ['Classificação', r.classificacao],
+  ];
+  document.getElementById('modal-body').innerHTML =
+    fields.filter(([,v])=>v&&v!=='—').map(([l,v])=>`<div class="modal-item"><div class="modal-label">${l}</div><div class="modal-value">${v}</div></div>`).join('') +
+    (r.tese_curta||r.tese ? `<div class="modal-item modal-tese"><div class="modal-label">Tese</div><div class="modal-value" style="font-size:12px;line-height:1.5">${r.tese_curta||r.tese}</div></div>` : '') +
+    (r.nota ? `<div class="modal-item modal-tese"><div class="modal-label">Nota</div><div class="modal-value" style="font-size:12px;line-height:1.5">${r.nota}</div></div>` : '');
+  document.getElementById('ativo-modal').style.display = 'block';
+}
+function fecharModal() { document.getElementById('ativo-modal').style.display = 'none'; }
+document.addEventListener('keydown', e => { if(e.key==='Escape') fecharModal(); });
+
 })();
 </script>
+  <div id="ativo-modal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.4);backdrop-filter:blur(2px)" onclick="if(event.target===this)fecharModal()">
+    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:16px;padding:28px;min-width:320px;max-width:520px;width:90%;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.2)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+        <div>
+          <div id="modal-ticker" style="font-size:22px;font-weight:700;color:#1c1c1a"></div>
+          <div id="modal-classe" style="font-size:12px;color:#9b9b98;margin-top:2px"></div>
+        </div>
+        <button onclick="fecharModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#9b9b98;padding:4px 8px">✕</button>
+      </div>
+      <div id="modal-body" style="display:grid;grid-template-columns:1fr 1fr;gap:12px"></div>
+    </div>
+  </div>
 </body>
 </html>
