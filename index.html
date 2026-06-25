@@ -457,25 +457,76 @@ function toEur(val, moeda, mesKey) {
 }
 
 let histChart = null;
+let histPizzaChart = null;
 
 function renderHist(rows) {
   if (!rows.length) { document.getElementById('hist-body').innerHTML = '<div class="empty">Nenhuma posição fechada</div>'; return; }
 
-  // --- KPIs por classe ---
   const CLASS_COLORS = {'Ação':'#1a7f4b','ETF':'#1565c0','FII':'#6a1b9a','Fundo':'#e65100','Renda Fixa':'#c0392b','Caixa':'#0288d1'};
+  const SETOR_COLORS = ['#1a7f4b','#1565c0','#6a1b9a','#e65100','#c0392b','#0288d1','#558b2f','#f57f17','#37474f','#ad1457'];
+
   const porClasse = {};
   rows.forEach(r => { const c=r.classe_ativo||'Outro'; porClasse[c]=(porClasse[c]||0)+(r.resultado_eur||0); });
   const totalEur = rows.reduce((s,r)=>s+(r.resultado_eur||0),0);
   const klassesSorted = Object.entries(porClasse).sort((a,b)=>b[1]-a[1]);
 
+  // Taxa de acerto
+  const comResult = rows.filter(r=>r.resultado_eur!=null);
+  const positivas = comResult.filter(r=>r.resultado_eur>0);
+  const taxaAcerto = comResult.length ? (positivas.length/comResult.length*100).toFixed(1) : '—';
+  const totalCustoEur = rows.reduce((s,r) => {
+    if (!r.custo_total) return s;
+    const mes = getMesKey(r.data_entrada);
+    if (r.moeda === 'EUR') return s + r.custo_total;
+    const rate = cambioRates[mes];
+    if (!rate) return s;
+    if (r.moeda === 'BRL' && rate.brl) return s + r.custo_total / rate.brl;
+    if (r.moeda === 'USD' && rate.usd) return s + r.custo_total / rate.usd;
+    return s;
+  }, 0);
+  const rentTotal = totalCustoEur ? (totalEur / totalCustoEur * 100) : null;
+
+  // Top 5 ganhos e perdas
+  const sorted = [...comResult].sort((a,b)=>b.resultado_eur-a.resultado_eur);
+  const top5g = sorted.slice(0,5);
+  const top5p = sorted.slice(-5).reverse();
+
+  // Por setor (valor absoluto para pizza)
+  const porSetor = {};
+  rows.forEach(r => { if(r.resultado_eur==null) return; const s=r.setor||'Outro'; porSetor[s]=(porSetor[s]||0)+Math.abs(r.resultado_eur); });
+  const setoresSorted = Object.entries(porSetor).sort((a,b)=>b[1]-a[1]);
+
   if (document.getElementById('hist-kpis')) {
-    document.getElementById('hist-kpis').innerHTML = '<div class="card" style="padding:14px 18px"><div class="card-label" style="margin-bottom:12px">Resultado por classe (EUR)</div><div style="display:flex;flex-wrap:wrap;gap:10px">'+
-      klassesSorted.map(([c,v])=>{
-        const color=CLASS_COLORS[c]||'#9b9b98';
-        return '<div style="display:flex;align-items:center;gap:8px;background:#f9f9f8;border-radius:8px;padding:8px 12px;min-width:160px"><div style="width:10px;height:10px;border-radius:50%;background:'+color+';flex-shrink:0"></div><div><div style="font-size:11px;color:#6b6b68">'+c+'</div><div style="font-size:13px;font-weight:600;color:'+(v>=0?'#1a7f4b':'#c0392b')+'">'+num(v,2)+'</div></div><div style="margin-left:auto;font-size:11px;color:#9b9b98">'+(totalEur?((v/totalEur)*100).toFixed(1)+'%':'—')+'</div></div>';
-      }).join('')+
-      '<div style="display:flex;align-items:center;gap:8px;background:#1c1c1a;border-radius:8px;padding:8px 12px;min-width:160px"><div><div style="font-size:11px;color:#9b9b98">Total</div><div style="font-size:13px;font-weight:700;color:'+(totalEur>=0?'#4ade80':'#f87171')+'">'+num(totalEur,2)+'</div></div></div>'+
-      '</div></div>';
+    document.getElementById('hist-kpis').innerHTML =
+      // Linha 1: KPIs gerais
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px">'+
+      '<div class="card" style="padding:14px 18px"><div class="card-label">Resultado total</div><div style="font-size:20px;font-weight:700;color:'+(totalEur>=0?'#1a7f4b':'#c0392b')+'">'+num(totalEur,2)+'</div></div>'+
+      '<div class="card" style="padding:14px 18px"><div class="card-label">Rentabilidade total</div><div style="font-size:20px;font-weight:700;color:'+(rentTotal!=null?(rentTotal>=0?'#1a7f4b':'#c0392b'):'#9b9b98')+'">'+(rentTotal!=null?rentTotal.toFixed(2)+'%':'—')+'</div><div style="font-size:11px;color:#9b9b98">sobre capital investido</div></div>'+
+      '<div class="card" style="padding:14px 18px"><div class="card-label">Taxa de acerto</div><div style="font-size:20px;font-weight:700;color:#1c1c1a">'+taxaAcerto+'%</div><div style="font-size:11px;color:#9b9b98">'+positivas.length+' de '+comResult.length+' operações</div></div>'+
+      '<div class="card" style="padding:14px 18px"><div class="card-label">Maior ganho</div><div style="font-size:16px;font-weight:700;color:#1a7f4b">'+(top5g[0]?num(top5g[0].resultado_eur,2):'—')+'</div><div style="font-size:11px;color:#9b9b98">'+(top5g[0]?top5g[0].ticker:'')+'</div></div>'+
+      '<div class="card" style="padding:14px 18px"><div class="card-label">Maior perda</div><div style="font-size:16px;font-weight:700;color:#c0392b">'+(top5p[0]?num(top5p[0].resultado_eur,2):'—')+'</div><div style="font-size:11px;color:#9b9b98">'+(top5p[0]?top5p[0].ticker:'')+'</div></div>'+
+      '</div>'+
+      // Linha 2: por classe
+      '<div class="card" style="padding:14px 18px;margin-bottom:16px"><div class="card-label" style="margin-bottom:12px">Resultado por classe (EUR)</div><div style="display:flex;flex-wrap:wrap;gap:10px">'+
+      klassesSorted.map(([c,v])=>{const color=CLASS_COLORS[c]||'#9b9b98';return '<div style="display:flex;align-items:center;gap:8px;background:#f9f9f8;border-radius:8px;padding:8px 12px;min-width:160px"><div style="width:10px;height:10px;border-radius:50%;background:'+color+';flex-shrink:0"></div><div><div style="font-size:11px;color:#6b6b68">'+c+'</div><div style="font-size:13px;font-weight:600;color:'+(v>=0?'#1a7f4b':'#c0392b')+'">'+num(v,2)+'</div></div></div>';}).join('')+
+      '</div></div>'+
+      // Linha 3: top 5 ganhos e perdas
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">'+
+      '<div class="card" style="padding:14px 18px"><div class="card-label" style="margin-bottom:10px">Top 5 Ganhos</div>'+top5g.map((r,i)=>'<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #f0f0ee"><div style="font-size:12px;font-weight:500">'+(i+1)+'. '+r.ticker+'<span style="font-size:10px;color:#9b9b98;margin-left:6px">'+dt(r.data_saida)+'</span></div><div style="font-size:12px;font-weight:600;color:#1a7f4b">'+num(r.resultado_eur,2)+'</div></div>').join('')+'</div>'+
+      '<div class="card" style="padding:14px 18px"><div class="card-label" style="margin-bottom:10px">Top 5 Perdas</div>'+top5p.map((r,i)=>'<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #f0f0ee"><div style="font-size:12px;font-weight:500">'+(i+1)+'. '+r.ticker+'<span style="font-size:10px;color:#9b9b98;margin-left:6px">'+dt(r.data_saida)+'</span></div><div style="font-size:12px;font-weight:600;color:#c0392b">'+num(r.resultado_eur,2)+'</div></div>').join('')+'</div>'+
+      '</div>'+
+      // Linha 4: pizza por setor
+      '<div style="display:grid;grid-template-columns:240px 1fr;gap:12px;margin-bottom:16px">'+
+      '<div class="card"><div class="card-label" style="margin-bottom:8px">Volume por setor</div><div style="position:relative;height:200px"><canvas id="hist-pizza"></canvas></div></div>'+
+      '<div class="card" style="padding:14px 18px"><div class="card-label" style="margin-bottom:10px">Por setor</div><div style="display:flex;flex-direction:column;gap:6px">'+setoresSorted.map(([s,v],i)=>'<div style="display:flex;align-items:center;gap:8px"><div style="width:8px;height:8px;border-radius:50%;background:'+SETOR_COLORS[i%SETOR_COLORS.length]+';flex-shrink:0"></div><div style="font-size:12px;flex:1">'+s+'</div><div style="font-size:12px;font-weight:500;color:#9b9b98">'+num(v,2)+'</div></div>').join('')+'</div></div>'+
+      '</div>';
+
+    // Pizza
+    setTimeout(()=>{
+      if (histPizzaChart) histPizzaChart.destroy();
+      const pc=document.getElementById('hist-pizza');
+      if(pc) histPizzaChart=new Chart(pc,{type:'doughnut',data:{labels:setoresSorted.map(([s])=>s),datasets:[{data:setoresSorted.map(([,v])=>v),backgroundColor:setoresSorted.map((_,i)=>SETOR_COLORS[i%SETOR_COLORS.length]),borderWidth:2,borderColor:'#fff'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}});
+    },50);
   }
 
   // --- Gráfico mensal ---
@@ -512,7 +563,10 @@ function renderHist(rows) {
   // --- Tabela ---
   document.getElementById('hist-body').innerHTML = `<table style="font-size:12px">
     <thead><tr>
-      <th>Ativo</th><th>Corretora</th><th>Classe</th><th>Setor</th><th>Entrada</th><th>Saída</th>
+      <th>Ativo</th><th>Corretora</th><th>Classe</th><th>Setor</th>
+      <th class="tr" style="white-space:normal;min-width:70px">Resultado<br>EUR</th>
+      <th class="tr" style="white-space:normal;min-width:55px">Rent.<br>%</th>
+      <th>Entrada</th><th>Saída</th>
       <th class="tr">Qtd</th>
       <th class="tr" style="white-space:normal;min-width:60px">PM<br>entrada</th>
       <th class="tr" style="white-space:normal;min-width:60px">PM<br>saída</th>
@@ -522,8 +576,6 @@ function renderHist(rows) {
       <th class="tr" style="white-space:normal;min-width:55px">V.entrada<br>EUR</th>
       <th class="tr" style="white-space:normal;min-width:55px">V.saída<br>EUR</th>
       <th class="tr" style="white-space:normal;min-width:70px">Resultado<br>moeda</th>
-      <th class="tr" style="white-space:normal;min-width:70px">Resultado<br>EUR</th>
-      <th class="tr" style="white-space:normal;min-width:55px">Rent.<br>%</th>
       <th class="tr" style="white-space:normal;min-width:40px">Dias</th>
     </tr></thead>
     <tbody>${rows.map(r => {
@@ -537,6 +589,8 @@ function renderHist(rows) {
         <td><span class="pill p-${r.corretora}">${r.corretora}</span></td>
         <td style="font-size:11px;color:#9b9b98">${r.classe_ativo||'—'}</td>
         <td style="font-size:11px;color:#9b9b98">${r.setor||'—'}</td>
+        <td class="tr ${dc(r.resultado_eur)}">${num(r.resultado_eur, 2)}</td>
+        <td class="tr ${rent != null ? (rent >= 0 ? 'pos' : 'neg') : ''}">${rent != null ? rent.toFixed(2) + '%' : '—'}</td>
         <td>${dt(r.data_entrada)}</td>
         <td>${dt(r.data_saida)}</td>
         <td class="tr">${num(r.quantidade, 2)}</td>
@@ -548,8 +602,6 @@ function renderHist(rows) {
         <td class="tr" style="color:#6b6b68">${custoEur ? num(custoEur, 2) : '—'}</td>
         <td class="tr" style="color:#6b6b68">${receitaEur ? num(receitaEur, 2) : '—'}</td>
         <td class="tr ${dc(r.resultado_moeda)}">${r.resultado_moeda != null ? num(r.resultado_moeda, 2) : '—'}</td>
-        <td class="tr ${dc(r.resultado_eur)}">${num(r.resultado_eur, 2)}</td>
-        <td class="tr ${rent != null ? (rent >= 0 ? 'pos' : 'neg') : ''}">${rent != null ? rent.toFixed(2) + '%' : '—'}</td>
         <td class="tr">${r.dias_posicao ?? '—'}</td>
       </tr>`;
     }).join('')}</tbody>
