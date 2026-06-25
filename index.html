@@ -386,7 +386,7 @@ async function loadGeral() {
 let posFiltCorr = 'TODAS', posFiltCat = 'TODAS';
 
 async function loadPosicoes() {
-  posData = await get('/operacoes?select=ticker,corretora,data_entrada,custo_total,moeda,tese,status,categoria,quantidade,preco_entrada&status=eq.ABERTO&order=data_entrada.asc');
+  posData = await get('/posicoes_abertas?select=*&order=data_entrada.asc');
   posFiltCorr = 'TODAS'; posFiltCat = 'TODAS';
   renderPos(posData);
 }
@@ -408,17 +408,14 @@ function filtPos(btn) {
 }
 
 let cambioRates = {};
-let histDataRF = [];
 let histFiltCorr = 'TODAS', histFiltCat = 'TODAS';
 
 async function loadHistorico() {
-  const [hist, cambio, rf] = await Promise.all([
+  const [hist, cambio] = await Promise.all([
     get('/resultado_fechado?select=*&order=data_saida.desc&limit=200'),
-    get('/cambio?select=mes,eur_brl,eur_usd'),
-    get('/operacoes?select=ticker,corretora,data_entrada,data_saida,custo_total,receita_total,resultado_moeda,resultado_eur,moeda,tese,nota,categoria,quantidade,preco_entrada,preco_saida&categoria=eq.RF&status=eq.FECHADO&order=data_saida.desc')
+    get('/cambio?select=mes,eur_brl,eur_usd')
   ]);
   histData = hist.map(r => ({...r, categoria: r.categoria || (r.tipo === 'RF' ? 'RF' : (r.tipo === 'ETF' ? 'ETF' : (r.tipo === 'FUNDO' ? 'FUNDO' : 'ACAO')))}));
-  histDataRF = rf.map(r => ({...r, categoria: 'RF', dias_posicao: r.data_entrada && r.data_saida ? Math.round((new Date(r.data_saida)-new Date(r.data_entrada))/86400000) : null}));
   cambioRates = {};
   cambio.forEach(c => { cambioRates[c.mes] = { brl: c.eur_brl, usd: c.eur_usd }; });
   histFiltCorr = 'TODAS'; histFiltCat = 'TODAS';
@@ -426,8 +423,7 @@ async function loadHistorico() {
 }
 
 function renderHistAll() {
-  const all = [...histData, ...histDataRF].sort((a,b) => (b.data_saida||'').localeCompare(a.data_saida||''));
-  let filtered = all;
+  let filtered = histData;
   if (histFiltCorr !== 'TODAS') filtered = filtered.filter(r => r.corretora === histFiltCorr);
   if (histFiltCat !== 'TODAS') filtered = filtered.filter(r => r.categoria === histFiltCat);
   renderHist(filtered);
