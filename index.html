@@ -400,7 +400,7 @@ let posCambio = {};
 async function loadPosicoes() {
   const [pos, cambio] = await Promise.all([
     get('/posicoes_abertas?select=*&order=data_entrada.asc'),
-    get('/cambio?select=mes,eur_brl,eur_usd&order=ordem.desc&limit=1')
+    get('/cambio?select=mes,eur_brl,eur_usd&order=mes.desc&limit=1')
   ]);
   posData = pos;
   if (cambio && cambio.length) {
