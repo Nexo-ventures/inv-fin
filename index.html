@@ -1015,6 +1015,8 @@ async function loadAuditoria() {
       el.textContent = 'Erro ao conectar ao banco: ' + e.message;
     });
   }
+})();
+
 function abrirModal(ticker) {
   const all = [...(posData||[]), ...(histData||[])];
   const r = all.find(x => x.ticker === ticker);
@@ -1037,8 +1039,6 @@ function abrirModal(ticker) {
 }
 function fecharModal() { document.getElementById('ativo-modal').style.display = 'none'; }
 document.addEventListener('keydown', e => { if(e.key==='Escape') fecharModal(); });
-
-})();
 </script>
   <div id="ativo-modal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.4);backdrop-filter:blur(2px)" onclick="if(event.target===this)fecharModal()">
     <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:16px;padding:28px;min-width:320px;max-width:520px;width:90%;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.2)">
