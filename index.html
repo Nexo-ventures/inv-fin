@@ -794,6 +794,18 @@ function renderHist(rows) {
   const diasArr = rows.filter(r=>r.data_entrada&&r.data_saida).map(r=>Math.floor((new Date(r.data_saida)-new Date(r.data_entrada))/86400000));
   const tempoMedio = diasArr.length ? Math.round(diasArr.reduce((s,d)=>s+d,0)/diasArr.length) : null;
 
+  // Tempo médio por classe
+  const tempoByClasse = {};
+  rows.filter(r=>r.data_entrada&&r.data_saida&&r.classe_ativo).forEach(r => {
+    const dias = Math.floor((new Date(r.data_saida)-new Date(r.data_entrada))/86400000);
+    if (!tempoByClasse[r.classe_ativo]) tempoByClasse[r.classe_ativo] = [];
+    tempoByClasse[r.classe_ativo].push(dias);
+  });
+  const tempoClasseStr = Object.entries(tempoByClasse)
+    .sort((a,b)=>b[1].reduce((s,v)=>s+v,0)/b[1].length - a[1].reduce((s,v)=>s+v,0)/a[1].length)
+    .map(([c,arr])=>`${c}: ${Math.round(arr.reduce((s,v)=>s+v,0)/arr.length)}d`)
+    .join(' · ');
+
   if (document.getElementById('hist-kpis')) {
     document.getElementById('hist-kpis').innerHTML =
       '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px">'+
@@ -801,7 +813,7 @@ function renderHist(rows) {
       '<div class="card" style="padding:14px 18px"><div class="card-label">Rentabilidade total</div><div style="font-size:20px;font-weight:700;color:'+(rentTotal!=null?(rentTotal>=0?'#1a7f4b':'#c0392b'):'#9b9b98')+'">'+(rentTotal!=null?rentTotal.toFixed(2)+'%':'—')+'</div><div style="font-size:11px;color:#9b9b98">sobre capital investido</div></div>'+
       '<div class="card" style="padding:14px 18px"><div class="card-label">Taxa de acerto</div><div style="font-size:20px;font-weight:700;color:#1c1c1a">'+taxaAcerto+'%</div><div style="font-size:11px;color:#9b9b98">'+positivas.length+' de '+comResult.length+' operações</div></div>'+
       '<div class="card" style="padding:14px 18px"><div class="card-label">Resultado médio/op.</div><div style="font-size:20px;font-weight:700;color:'+(resultMedio!=null?(resultMedio>=0?'#1a7f4b':'#c0392b'):'#9b9b98')+'">'+(resultMedio!=null?(resultMedio>=0?'+':'')+num(resultMedio,2):'—')+'</div><div style="font-size:11px;color:#9b9b98">por operação fechada</div></div>'+
-      '<div class="card" style="padding:14px 18px"><div class="card-label">Tempo médio posição</div><div style="font-size:20px;font-weight:700">'+(tempoMedio!=null?tempoMedio+' dias':'—')+'</div><div style="font-size:11px;color:#9b9b98">entre entrada e saída</div></div>'+
+      '<div class="card" style="padding:14px 18px"><div class="card-label">Tempo médio posição</div><div style="font-size:20px;font-weight:700">'+(tempoMedio!=null?tempoMedio+' dias':'—')+'</div><div style="font-size:10px;color:#9b9b98;margin-top:4px;line-height:1.6">'+(tempoClasseStr||'—')+'</div></div>'+
       '</div>'+
       // Linha 2: por classe
       '<div class="card" style="padding:14px 18px;margin-bottom:16px"><div class="card-label" style="margin-bottom:12px">Resultado por classe (EUR)</div><div style="display:flex;flex-wrap:wrap;gap:10px">'+
