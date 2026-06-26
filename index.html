@@ -440,7 +440,8 @@ function renderPos(rows) {
     const custoEur = posToEur(r.custo_total, r.moeda);
     const mercadoEur = posToEur(valorMercado, r.moeda);
     const resultEur = (mercadoEur != null && custoEur != null) ? mercadoEur - custoEur : null;
-    const rentPctRow = (resultEur != null && custoEur) ? (resultEur / custoEur * 100) : null;
+    const resultMoeda = (valorMercado != null && r.custo_total) ? valorMercado - r.custo_total : null;
+    const rentPctRow = (resultMoeda != null && r.custo_total) ? (resultMoeda / r.custo_total * 100) : null;
     return {...r, valorMercado, custoEur, mercadoEur, resultEur, rentPctRow};
   });
 
