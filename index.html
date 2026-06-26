@@ -387,20 +387,37 @@ async function loadGeral() {
 
   // Cards por corretora
   const CORR_LABELS = {XP:'XP Investimentos', AV:'Avenue', IBKR:'Interactive Brokers', R4:'Renta 4'};
-  const CORR_MOEDA = {XP:'BRL', AV:'USD', IBKR:'EUR', R4:'EUR'};
   const CORR_COLORS = {XP:'#e65100', AV:'#1565c0', IBKR:'#1a7f4b', R4:'#6a1b9a'};
+
+  // Valores originais por corretora
+  const corrOriginal = {
+    IBKR: { val: 125777.32, moeda: 'EUR', symbol: '€', caixaOrig: 107837.33, investOrig: 17827.40 },
+    AV:   { val: 27823.71,  moeda: 'USD', symbol: '$', caixaOrig: 68.90,      investOrig: 27754.81 },
+    XP:   { val: 55903.84,  moeda: 'BRL', symbol: 'R$', caixaOrig: 124.49,    investOrig: 55779.35 },
+    R4:   { val: 935.34,    moeda: 'EUR', symbol: '€', caixaOrig: 935.34,     investOrig: 0 },
+  };
+  const fmtOrig = (v, sym) => sym + v.toLocaleString('de-DE', {minimumFractionDigits:2, maximumFractionDigits:2});
+
   const corrCards = ['IBKR','AV','XP','R4'].map(c => {
     const inv = investCorr[c]||0;
     const caixa = c==='IBKR'?caixaIBKR : c==='R4'?caixaR4 : 0;
     const total = inv + caixa;
     const pct = patrimonioTotal > 0 ? (total/patrimonioTotal*100).toFixed(1) : '0';
+    const orig = corrOriginal[c];
     return `<div class="card" style="border-left:3px solid ${CORR_COLORS[c]}">
       <div class="card-label">${CORR_LABELS[c]}</div>
-      <div style="font-size:20px;font-weight:700;margin-bottom:6px">${eur(total)}</div>
-      <div style="font-size:11px;color:#9b9b98;margin-bottom:4px">${pct}% do patrimônio</div>
-      <div style="display:flex;justify-content:space-between;font-size:11px;color:#6b6b68;margin-top:6px;padding-top:6px;border-top:1px solid #f0f0ee">
-        <span>Investido: ${eur(inv)}</span>
-        ${caixa>0?'<span>Caixa: '+eur(caixa)+'</span>':''}
+      <div style="font-size:20px;font-weight:700;margin-bottom:2px">${eur(total)}</div>
+      <div style="font-size:12px;color:#6b6b68;margin-bottom:4px">${fmtOrig(orig.val, orig.symbol)} ${orig.moeda}</div>
+      <div style="font-size:11px;color:#9b9b98;margin-bottom:6px">${pct}% do patrimônio</div>
+      <div style="font-size:11px;color:#6b6b68;padding-top:6px;border-top:1px solid #f0f0ee">
+        <div style="display:flex;justify-content:space-between;margin-bottom:2px">
+          <span>Investido</span>
+          <span>${eur(inv)} <span style="color:#9b9b98">(${fmtOrig(orig.investOrig, orig.symbol)})</span></span>
+        </div>
+        <div style="display:flex;justify-content:space-between">
+          <span>Caixa</span>
+          <span>${eur(caixa || posToEur(orig.caixaOrig, orig.moeda))} <span style="color:#9b9b98">(${fmtOrig(orig.caixaOrig, orig.symbol)})</span></span>
+        </div>
       </div>
     </div>`;
   }).join('');
