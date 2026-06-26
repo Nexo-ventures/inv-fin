@@ -516,7 +516,7 @@ function renderPos(rows) {
   // Gráfico por classe (barras horizontais)
   const totalResultEurAbs = klassesSorted.reduce((s,[,v])=>s+Math.abs(v),0);
   const cc = document.getElementById('pos-classe-chart');
-  if (cc) { if(posClasseChart) posClasseChart.destroy(); posClasseChart = new Chart(cc, {type:'bar', data:{labels:klassesSorted.map(([c])=>c), datasets:[{data:klassesSorted.map(([,v])=>v), backgroundColor:klassesSorted.map(([c,v])=>(CLASS_COLORS[c]||'#9b9b98')+(v>=0?'cc':'88')), borderRadius:4}]}, options:{indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>{const v=ctx.raw; const pct=totalResultEurAbs?((Math.abs(v)/totalResultEurAbs)*100).toFixed(1):'0'; return ' €'+v.toLocaleString('de-DE',{minimumFractionDigits:2})+' ('+pct+'%)';}}}}, scales:{x:{grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>'€'+v.toLocaleString('de-DE')}}, y:{grid:{display:false}, ticks:{font:{size:10}}}}}}); }
+  if (cc) { if(posClasseChart) posClasseChart.destroy(); posClasseChart = new Chart(cc, {type:'bar', data:{labels:klassesSorted.map(([c,v])=>c+' ('+(totalResultEurAbs?((Math.abs(v)/totalResultEurAbs)*100).toFixed(1):'0')+'%)'), datasets:[{data:klassesSorted.map(([,v])=>v), backgroundColor:klassesSorted.map(([c,v])=>(CLASS_COLORS[c]||'#9b9b98')+(v>=0?'cc':'88')), borderRadius:4}]}, options:{indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>{const v=ctx.raw; return ' €'+v.toLocaleString('de-DE',{minimumFractionDigits:2});}}}}, scales:{x:{grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>'€'+v.toLocaleString('de-DE')}}, y:{grid:{display:false}, ticks:{font:{size:10}}}}}}); }
 
   // Gráfico por corretora (donut)
   const porCorr = {};
@@ -524,7 +524,7 @@ function renderPos(rows) {
   const corrSorted = Object.entries(porCorr).sort((a,b)=>b[1]-a[1]);
   const totalCorr = corrSorted.reduce((s,[,v])=>s+v,0);
   const pc = document.getElementById('pos-corr-chart');
-  if (pc) { if(posCorrChart) posCorrChart.destroy(); posCorrChart = new Chart(pc, {type:'doughnut', data:{labels:corrSorted.map(([c,v])=>c+' '+( totalCorr?(v/totalCorr*100).toFixed(1):'0')+'%'), datasets:[{data:corrSorted.map(([,v])=>v), backgroundColor:corrSorted.map(([c])=>CORR_COLORS[c]||'#9b9b98'), borderWidth:2, borderColor:'#fff'}]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{font:{size:9}, boxWidth:10}}, tooltip:{callbacks:{label:ctx=>{const v=ctx.raw; const pct=totalCorr?(v/totalCorr*100).toFixed(1):'0'; return ' €'+v.toLocaleString('de-DE',{minimumFractionDigits:0})+' ('+pct+'%)';}}}}}}); }
+  if (pc) { if(posCorrChart) posCorrChart.destroy(); posCorrChart = new Chart(pc, {type:'doughnut', data:{labels:corrSorted.map(([c,v])=>c+' '+(totalCorr?(v/totalCorr*100).toFixed(1):'0')+'%'), datasets:[{data:corrSorted.map(([,v])=>v), backgroundColor:corrSorted.map(([c])=>CORR_COLORS[c]||'#9b9b98'), borderWidth:2, borderColor:'#fff'}]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{font:{size:9}, boxWidth:10}}, tooltip:{callbacks:{label:ctx=>{const v=ctx.raw; const pct=totalCorr?(v/totalCorr*100).toFixed(1):'0'; return ' €'+v.toLocaleString('de-DE',{minimumFractionDigits:0})+' ('+pct+'%)';}}}}}}); }
 
   // Gráfico por moeda (donut)
   const MOEDA_COLORS = {'BRL':'#e65100','USD':'#1565c0','EUR':'#1a7f4b'};
@@ -541,7 +541,7 @@ function renderPos(rows) {
   const setoresSorted = Object.entries(porSetor).sort((a,b)=>b[1]-a[1]);
   const totalSetorAbs = setoresSorted.reduce((s,[,v])=>s+Math.abs(v),0);
   const sc = document.getElementById('pos-setor-chart');
-  if (sc) { if(posSetorChart) posSetorChart.destroy(); posSetorChart = new Chart(sc, {type:'bar', data:{labels:setoresSorted.map(([s])=>s), datasets:[{data:setoresSorted.map(([,v])=>v), backgroundColor:setoresSorted.map(([,v])=>v>=0?'#1a7f4b99':'#c0392b99'), borderRadius:4}]}, options:{indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>{const v=ctx.raw; const pct=totalSetorAbs?((Math.abs(v)/totalSetorAbs)*100).toFixed(1):'0'; return ' €'+v.toLocaleString('de-DE',{minimumFractionDigits:2})+' ('+pct+'%)';}}}}, scales:{x:{grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>'€'+v.toLocaleString('de-DE')}}, y:{grid:{display:false}, ticks:{font:{size:10}}}}}}); }
+  if (sc) { if(posSetorChart) posSetorChart.destroy(); posSetorChart = new Chart(sc, {type:'bar', data:{labels:setoresSorted.map(([s,v])=>s+' ('+(totalSetorAbs?((Math.abs(v)/totalSetorAbs)*100).toFixed(1):'0')+'%)'), datasets:[{data:setoresSorted.map(([,v])=>v), backgroundColor:setoresSorted.map(([,v])=>v>=0?'#1a7f4b99':'#c0392b99'), borderRadius:4}]}, options:{indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>{const v=ctx.raw; return ' €'+v.toLocaleString('de-DE',{minimumFractionDigits:2});}}}}, scales:{x:{grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>'€'+v.toLocaleString('de-DE')}}, y:{grid:{display:false}, ticks:{font:{size:10}}}}}}); }
 
   // Gráfico por subsetor (barras horizontais)
   const porSubsetor = {};
@@ -549,7 +549,7 @@ function renderPos(rows) {
   const subsetoresSorted = Object.entries(porSubsetor).sort((a,b)=>b[1]-a[1]);
   const totalSubsetorAbs = subsetoresSorted.reduce((s,[,v])=>s+Math.abs(v),0);
   const ss = document.getElementById('pos-subsetor-chart');
-  if (ss) { if(ss._ci) ss._ci.destroy(); ss._ci = new Chart(ss, {type:'bar', data:{labels:subsetoresSorted.map(([s])=>s), datasets:[{data:subsetoresSorted.map(([,v])=>v), backgroundColor:subsetoresSorted.map(([,v])=>v>=0?'#1565c099':'#e6510099'), borderRadius:4}]}, options:{indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>{const v=ctx.raw; const pct=totalSubsetorAbs?((Math.abs(v)/totalSubsetorAbs)*100).toFixed(1):'0'; return ' €'+v.toLocaleString('de-DE',{minimumFractionDigits:2})+' ('+pct+'%)';}}}}, scales:{x:{grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>'€'+v.toLocaleString('de-DE')}}, y:{grid:{display:false}, ticks:{font:{size:10}}}}}}); }
+  if (ss) { if(ss._ci) ss._ci.destroy(); ss._ci = new Chart(ss, {type:'bar', data:{labels:subsetoresSorted.map(([s,v])=>s+' ('+(totalSubsetorAbs?((Math.abs(v)/totalSubsetorAbs)*100).toFixed(1):'0')+'%)'), datasets:[{data:subsetoresSorted.map(([,v])=>v), backgroundColor:subsetoresSorted.map(([,v])=>v>=0?'#1565c099':'#e6510099'), borderRadius:4}]}, options:{indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>{const v=ctx.raw; return ' €'+v.toLocaleString('de-DE',{minimumFractionDigits:2});}}}}, scales:{x:{grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>'€'+v.toLocaleString('de-DE')}}, y:{grid:{display:false}, ticks:{font:{size:10}}}}}}); }
 
   // Ordenação default: rentPctRow ascendente (piores primeiro)
   if (!window.posSortCol) { window.posSortCol = 'rentPctRow'; window.posSortDir = 1; }
