@@ -97,7 +97,6 @@
   <div class="nav-tab" data-tab="custos">Custos</div>
   <div class="nav-tab" data-tab="cambio">Câmbio</div>
   <div class="nav-tab" data-tab="fluxos">Fluxos</div>
-  <div class="nav-tab" data-tab="auditoria">Auditoria</div>
 </div>
 
 <div class="content">
@@ -321,14 +320,7 @@
     </div>
   </div>
 
-  <div id="tab-auditoria" class="section">
-    <div class="table-wrap">
-      <div class="table-head"><span class="table-title">Auditoria automática</span></div>
-      <div id="audit-body"><div class="loading">carregando...</div></div>
-    </div>
-  </div>
 
-</div>
 
 <script>
 const BASE = 'https://ogkomoewpaxwmlbdlvfi.supabase.co/rest/v1';
@@ -364,7 +356,6 @@ document.querySelectorAll('.nav-tab').forEach(t => {
     if (id === 'custos'    && document.getElementById('custos-body').querySelector('.loading')) loadCustos();
     if (id === 'cambio'    && document.getElementById('cambio-body').querySelector('.loading')) loadCambio();
     if (id === 'fluxos'    && document.getElementById('fluxos-body').querySelector('.loading')) loadFluxos();
-    if (id === 'auditoria' && document.getElementById('audit-body').querySelector('.loading')) loadAuditoria();
   };
 });
 
@@ -1811,17 +1802,7 @@ function filtFluxos(c, btn) {
   renderFluxos(c === 'TODAS' ? fluxosData : fluxosData.filter(r => r.corretora === c));
 }
 
-async function loadAuditoria() {
-  const data = await get('/auditoria?select=*');
-  document.getElementById('audit-body').innerHTML = `<table>
-    <thead><tr><th>Verificação</th><th class="tr">Resultado</th><th>Status</th></tr></thead>
-    <tbody>${data.map(r => `<tr>
-      <td>${r.check_name.replace(/_/g, ' ')}</td>
-      <td class="tr">${r.resultado}</td>
-      <td style="font-size:18px;padding-left:8px">${r.status}</td>
-    </tr>`).join('')}</tbody>
-  </table>`;
-}
+
 
 (async () => {
   try {
