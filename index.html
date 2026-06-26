@@ -120,6 +120,7 @@
       <div class="card"><div class="card-label">Resultado não realizado</div><div class="card-value" id="k-result-nr">—</div><div class="card-sub" id="k-result-nr-sub">—</div></div>
       <div class="card"><div class="card-label">Renda total</div><div class="card-value" id="k-renda-tot">—</div><div class="card-sub">dividendos + juros + FII</div></div>
       <div class="card"><div class="card-label">Custos totais</div><div class="card-value" id="k-custos-tot">—</div><div class="card-sub">corretagens + impostos</div></div>
+      <div class="card"><div class="card-label">Tarifas câmbio (Wise)</div><div class="card-value" id="k-tarifas-wise">—</div><div class="card-sub">custo total remessas</div></div>
     </div>
     <!-- Linha 3: Rentabilidade -->
     <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:#9b9b98;margin-bottom:8px">Rentabilidade</div>
@@ -370,14 +371,15 @@ document.querySelectorAll('.nav-tab').forEach(t => {
 let geralEvolucaoChart = null, geralMoedaChart = null, geralVarChart = null, geralPnlChart = null;
 
 async function loadGeral() {
-  const [pat, posData_g, cash, rendaTot, custosTot, resultFech, fluxos] = await Promise.all([
+  const [pat, posData_g, cash, rendaTot, custosTot, resultFech, fluxos, wiseData_g] = await Promise.all([
     get('/patrimonio_consolidado?select=mes,ordem,total_eur,xp_eur,av_eur,r4_eur,ibkr_eur,tem_provisorio&order=ordem.asc'),
     get('/posicoes_abertas?select=corretora,moeda,preco_atual,quantidade,custo_total'),
     get('/operacoes?select=corretora,ticker,custo_total,preco_atual&status=eq.IGNORAR'),
     get('/renda?select=valor_eur,data'),
     get('/custos?select=valor_eur&corretora=neq.nan'),
     get('/resultado_fechado?select=resultado_eur,data_saida,dias_posicao'),
-    get('/fluxos_capital?select=tipo,valor_eur,corretora')
+    get('/fluxos_capital?select=tipo,valor_eur,corretora'),
+    get('/cambio_wise?select=custo_pct,valor_eur')
   ]);
 
   const last = pat[pat.length - 1];
@@ -417,7 +419,8 @@ async function loadGeral() {
   const totalRenda = rendaTot.reduce((s,r)=>s+(r.valor_eur||0),0);
   const totalCustos = custosTot.reduce((s,r)=>s+(r.valor_eur||0),0);
   const totalRealizado = resultFech.reduce((s,r)=>s+(r.resultado_eur||0),0);
-  const pnlLiquido = totalRealizado + resultNR + totalRenda - totalCustos;
+  const totalTarifasWise = wiseData_g.reduce((s,r)=>s+((r.custo_pct&&r.valor_eur)?r.custo_pct*r.valor_eur:0),0);
+  const pnlLiquido = totalRealizado + resultNR + totalRenda - totalCustos - totalTarifasWise;
 
   // Aportes líquidos (excluindo CB — mesma lógica da aba Fluxos)
   const aportesLiquidos = fluxos.filter(r=>r.corretora!=='CB' && r.corretora!=='nan').reduce((s,r)=>s+(r.tipo==='APORTE'?r.valor_eur:-r.valor_eur),0);
@@ -480,13 +483,14 @@ async function loadGeral() {
   document.getElementById('k-alloc-sub').innerHTML = 'investido · <span style="font-weight:600">'+pctCaixa+'%</span> caixa';
 
   document.getElementById('k-pnl').innerHTML = '<span style="font-size:22px;font-weight:700;color:'+(pnlLiquido>=0?'#1a7f4b':'#c0392b')+'">'+(pnlLiquido>=0?'+':'')+eur(pnlLiquido)+'</span>';
-  document.getElementById('k-pnl-sub').innerHTML = '<span style="font-size:10px;color:#9b9b98">Real '+(totalRealizado>=0?'+':'')+eur(totalRealizado)+' · NR '+(resultNR>=0?'+':'')+eur(resultNR)+'<br>+Renda '+eur(totalRenda)+' · -Custos '+eur(totalCustos)+'</span>';
+  document.getElementById('k-pnl-sub').innerHTML = '<span style="font-size:10px;color:#9b9b98">Real '+(totalRealizado>=0?'+':'')+eur(totalRealizado)+' · NR '+(resultNR>=0?'+':'')+eur(resultNR)+'<br>+Renda '+eur(totalRenda)+' · -Custos '+eur(totalCustos)+' · -Wise '+eur(totalTarifasWise)+'</span>';
 
   document.getElementById('k-realizado').innerHTML = '<span style="font-size:22px;font-weight:700;color:'+(totalRealizado>=0?'#1a7f4b':'#c0392b')+'">'+(totalRealizado>=0?'+':'')+eur(totalRealizado)+'</span>';
   document.getElementById('k-result-nr').innerHTML = '<span style="font-size:22px;font-weight:700;color:'+(resultNR>=0?'#1a7f4b':'#c0392b')+'">'+(resultNR>=0?'+':'')+eur(resultNR)+'</span>';
   document.getElementById('k-result-nr-sub').innerHTML = '<span style="color:'+(rentNR!=null?(rentNR>=0?'#1a7f4b':'#c0392b'):'#9b9b98')+'">'+(rentNR!=null?(rentNR>=0?'+':'')+rentNR.toFixed(1)+'% sobre custo':'—')+'</span>';
   document.getElementById('k-renda-tot').innerHTML = '<span style="font-size:22px;font-weight:700;color:#1a7f4b">+'+eur(totalRenda)+'</span>';
   document.getElementById('k-custos-tot').innerHTML = '<span style="font-size:22px;font-weight:700;color:#c0392b">-'+eur(totalCustos)+'</span>';
+  document.getElementById('k-tarifas-wise').innerHTML = '<span style="font-size:22px;font-weight:700;color:#c0392b">-'+eur(totalTarifasWise)+'</span>';
 
   document.getElementById('k-rent-total').innerHTML = '<span style="font-size:22px;font-weight:700;color:'+(rentTotal!=null?(rentTotal>=0?'#1a7f4b':'#c0392b'):'#9b9b98')+'">'+(rentTotal!=null?(rentTotal>=0?'+':'')+rentTotal.toFixed(2)+'%':'—')+'</span>';
   document.getElementById('k-yield').innerHTML = '<span style="font-size:22px;font-weight:700;color:#1a7f4b">'+(yieldAnual!=null?yieldAnual.toFixed(2)+'%':'—')+'</span>';
