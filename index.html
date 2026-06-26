@@ -1664,9 +1664,9 @@ function renderFluxos(rows) {
       <div style="position:relative;height:220px"><canvas id="fluxos-chart"></canvas></div>
     </div>`;
 
-  // --- Gráfico mensal ---
+  // --- Gráfico mensal --- (exclui CB)
   const byMonth = {};
-  rows.forEach(r => {
+  rows.filter(r=>r.corretora!=='CB').forEach(r => {
     if (!r.data) return;
     const d = new Date(r.data);
     const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
@@ -1768,11 +1768,11 @@ function renderFluxos(rows) {
             totA25+=d.a25; totR25+=d.r25; totA26+=d.a26; totR26+=d.r26;
             return `<tr>
               <td><span class="pill p-${c}">${c}</span></td>
-              <td class="tr">${d.a25?'<span class="pos">'+eur(d.a25)+'</span>':'—'}</td>
-              <td class="tr">${d.r25?'<span class="neg">-'+eur(d.r25)+'</span>':'—'}</td>
+              <td class="tr">${d.a25?'<span class="pos">'+eur(d.a25)+'</span>':'€0'}</td>
+              <td class="tr">${d.r25?'<span class="neg">-'+eur(d.r25)+'</span>':'€0'}</td>
               <td class="tr ${l25>=0?'pos':'neg'}" style="font-weight:500">${l25>=0?'':'-'}${eur(Math.abs(l25))}</td>
-              <td class="tr">${d.a26?'<span class="pos">'+eur(d.a26)+'</span>':'—'}</td>
-              <td class="tr">${d.r26?'<span class="neg">-'+eur(d.r26)+'</span>':'—'}</td>
+              <td class="tr">${d.a26?'<span class="pos">'+eur(d.a26)+'</span>':'€0'}</td>
+              <td class="tr">${d.r26?'<span class="neg">-'+eur(d.r26)+'</span>':'€0'}</td>
               <td class="tr ${l26>=0?'pos':'neg'}" style="font-weight:500">${l26>=0?'':'-'}${eur(Math.abs(l26))}</td>
               <td class="tr ${tot>=0?'pos':'neg'}" style="font-weight:600">${tot>=0?'':'-'}${eur(Math.abs(tot))}</td>
             </tr>`;
