@@ -132,13 +132,12 @@
       <div class="card"><div class="card-label">Pior mês</div><div class="card-value" id="k-worst-mes">—</div><div class="card-sub" id="k-worst-mes-sub">—</div></div>
     </div>
     <!-- Cards por corretora -->
-    <div id="geral-corr-cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px"></div>
+    <div id="geral-corr-cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px"></div>
     <!-- Gráficos -->
     <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:16px">
       <div class="card"><div class="card-label" style="margin-bottom:8px">Evolução patrimonial (EUR)</div><div style="position:relative;height:220px"><canvas id="geral-evolucao-chart"></canvas></div></div>
       <div class="card"><div class="card-label" style="margin-bottom:8px">Distribuição por moeda</div><div style="position:relative;height:220px"><canvas id="geral-moeda-chart"></canvas></div></div>
     </div>
-    <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">P&L líquido acumulado (EUR)</div><div style="position:relative;height:180px"><canvas id="geral-pnl-chart"></canvas></div></div>
     <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Variação % mensal do patrimônio</div><div style="position:relative;height:180px"><canvas id="geral-var-chart"></canvas></div></div>
   </div>
 
@@ -420,8 +419,8 @@ async function loadGeral() {
   const totalRealizado = resultFech.reduce((s,r)=>s+(r.resultado_eur||0),0);
   const pnlLiquido = totalRealizado + resultNR + totalRenda - totalCustos;
 
-  // Aportes líquidos (excluindo CB)
-  const aportesLiquidos = fluxos.filter(r=>r.corretora!=='CB').reduce((s,r)=>s+(r.tipo==='APORTE'?r.valor_eur:-r.valor_eur),0);
+  // Aportes líquidos (excluindo CB — mesma lógica da aba Fluxos)
+  const aportesLiquidos = fluxos.filter(r=>r.corretora!=='CB' && r.corretora!=='nan').reduce((s,r)=>s+(r.tipo==='APORTE'?r.valor_eur:-r.valor_eur),0);
   const multiplo = aportesLiquidos > 0 ? (patrimonioTotal / aportesLiquidos) : null;
   const rentTotal = aportesLiquidos > 0 ? (pnlLiquido / aportesLiquidos * 100) : null;
 
@@ -444,10 +443,17 @@ async function loadGeral() {
   const diasArr = resultFech.filter(r=>r.dias_posicao).map(r=>r.dias_posicao);
   const tempoMedio = diasArr.length ? Math.round(diasArr.reduce((s,d)=>s+d,0)/diasArr.length) : null;
 
-  // Melhor e pior mês (patrimonio_consolidado)
-  const varMeses = pat.slice(1).map((d,i)=>({mes:d.mes, var:(d.total_eur-pat[i].total_eur)/pat[i].total_eur*100, abs:d.total_eur-pat[i].total_eur}));
-  const bestMes = varMeses.length ? varMeses.reduce((a,b)=>b.var>a.var?b:a) : null;
-  const worstMes = varMeses.length ? varMeses.reduce((a,b)=>b.var<a.var?b:a) : null;
+  // Melhor e pior mês — excluindo efeito de aportes (variação absoluta - aportes do mês)
+  const fluxosByMes = {};
+  fluxos.filter(r=>r.corretora!=='CB').forEach(r => {
+    // não temos data nos fluxos no fetch atual — usamos variação absoluta como proxy
+  });
+  // Usa variação absoluta simples (sem data nos fluxos, não dá para subtrair por mês)
+  // Marca meses com variação > 20k como potencialmente contaminados por aporte
+  const varMeses = pat.slice(1).map((d,i)=>({mes:d.mes, var:pat[i].total_eur>0?((d.total_eur-pat[i].total_eur)/pat[i].total_eur*100):0, abs:d.total_eur-pat[i].total_eur}));
+  const varMesesFiltradas = varMeses.filter(m=>Math.abs(m.abs)<30000); // exclui meses com grandes aportes
+  const bestMes = varMesesFiltradas.length ? varMesesFiltradas.reduce((a,b)=>b.var>a.var?b:a) : null;
+  const worstMes = varMesesFiltradas.length ? varMesesFiltradas.reduce((a,b)=>b.var<a.var?b:a) : null;
 
   // --- Populate KPIs ---
   const dc2 = v => v==null?'':v>=0?'pos':'neg';
@@ -519,7 +525,16 @@ async function loadGeral() {
         <div style="display:flex;justify-content:space-between"><span>Caixa</span><span>${eur(caixa||toE(orig.caixaOrig,orig.moeda))} <span style="color:#9b9b98">(${fmtOrig(orig.caixaOrig,orig.symbol)})</span></span></div>
       </div>
     </div>`;
-  }).join('');
+  }).concat([`<div class="card" style="border-left:3px solid #1c1c1a;background:#fafaf9">
+    <div class="card-label">Total</div>
+    <div style="font-size:20px;font-weight:700;margin-bottom:2px">${eur(patrimonioTotal)}</div>
+    <div style="font-size:12px;color:#6b6b68;margin-bottom:4px">referência EUR</div>
+    <div style="font-size:11px;color:#9b9b98;margin-bottom:6px">100%</div>
+    <div style="font-size:11px;color:#6b6b68;padding-top:6px;border-top:1px solid #f0f0ee">
+      <div style="display:flex;justify-content:space-between;margin-bottom:2px"><span>Investido</span><span>${eur(totalInvestido)} (${pctInvestido}%)</span></div>
+      <div style="display:flex;justify-content:space-between"><span>Caixa</span><span>${eur(totalCaixa)} (${pctCaixa}%)</span></div>
+    </div>
+  </div>`]).join('');
 
   // Gráfico evolução
   const labels = pat.map(d=>d.mes.split('/')[0]+'/'+d.mes.split('/')[1].slice(2));
@@ -532,20 +547,6 @@ async function loadGeral() {
   const totalMoeda = moedaData.reduce((s,d)=>s+d.v,0);
   const mc = document.getElementById('geral-moeda-chart');
   if (mc) { if(geralMoedaChart) geralMoedaChart.destroy(); geralMoedaChart = new Chart(mc, {type:'doughnut', data:{labels:moedaData.map(d=>d.l+' '+(totalMoeda?(d.v/totalMoeda*100).toFixed(1):'0')+'%'), datasets:[{data:moedaData.map(d=>d.v), backgroundColor:moedaData.map(d=>d.c), borderWidth:2, borderColor:'#fff'}]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{font:{size:10}, boxWidth:12}}, tooltip:{callbacks:{label:ctx=>' '+eur(ctx.raw)}}}}}); }
-
-  // Gráfico P&L acumulado (usa patrimonio_consolidado como proxy: total - aportes acumulados)
-  let aportesAcum = 0;
-  const pnlAcumVals = pat.map(d => {
-    // aproximação: total patrimônio - aportes acumulados até aquele mês
-    return null; // preenchido abaixo
-  });
-  // Calcula P&L acumulado mês a mês = total_eur - aportes_liquidos (estático por ora)
-  const pnlAcumData = pat.map(d => d.total_eur - aportesLiquidos + (aportesLiquidos - d.total_eur < 0 ? 0 : 0));
-  // Simplificado: PnL = total_eur - primeiro aporte líquido proporcional
-  const primeiroTotal = pat[0]?.total_eur || 0;
-  const pnlSimples = pat.map(d => d.total_eur - primeiroTotal);
-  const pc2 = document.getElementById('geral-pnl-chart');
-  if (pc2) { if(geralPnlChart) geralPnlChart.destroy(); geralPnlChart = new Chart(pc2, {type:'line', data:{labels, datasets:[{label:'P&L acumulado EUR', data:pnlSimples, borderColor:'#1565c0', backgroundColor:'#1565c015', borderWidth:2, pointRadius:3, tension:0.3, fill:true}]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>' '+(ctx.raw>=0?'+':'')+eur(ctx.raw)}}}, scales:{x:{grid:{display:false}, ticks:{font:{size:9}}}, y:{grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>(v>=0?'+':'')+eur(v)}}}}}); }
 
   // Gráfico variação % mensal
   const varLabels = pat.slice(1).map(d=>d.mes.split('/')[0]+'/'+d.mes.split('/')[1].slice(2));
