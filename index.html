@@ -727,6 +727,11 @@ function renderHistAll() {
   renderHist(filtered);
 }
 
+function sortHist(col) {
+  if (window.histSortCol === col) { window.histSortDir *= -1; } else { window.histSortCol = col; window.histSortDir = col === 'data_saida' ? -1 : 1; }
+  renderHistAll();
+}
+
 function getMesKey(dateStr) {
   if (!dateStr) return null;
   const d = new Date(dateStr);
@@ -784,14 +789,19 @@ function renderHist(rows) {
   rows.forEach(r => { if(r.resultado_eur==null) return; const s=r.setor||'Outro'; porSetor[s]=(porSetor[s]||0)+Math.abs(r.resultado_eur); });
   const setoresSorted = Object.entries(porSetor).sort((a,b)=>b[1]-a[1]);
 
+  // Novos KPIs
+  const resultMedio = comResult.length ? totalEur / comResult.length : null;
+  const diasArr = rows.filter(r=>r.data_entrada&&r.data_saida).map(r=>Math.floor((new Date(r.data_saida)-new Date(r.data_entrada))/86400000));
+  const tempoMedio = diasArr.length ? Math.round(diasArr.reduce((s,d)=>s+d,0)/diasArr.length) : null;
+
   if (document.getElementById('hist-kpis')) {
     document.getElementById('hist-kpis').innerHTML =
-      // Linha 1: KPIs gerais
       '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px">'+
       '<div class="card" style="padding:14px 18px"><div class="card-label">Resultado total</div><div style="font-size:20px;font-weight:700;color:'+(totalEur>=0?'#1a7f4b':'#c0392b')+'">'+num(totalEur,2)+'</div></div>'+
       '<div class="card" style="padding:14px 18px"><div class="card-label">Rentabilidade total</div><div style="font-size:20px;font-weight:700;color:'+(rentTotal!=null?(rentTotal>=0?'#1a7f4b':'#c0392b'):'#9b9b98')+'">'+(rentTotal!=null?rentTotal.toFixed(2)+'%':'—')+'</div><div style="font-size:11px;color:#9b9b98">sobre capital investido</div></div>'+
       '<div class="card" style="padding:14px 18px"><div class="card-label">Taxa de acerto</div><div style="font-size:20px;font-weight:700;color:#1c1c1a">'+taxaAcerto+'%</div><div style="font-size:11px;color:#9b9b98">'+positivas.length+' de '+comResult.length+' operações</div></div>'+
-
+      '<div class="card" style="padding:14px 18px"><div class="card-label">Resultado médio/op.</div><div style="font-size:20px;font-weight:700;color:'+(resultMedio!=null?(resultMedio>=0?'#1a7f4b':'#c0392b'):'#9b9b98')+'">'+(resultMedio!=null?(resultMedio>=0?'+':'')+num(resultMedio,2):'—')+'</div><div style="font-size:11px;color:#9b9b98">por operação fechada</div></div>'+
+      '<div class="card" style="padding:14px 18px"><div class="card-label">Tempo médio posição</div><div style="font-size:20px;font-weight:700">'+(tempoMedio!=null?tempoMedio+' dias':'—')+'</div><div style="font-size:11px;color:#9b9b98">entre entrada e saída</div></div>'+
       '</div>'+
       // Linha 2: por classe
       '<div class="card" style="padding:14px 18px;margin-bottom:16px"><div class="card-label" style="margin-bottom:12px">Resultado por classe (EUR)</div><div style="display:flex;flex-wrap:wrap;gap:10px">'+
@@ -887,13 +897,25 @@ function renderHist(rows) {
     document.getElementById('hist-anual').innerHTML='<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:400px"><thead><tr style="background:#fafaf9"><th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;border-bottom:1px solid #f0f0ee">Ano</th>'+CORRS.map(c=>'<th style="padding:10px 14px;text-align:right;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;border-bottom:1px solid #f0f0ee">'+c+'</th>').join('')+'<th style="padding:10px 14px;text-align:right;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;border-bottom:1px solid #f0f0ee">Total</th></tr></thead><tbody>'+years.map(y=>{const rowTot=CORRS.reduce((s,c)=>s+(byYear[y][c]||0),0);return'<tr><td style="padding:10px 14px;font-size:13px;font-weight:500;border-bottom:1px solid #f0f0ee">'+y+'</td>'+CORRS.map(c=>'<td style="padding:10px 14px;text-align:right;font-size:13px;border-bottom:1px solid #f0f0ee;color:'+(byYear[y][c]?(byYear[y][c]>=0?'#1a7f4b':'#c0392b'):'#9b9b98')+'">'+(byYear[y][c]?num(byYear[y][c],2):'€0')+'</td>').join('')+'<td style="padding:10px 14px;text-align:right;font-size:13px;font-weight:600;color:'+(rowTot>=0?'#1a7f4b':'#c0392b')+';border-bottom:1px solid #f0f0ee">'+num(rowTot,2)+'</td></tr>';}).join('')+'</tbody><tfoot><tr style="background:#fafaf9"><td style="padding:10px 14px;font-size:13px;font-weight:600;border-top:1px solid #e5e5e3">Total</td>'+CORRS.map(c=>{const v=years.reduce((s,y)=>s+(byYear[y][c]||0),0);return'<td style="padding:10px 14px;text-align:right;font-size:13px;font-weight:600;color:'+(v?(v>=0?'#1a7f4b':'#c0392b'):'#9b9b98')+';border-top:1px solid #e5e5e3">'+(v?num(v,2):'€0')+'</td>';}).join('')+'<td style="padding:10px 14px;text-align:right;font-size:13px;font-weight:700;color:'+(totalEur>=0?'#1a7f4b':'#c0392b')+';border-top:1px solid #e5e5e3">'+num(totalEur,2)+'</td></tr></tfoot></table></div>';
   }
 
-  // --- Tabela ---
+  // --- Tabela com ordenação ---
+  if (!window.histSortCol) { window.histSortCol = 'data_saida'; window.histSortDir = -1; }
+  const col = window.histSortCol, dir = window.histSortDir;
+  // Add computed rent_pct for sorting
+  const rowsWithRent = rows.map(r => ({...r, rent_pct: (r.resultado_moeda != null && r.custo_total) ? r.resultado_moeda / r.custo_total * 100 : null}));
+  const rowsSorted = [...rowsWithRent].sort((a,b) => {
+    let va = a[col], vb = b[col];
+    if (va == null) return 1; if (vb == null) return -1;
+    if (typeof va === 'string') return dir * va.localeCompare(vb);
+    return dir * (va - vb);
+  });
+  const thS = (k, label, cls='') => `<th class="${cls}" style="cursor:pointer;user-select:none;white-space:normal;min-width:50px${col===k?';color:#1a7f4b':''}" onclick="sortHist('${k}')">${label}${col===k?(dir===1?' ↑':' ↓'):''}</th>`;
+
   document.getElementById('hist-body').innerHTML = `<table style="font-size:12px">
     <thead><tr>
-      <th>Ativo</th><th>Corretora</th><th>Classe</th><th>Setor</th>
-      <th class="tr" style="white-space:normal;min-width:70px">Resultado<br>EUR</th>
-      <th class="tr" style="white-space:normal;min-width:55px">Rent.<br>%</th>
-      <th>Entrada</th><th>Saída</th>
+      ${thS('ticker','Ativo')}${thS('corretora','Corretora')}${thS('classe_ativo','Classe')}${thS('setor','Setor')}
+      ${thS('resultado_eur','Resultado<br>EUR','tr')}
+      ${thS('rent_pct','Rent.<br>%','tr')}
+      ${thS('data_entrada','Entrada')}${thS('data_saida','Saída')}
       <th class="tr">Qtd</th>
       <th class="tr" style="white-space:normal;min-width:60px">PM<br>entrada</th>
       <th class="tr" style="white-space:normal;min-width:60px">PM<br>saída</th>
@@ -902,10 +924,10 @@ function renderHist(rows) {
       <th class="tr" style="white-space:normal;min-width:70px">Valor<br>saída</th>
       <th class="tr" style="white-space:normal;min-width:55px">V.entrada<br>EUR</th>
       <th class="tr" style="white-space:normal;min-width:55px">V.saída<br>EUR</th>
-      <th class="tr" style="white-space:normal;min-width:70px">Resultado<br>moeda</th>
-      <th class="tr" style="white-space:normal;min-width:40px">Dias</th>
+      ${thS('resultado_moeda','Resultado<br>moeda','tr')}
+      ${thS('dias_posicao','Dias','tr')}
     </tr></thead>
-    <tbody>${rows.map(r => {
+    <tbody>${rowsSorted.map(r => {
       const mesE = getMesKey(r.data_entrada);
       const mesS = getMesKey(r.data_saida);
       const custoEur = r.moeda === 'EUR' ? r.custo_total : toEur(r.custo_total, r.moeda, mesE);
