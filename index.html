@@ -103,42 +103,22 @@
 <div class="content">
 
   <div id="tab-geral" class="section active">
-    <div class="cards">
-      <div class="card">
-        <div class="card-label">Patrimônio EUR</div>
-        <div class="card-value" id="k-total">—</div>
-        <div class="card-sub" id="k-mes">—</div>
-      </div>
-      <div class="card">
-        <div class="card-label">Variação mensal</div>
-        <div class="card-value" id="k-var">—</div>
-        <div class="card-sub" id="k-var2">—</div>
-      </div>
-      <div class="card">
-        <div class="card-label">Posições abertas</div>
-        <div class="card-value" id="k-pos">—</div>
-        <div class="card-sub">ativos investidos</div>
-      </div>
-      <div class="card">
-        <div class="card-label">Renda 2026</div>
-        <div class="card-value" id="k-renda">—</div>
-        <div class="card-sub">líquido EUR</div>
-      </div>
+    <!-- KPIs linha 1 -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px" id="geral-kpis">
+      <div class="card"><div class="card-label">Patrimônio total</div><div class="card-value" id="k-total">—</div><div class="card-sub" id="k-mes">—</div></div>
+      <div class="card"><div class="card-label">Variação mensal</div><div class="card-value" id="k-var">—</div><div class="card-sub" id="k-var2">—</div></div>
+      <div class="card"><div class="card-label">Investido (mercado)</div><div class="card-value" id="k-investido">—</div><div class="card-sub" id="k-investido-sub">valor atual EUR</div></div>
+      <div class="card"><div class="card-label">Resultado não realizado</div><div class="card-value" id="k-result-nr">—</div><div class="card-sub" id="k-result-nr-sub">—</div></div>
+      <div class="card"><div class="card-label">Caixa total</div><div class="card-value" id="k-caixa">—</div><div class="card-sub">IBKR + R4</div></div>
     </div>
-    <div class="panel">
-      <div class="panel-title">Evolução patrimonial — EUR</div>
-      <div class="bars" id="chart"><div class="loading">carregando...</div></div>
+    <!-- Cards por corretora -->
+    <div id="geral-corr-cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px"></div>
+    <!-- Gráficos linha -->
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:16px">
+      <div class="card"><div class="card-label" style="margin-bottom:8px">Evolução patrimonial (EUR)</div><div style="position:relative;height:220px"><canvas id="geral-evolucao-chart"></canvas></div></div>
+      <div class="card"><div class="card-label" style="margin-bottom:8px">Distribuição por moeda</div><div style="position:relative;height:220px"><canvas id="geral-moeda-chart"></canvas></div></div>
     </div>
-    <div class="two-col">
-      <div class="panel" style="margin-bottom:0">
-        <div class="panel-title">Por corretora — <span id="mes-ref">—</span></div>
-        <div id="corr-rows"><div class="loading">carregando...</div></div>
-      </div>
-      <div class="panel" style="margin-bottom:0">
-        <div class="panel-title">Alocação por moeda</div>
-        <div id="alloc-rows"><div class="loading">carregando...</div></div>
-      </div>
-    </div>
+    <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Variação % mensal do patrimônio</div><div style="position:relative;height:180px"><canvas id="geral-var-chart"></canvas></div></div>
   </div>
 
   <div id="tab-posicoes" class="section">
@@ -347,63 +327,115 @@ document.querySelectorAll('.nav-tab').forEach(t => {
   };
 });
 
+let geralEvolucaoChart = null, geralMoedaChart = null, geralVarChart = null;
+
 async function loadGeral() {
-  const [pat, pos, renda26] = await Promise.all([
+  const [pat, posData_g, cash] = await Promise.all([
     get('/patrimonio_consolidado?select=mes,ordem,total_eur,xp_eur,av_eur,r4_eur,ibkr_eur,tem_provisorio&order=ordem.asc'),
-    get('/posicoes_abertas?select=id'),
-    get('/renda?select=valor_eur&data=gte.2026-01-01')
+    get('/posicoes_abertas?select=corretora,moeda,preco_atual,quantidade,custo_total'),
+    get('/operacoes?select=corretora,ticker,custo_total,preco_atual&status=eq.IGNORAR')
   ]);
+
   const last = pat[pat.length - 1];
   const prev = pat[pat.length - 2];
+
+  // Badge
   document.getElementById('badge-mes').textContent = last.mes;
   if (last.tem_provisorio) document.getElementById('badge-prov').style.display = '';
-  document.getElementById('k-total').textContent = eur(last.total_eur);
-  document.getElementById('k-mes').textContent   = last.mes + (last.tem_provisorio ? ' *provisório' : '');
-  document.getElementById('k-pos').textContent   = pos.length;
-  const totalRenda = renda26.reduce((s,r) => s + (r.valor_eur || 0), 0);
-  document.getElementById('k-renda').textContent = eur(totalRenda);
+
+  // Caixa: IBKR + R4 de operacoes IGNORAR
+  const caixaIBKR = cash.filter(r=>r.corretora==='IBKR').reduce((s,r)=>s+(r.preco_atual||r.custo_total||0),0);
+  const caixaR4 = cash.filter(r=>r.corretora==='R4').reduce((s,r)=>s+(r.preco_atual||r.custo_total||0),0);
+  const totalCaixa = caixaIBKR + caixaR4;
+
+  // Investido por corretora (valor mercado EUR usando câmbio do posCambio se disponível)
+  const brl = posCambio.brl || 6.24;
+  const usd = posCambio.usd || 1.17;
+  const toE = (v, m) => m==='EUR'?v : m==='BRL'?v/brl : m==='USD'?v/usd : v;
+
+  const investCorr = {XP:0, AV:0, IBKR:0, R4:0};
+  let totalInvestido = 0, totalCusto = 0;
+  posData_g.forEach(r => {
+    if (!r.preco_atual || !r.quantidade) return;
+    const vm = r.preco_atual * r.quantidade;
+    const vmEur = toE(vm, r.moeda);
+    investCorr[r.corretora] = (investCorr[r.corretora]||0) + vmEur;
+    totalInvestido += vmEur;
+    totalCusto += toE(r.custo_total||0, r.moeda);
+  });
+  const resultNR = totalInvestido - totalCusto;
+  const rentNR = totalCusto > 0 ? (resultNR/totalCusto*100) : null;
+
+  // Patrimônio total = investido + caixa
+  const patrimonioTotal = totalInvestido + totalCaixa;
+
+  // KPIs
+  document.getElementById('k-total').innerHTML = '<span style="font-size:24px;font-weight:700">' + eur(patrimonioTotal) + '</span>';
+  document.getElementById('k-mes').textContent = last.mes + (last.tem_provisorio ? ' *provisório' : '');
+  document.getElementById('k-investido').innerHTML = '<span style="font-size:22px;font-weight:700">' + eur(totalInvestido) + '</span>';
+  document.getElementById('k-investido-sub').textContent = Object.values(investCorr).filter(v=>v>0).length + ' corretoras';
+  document.getElementById('k-result-nr').innerHTML = '<span style="font-size:22px;font-weight:700;color:' + (resultNR>=0?'#1a7f4b':'#c0392b') + '">' + (resultNR>=0?'+':'') + eur(resultNR) + '</span>';
+  document.getElementById('k-result-nr-sub').innerHTML = '<span style="color:' + (rentNR!=null?(rentNR>=0?'#1a7f4b':'#c0392b'):'#9b9b98') + '">' + (rentNR!=null?(rentNR>=0?'+':'')+rentNR.toFixed(1)+'% sobre custo':'—') + '</span>';
+  document.getElementById('k-caixa').innerHTML = '<span style="font-size:22px;font-weight:700">' + eur(totalCaixa) + '</span>';
+
   if (prev) {
     const d = last.total_eur - prev.total_eur;
     const p = d / prev.total_eur * 100;
-    document.getElementById('k-var').innerHTML  = `<span class="${dc(d)}">${eur(d)}</span>`;
-    document.getElementById('k-var2').innerHTML = `<span class="${dc(d)}">${sign(p)}${p.toFixed(1)}% vs ${prev.mes}</span>`;
+    document.getElementById('k-var').innerHTML = '<span class="' + dc(d) + '" style="font-size:22px;font-weight:700">' + (d>=0?'+':'') + eur(d) + '</span>';
+    document.getElementById('k-var2').innerHTML = '<span class="' + dc(d) + '">' + (p>=0?'+':'') + p.toFixed(1) + '% vs ' + prev.mes + '</span>';
   }
-  const max = Math.max(...pat.map(d => d.total_eur));
-  document.getElementById('chart').innerHTML = pat.map(d => {
-    const h = Math.round(d.total_eur / max * 100);
-    const isLast = d.mes === last.mes;
-    const color = isLast ? '#534AB7' : '#d4d4d0';
-    return `<div class="bar-col" title="${d.mes}: ${eur(d.total_eur)}">
-      <div class="bar-val" style="font-size:8px;color:${isLast?'#534AB7':'transparent'}">${isLast ? eur(d.total_eur) : ''}</div>
-      <div class="bar" style="height:${h}px;background:${color}"></div>
-      <div class="bar-lbl">${d.mes.split('/')[0]}</div>
+
+  // Cards por corretora
+  const CORR_LABELS = {XP:'XP Investimentos', AV:'Avenue', IBKR:'Interactive Brokers', R4:'Renta 4'};
+  const CORR_MOEDA = {XP:'BRL', AV:'USD', IBKR:'EUR', R4:'EUR'};
+  const CORR_COLORS = {XP:'#e65100', AV:'#1565c0', IBKR:'#1a7f4b', R4:'#6a1b9a'};
+  const corrCards = ['IBKR','AV','XP','R4'].map(c => {
+    const inv = investCorr[c]||0;
+    const caixa = c==='IBKR'?caixaIBKR : c==='R4'?caixaR4 : 0;
+    const total = inv + caixa;
+    const pct = patrimonioTotal > 0 ? (total/patrimonioTotal*100).toFixed(1) : '0';
+    return `<div class="card" style="border-left:3px solid ${CORR_COLORS[c]}">
+      <div class="card-label">${CORR_LABELS[c]}</div>
+      <div style="font-size:20px;font-weight:700;margin-bottom:6px">${eur(total)}</div>
+      <div style="font-size:11px;color:#9b9b98;margin-bottom:4px">${pct}% do patrimônio</div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:#6b6b68;margin-top:6px;padding-top:6px;border-top:1px solid #f0f0ee">
+        <span>Investido: ${eur(inv)}</span>
+        ${caixa>0?'<span>Caixa: '+eur(caixa)+'</span>':''}
+      </div>
     </div>`;
   }).join('');
-  document.getElementById('mes-ref').textContent = last.mes;
-  const total = last.total_eur;
-  const corrs = [
-    { label: 'Interactive Brokers', moeda: 'EUR', v: last.ibkr_eur },
-    { label: 'Avenue',              moeda: 'USD', v: last.av_eur },
-    { label: 'XP Investimentos',    moeda: 'BRL', v: last.xp_eur },
-    { label: 'Renta 4',             moeda: 'EUR', v: last.r4_eur },
-  ].filter(c => c.v);
-  document.getElementById('corr-rows').innerHTML = corrs.map(c => `
-    <div class="corr-row">
-      <div><div class="corr-name">${c.label}</div><div class="corr-moeda">${c.moeda}</div></div>
-      <div><div class="corr-val">${eur(c.v)}</div><div class="corr-pct">${(c.v/total*100).toFixed(1)}%</div></div>
-    </div>`).join('');
-  const allocs = [
-    { l: 'EUR (IBKR + R4)', v: (last.ibkr_eur||0) + (last.r4_eur||0), c: '#534AB7' },
-    { l: 'USD (Avenue)',    v: last.av_eur || 0, c: '#185FA5' },
-    { l: 'BRL (XP)',        v: last.xp_eur || 0, c: '#0F6E56' },
-  ];
-  document.getElementById('alloc-rows').innerHTML = allocs.map(a => {
-    const p = (a.v / total * 100).toFixed(1);
-    return `<div class="alloc-item">
-      <div class="alloc-info"><span>${a.l}</span><span>${p}% · ${eur(a.v)}</span></div>
-      <div class="alloc-bg"><div class="alloc-fill" style="width:${p}%;background:${a.c}"></div></div>
-    </div>`;
-  }).join('');
+  document.getElementById('geral-corr-cards').innerHTML = corrCards;
+
+  // Gráfico evolução linha
+  const labels = pat.map(d => d.mes.split('/')[0]+'/'+d.mes.split('/')[1].slice(2));
+  const vals = pat.map(d => d.total_eur);
+  const ec = document.getElementById('geral-evolucao-chart');
+  if (ec) {
+    if (geralEvolucaoChart) geralEvolucaoChart.destroy();
+    geralEvolucaoChart = new Chart(ec, {type:'line', data:{labels, datasets:[{label:'Patrimônio EUR', data:vals, borderColor:'#1a7f4b', backgroundColor:'#1a7f4b15', borderWidth:2, pointRadius:3, tension:0.3, fill:true}]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>' '+eur(ctx.raw)}}}, scales:{x:{grid:{display:false}, ticks:{font:{size:9}}}, y:{grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>'€'+Math.round(v/1000)+'k'}}}}});
+  }
+
+  // Gráfico pizza por moeda
+  const moedaData = [
+    {l:'EUR (IBKR+R4)', v:(investCorr.IBKR||0)+(investCorr.R4||0)+totalCaixa, c:'#1a7f4b'},
+    {l:'USD (Avenue)', v:investCorr.AV||0, c:'#1565c0'},
+    {l:'BRL (XP)', v:investCorr.XP||0, c:'#e65100'},
+  ].filter(d=>d.v>0);
+  const totalMoeda = moedaData.reduce((s,d)=>s+d.v,0);
+  const mc = document.getElementById('geral-moeda-chart');
+  if (mc) {
+    if (geralMoedaChart) geralMoedaChart.destroy();
+    geralMoedaChart = new Chart(mc, {type:'doughnut', data:{labels:moedaData.map(d=>d.l+' '+(totalMoeda?(d.v/totalMoeda*100).toFixed(1):'0')+'%'), datasets:[{data:moedaData.map(d=>d.v), backgroundColor:moedaData.map(d=>d.c), borderWidth:2, borderColor:'#fff'}]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{font:{size:10}, boxWidth:12}}, tooltip:{callbacks:{label:ctx=>' '+eur(ctx.raw)+' ('+(totalMoeda?(ctx.raw/totalMoeda*100).toFixed(1):'0')+'%)'}}}}});
+  }
+
+  // Gráfico variação % mensal
+  const varLabels = pat.slice(1).map(d => d.mes.split('/')[0]+'/'+d.mes.split('/')[1].slice(2));
+  const varVals = pat.slice(1).map((d,i) => pat[i].total_eur > 0 ? ((d.total_eur - pat[i].total_eur)/pat[i].total_eur*100) : 0);
+  const vc = document.getElementById('geral-var-chart');
+  if (vc) {
+    if (geralVarChart) geralVarChart.destroy();
+    geralVarChart = new Chart(vc, {type:'bar', data:{labels:varLabels, datasets:[{data:varVals, backgroundColor:varVals.map(v=>v>=0?'#1a7f4b99':'#c0392b99'), borderRadius:4}]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>' '+(ctx.raw>=0?'+':'')+ctx.raw.toFixed(1)+'%'}}}, scales:{x:{grid:{display:false}, ticks:{font:{size:9}}}, y:{grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>v.toFixed(1)+'%'}}}}});
+  }
 }
 
 let posFiltCorr = 'TODAS', posFiltClasse = 'TODAS';
