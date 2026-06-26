@@ -371,7 +371,7 @@ document.querySelectorAll('.nav-tab').forEach(t => {
 let geralEvolucaoChart = null, geralMoedaChart = null, geralVarChart = null, geralPnlChart = null;
 
 async function loadGeral() {
-  const [pat, posData_g, cash, rendaTot, custosTot, resultFech, fluxos, wiseData_g] = await Promise.all([
+  const [pat, posData_g, cash, rendaTot, custosTot, resultFech, fluxos, wiseData_g, cambioG] = await Promise.all([
     get('/patrimonio_consolidado?select=mes,ordem,total_eur,xp_eur,av_eur,r4_eur,ibkr_eur,tem_provisorio&order=ordem.asc'),
     get('/posicoes_abertas?select=corretora,moeda,preco_atual,quantidade,custo_total'),
     get('/operacoes?select=corretora,ticker,custo_total,preco_atual&status=eq.IGNORAR'),
@@ -379,7 +379,8 @@ async function loadGeral() {
     get('/custos?select=valor_eur&corretora=neq.nan'),
     get('/resultado_fechado?select=resultado_eur,data_saida,dias_posicao'),
     get('/fluxos_capital?select=tipo,valor_eur,corretora'),
-    get('/cambio_wise?select=custo_pct,valor_eur')
+    get('/cambio_wise?select=custo_pct,valor_eur'),
+    get('/cambio?select=mes,eur_brl,eur_usd&order=mes.desc&limit=1')
   ]);
 
   const last = pat[pat.length - 1];
@@ -393,9 +394,9 @@ async function loadGeral() {
   const caixaR4 = cash.filter(r=>r.corretora==='R4').reduce((s,r)=>s+(r.preco_atual||r.custo_total||0),0);
   const totalCaixa = caixaIBKR + caixaR4;
 
-  // Câmbio
-  const brl = posCambio.brl || 6.24;
-  const usd = posCambio.usd || 1.17;
+  // Câmbio — usa o mesmo que Posições Abertas
+  const brl = (cambioG?.[0]?.eur_brl) || posCambio.brl || 6.2383;
+  const usd = (cambioG?.[0]?.eur_usd) || posCambio.usd || 1.1735;
   const toE = (v, m) => m==='EUR'?v : m==='BRL'?v/brl : m==='USD'?v/usd : v;
 
   // Investido
