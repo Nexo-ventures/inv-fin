@@ -981,13 +981,20 @@ let custosChart = null;
 let custosFiltCorr = 'TODAS';
 let custosFiltTipo = 'TODOS';
 async function loadCustos() {
-  custosData = await get('/custos?select=*&order=data.desc&limit=200');
+  const [custosRaw, pat] = await Promise.all([
+    get('/custos?select=*&order=data.desc&limit=200'),
+    get('/patrimonio_consolidado?select=total_eur&order=ordem.desc&limit=1')
+  ]);
+  custosData = custosRaw;
+  const patrimonioTotal = pat?.[0]?.total_eur || 0;
+  window._custosPatrimonio = patrimonioTotal;
   custosFiltCorr = 'TODAS'; custosFiltTipo = 'TODOS';
-  renderCustos(custosData);
+  renderCustos(custosData, patrimonioTotal);
 }
-function renderCustos(rows) {
+function renderCustos(rows, patrimonioTotal) {
   rows = rows.filter(r => r.corretora && r.corretora !== 'nan');
   if (!rows.length) { document.getElementById('custos-body').innerHTML = '<div class="empty">Nenhum registro</div>'; return; }
+  if (patrimonioTotal == null) patrimonioTotal = 0;
   const total = rows.reduce((s, r) => s + (r.valor_eur || 0), 0);
 
   const porTipo = {}; const CORRETORAS = ['XP','AV','R4','IBKR'];
@@ -1007,8 +1014,7 @@ function renderCustos(rows) {
   const totalCorretagem = rows.filter(r=>r.tipo==='CORRETAGEM').reduce((s,r)=>s+(r.valor_eur||0),0);
   const nOrdens = rows.filter(r=>r.tipo==='CORRETAGEM').length;
   const custoMedio = nOrdens > 0 ? totalCorretagem / nOrdens : null;
-  const patrimonioRef = 49250; // valor a mercado atual aproximado
-  const custoPctPatrimonio = patrimonioRef > 0 ? (total / patrimonioRef * 100) : null;
+  const custoPctPatrimonio = patrimonioTotal > 0 ? (total / patrimonioTotal * 100) : null;
   const maiorCusto = rows.filter(r=>r.valor_eur).reduce((max,r)=>r.valor_eur>max.valor_eur?r:max, {valor_eur:0});
 
   document.getElementById('custos-kpis').innerHTML = `
@@ -1158,7 +1164,7 @@ function filtCustos(dim, val, btn) {
   let filtered = custosData.filter(r => r.corretora && r.corretora !== 'nan');
   if (custosFiltCorr !== 'TODAS') filtered = filtered.filter(r => r.corretora === custosFiltCorr);
   if (custosFiltTipo !== 'TODOS') filtered = filtered.filter(r => r.tipo === custosFiltTipo);
-  renderCustos(filtered);
+  renderCustos(filtered, window._custosPatrimonio);
 }
 
 let wiseData = [];
