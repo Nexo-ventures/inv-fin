@@ -165,6 +165,10 @@
     <div id="hist-kpis" style="margin-bottom:16px"></div>
     <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:12px">Resultado mensal realizado (EUR)</div><div style="position:relative;height:220px"><canvas id="hist-chart"></canvas></div></div>
     <div id="hist-anual" style="margin-bottom:16px"></div>
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-label" style="margin-bottom:8px">Resultado por ativo (EUR)</div>
+      <div id="hist-pagadores-wrap" style="overflow-y:auto;max-height:500px"><canvas id="hist-pagadores-chart"></canvas></div>
+    </div>
     <div class="card" style="padding:0">
       <div class="table-head">
         <span class="table-title">Posições fechadas</span>
@@ -911,6 +915,42 @@ function renderHist(rows) {
   const years=Object.keys(byYear).sort((a,b)=>b-a);
   if (document.getElementById('hist-anual')) {
     document.getElementById('hist-anual').innerHTML='<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:400px"><thead><tr style="background:#fafaf9"><th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;border-bottom:1px solid #f0f0ee">Ano</th>'+CORRS.map(c=>'<th style="padding:10px 14px;text-align:right;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;border-bottom:1px solid #f0f0ee">'+c+'</th>').join('')+'<th style="padding:10px 14px;text-align:right;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;border-bottom:1px solid #f0f0ee">Total</th></tr></thead><tbody>'+years.map(y=>{const rowTot=CORRS.reduce((s,c)=>s+(byYear[y][c]||0),0);return'<tr><td style="padding:10px 14px;font-size:13px;font-weight:500;border-bottom:1px solid #f0f0ee">'+y+'</td>'+CORRS.map(c=>'<td style="padding:10px 14px;text-align:right;font-size:13px;border-bottom:1px solid #f0f0ee;color:'+(byYear[y][c]?(byYear[y][c]>=0?'#1a7f4b':'#c0392b'):'#9b9b98')+'">'+(byYear[y][c]?num(byYear[y][c],2):'€0')+'</td>').join('')+'<td style="padding:10px 14px;text-align:right;font-size:13px;font-weight:600;color:'+(rowTot>=0?'#1a7f4b':'#c0392b')+';border-bottom:1px solid #f0f0ee">'+num(rowTot,2)+'</td></tr>';}).join('')+'</tbody><tfoot><tr style="background:#fafaf9"><td style="padding:10px 14px;font-size:13px;font-weight:600;border-top:1px solid #e5e5e3">Total</td>'+CORRS.map(c=>{const v=years.reduce((s,y)=>s+(byYear[y][c]||0),0);return'<td style="padding:10px 14px;text-align:right;font-size:13px;font-weight:600;color:'+(v?(v>=0?'#1a7f4b':'#c0392b'):'#9b9b98')+';border-top:1px solid #e5e5e3">'+(v?num(v,2):'€0')+'</td>';}).join('')+'<td style="padding:10px 14px;text-align:right;font-size:13px;font-weight:700;color:'+(totalEur>=0?'#1a7f4b':'#c0392b')+';border-top:1px solid #e5e5e3">'+num(totalEur,2)+'</td></tr></tfoot></table></div>';
+  }
+
+  // --- Gráfico resultado por ativo ---
+  const porAtivo = {};
+  rows.forEach(r => { if(r.resultado_eur==null) return; porAtivo[r.ticker]=(porAtivo[r.ticker]||0)+r.resultado_eur; });
+  const ativosSorted = Object.entries(porAtivo).sort((a,b)=>b[1]-a[1]);
+  const alturaAtivos = Math.max(200, ativosSorted.length * 28);
+  const wrapA = document.getElementById('hist-pagadores-wrap');
+  if (wrapA) {
+    wrapA.style.height = alturaAtivos + 'px';
+    const canvasA = document.getElementById('hist-pagadores-chart');
+    if (canvasA) {
+      canvasA.height = alturaAtivos;
+      if (window._histPagadoresChart) window._histPagadoresChart.destroy();
+      window._histPagadoresChart = new Chart(canvasA, {
+        type: 'bar',
+        data: {
+          labels: ativosSorted.map(([t])=>t),
+          datasets: [{
+            data: ativosSorted.map(([,v])=>v),
+            backgroundColor: ativosSorted.map(([,v])=>v>=0?'#1a7f4b99':'#c0392b99'),
+            borderRadius: 4
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: false,
+          maintainAspectRatio: false,
+          plugins: { legend:{display:false}, tooltip:{callbacks:{label:ctx=>' '+eur(ctx.raw)}} },
+          scales: {
+            x: { grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>'€'+v.toLocaleString('de-DE')} },
+            y: { grid:{display:false}, ticks:{font:{size:10}} }
+          }
+        }
+      });
+    }
   }
 
   // --- Tabela com ordenação ---
