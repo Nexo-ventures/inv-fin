@@ -936,18 +936,59 @@ function filtHist(btn) {
 }
 
 async function loadRenda() {
-  rendaData = await get('/renda?select=*&order=data.desc&limit=200');
+  const [rendaRaw, ops] = await Promise.all([
+    get('/renda?select=*&order=data.desc&limit=200'),
+    get('/posicoes_abertas?select=ticker,custo_total,moeda')
+  ]);
+  rendaData = rendaRaw;
+  window._rendaOps = ops;
   rendaFiltCorr = 'TODAS'; rendaFiltTipo = 'TODOS';
   renderRenda(rendaData);
 }
 function renderRenda(rows) {
   if (!rows.length) { document.getElementById('renda-body').innerHTML = '<div class="empty">Nenhum registro</div>'; return; }
-  const totalEur = rows.reduce((s, r) => s + (r.valor_eur || 0), 0);
+  const allRows = rendaData; // always use full data for KPIs
+  const totalEur = allRows.reduce((s, r) => s + (r.valor_eur || 0), 0);
   const TIPO_COLORS = ['#1a7f4b','#1565c0','#6a1b9a','#e65100','#c0392b','#0288d1','#558b2f','#f57f17'];
+
+  // KPI calculations
+  const renda25 = allRows.filter(r=>r.data&&new Date(r.data).getFullYear()===2025).reduce((s,r)=>s+(r.valor_eur||0),0);
+  const renda26 = allRows.filter(r=>r.data&&new Date(r.data).getFullYear()===2026).reduce((s,r)=>s+(r.valor_eur||0),0);
+  // meses ativos = distância entre primeiro e último pagamento
+  const datas = allRows.filter(r=>r.data).map(r=>new Date(r.data)).sort((a,b)=>a-b);
+  const mesesAtivos = datas.length >= 2 ? Math.max(1, Math.round((datas[datas.length-1]-datas[0])/(1000*60*60*24*30))) : 1;
+  const mediaM = totalEur / mesesAtivos;
+  // maior pagador por ticker
+  const porTicker = {};
+  allRows.forEach(r => { if(r.ticker) porTicker[r.ticker]=(porTicker[r.ticker]||0)+(r.valor_eur||0); });
+  const maiorPagador = Object.entries(porTicker).sort((a,b)=>b[1]-a[1])[0];
+  // yield estimado = renda total / custo total posições abertas
+  const ops = window._rendaOps || [];
+  const custoTotalOps = ops.reduce((s,r)=>s+(r.custo_total||0),0);
+  // aproximado: custo em BRL/USD → EUR usando 6.24 e 1.17
+  const custoEur = ops.reduce((s,r)=>{
+    const v = r.custo_total||0;
+    return s + (r.moeda==='EUR'?v : r.moeda==='BRL'?v/6.24 : r.moeda==='USD'?v/1.17 : v);
+  },0);
+  const yieldEst = custoEur > 0 ? (totalEur / custoEur * 100) : null;
+
+  // por classe (tipo)
   const porTipo = {};
-  rows.forEach(r => { if (r.tipo) porTipo[r.tipo] = (porTipo[r.tipo]||0) + (r.valor_eur||0); });
+  allRows.forEach(r => { if (r.tipo) porTipo[r.tipo] = (porTipo[r.tipo]||0) + (r.valor_eur||0); });
   const tiposSorted = Object.entries(porTipo).sort((a,b) => b[1]-a[1]);
-  document.getElementById('renda-kpis').innerHTML = '<div class="card" style="padding:14px 18px"><div class="card-label" style="margin-bottom:12px">Por tipo</div><div style="display:flex;flex-wrap:wrap;gap:10px">'+tiposSorted.map(([t,v],i) => { const pct=(v/totalEur*100).toFixed(1); const color=TIPO_COLORS[i%TIPO_COLORS.length]; return '<div style="display:flex;align-items:center;gap:8px;background:#f9f9f8;border-radius:8px;padding:8px 12px;min-width:190px"><div style="width:10px;height:10px;border-radius:50%;background:'+color+';flex-shrink:0"></div><div><div style="font-size:11px;color:#6b6b68">'+t.replace(/_/g,' ')+'</div><div style="font-size:13px;font-weight:600;color:#1a7f4b">'+num(v,2)+'</div></div><div style="margin-left:auto;font-size:12px;font-weight:500;color:#9b9b98">'+pct+'%</div></div>'; }).join('')+'</div></div>';
+
+  document.getElementById('renda-kpis').innerHTML =
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-bottom:12px">' +
+    '<div class="card"><div class="card-label">Renda total</div><div style="font-size:20px;font-weight:700;color:#1a7f4b">'+eur(totalEur)+'</div><div style="font-size:11px;color:#9b9b98">'+allRows.length+' pagamentos</div></div>' +
+    '<div class="card"><div class="card-label">Renda 2025</div><div style="font-size:20px;font-weight:700;color:#1a7f4b">'+eur(renda25)+'</div><div style="font-size:11px;color:#9b9b98">ano anterior</div></div>' +
+    '<div class="card"><div class="card-label">Renda 2026</div><div style="font-size:20px;font-weight:700;color:#1a7f4b">'+eur(renda26)+'</div><div style="font-size:11px;color:#9b9b98">ano atual</div></div>' +
+    '<div class="card"><div class="card-label">Média mensal</div><div style="font-size:20px;font-weight:700;color:#1a7f4b">'+eur(mediaM)+'</div><div style="font-size:11px;color:#9b9b98">'+mesesAtivos+' meses</div></div>' +
+    '<div class="card"><div class="card-label">Maior pagador</div><div style="font-size:20px;font-weight:700;color:#1a7f4b">'+(maiorPagador?eur(maiorPagador[1]):'—')+'</div><div style="font-size:11px;color:#9b9b98">'+(maiorPagador?maiorPagador[0]:'—')+'</div></div>' +
+    '<div class="card"><div class="card-label">Yield estimado</div><div style="font-size:20px;font-weight:700;color:#1a7f4b">'+(yieldEst!=null?yieldEst.toFixed(2)+'%':'—')+'</div><div style="font-size:11px;color:#9b9b98">renda / custo posições</div></div>' +
+    '</div>' +
+    '<div class="card" style="padding:14px 18px;margin-bottom:12px"><div class="card-label" style="margin-bottom:12px">Por tipo</div><div style="display:flex;flex-wrap:wrap;gap:10px">'+
+    tiposSorted.map(([t,v],i) => { const pct=(v/totalEur*100).toFixed(1); const color=TIPO_COLORS[i%TIPO_COLORS.length]; return '<div style="display:flex;align-items:center;gap:8px;background:#f9f9f8;border-radius:8px;padding:8px 12px;min-width:190px"><div style="width:10px;height:10px;border-radius:50%;background:'+color+';flex-shrink:0"></div><div><div style="font-size:11px;color:#6b6b68">'+t.replace(/_/g,' ')+'</div><div style="font-size:13px;font-weight:600;color:#1a7f4b">'+num(v,2)+'</div></div><div style="margin-left:auto;font-size:12px;font-weight:500;color:#9b9b98">'+pct+'%</div></div>'; }).join('')+
+    '</div></div>';
   const byMonth = {};
   rows.forEach(r => { if (!r.data) return; const d=new Date(r.data); const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); if (!byMonth[key]) byMonth[key]={}; byMonth[key][r.tipo]=(byMonth[key][r.tipo]||0)+(r.valor_eur||0); });
   const months = Object.keys(byMonth).sort();
