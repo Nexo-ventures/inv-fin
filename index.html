@@ -110,6 +110,7 @@
       <div class="card"><div class="card-label">Investido (mercado)</div><div class="card-value" id="k-investido">—</div><div class="card-sub" id="k-investido-sub">valor atual EUR</div></div>
       <div class="card"><div class="card-label">Resultado não realizado</div><div class="card-value" id="k-result-nr">—</div><div class="card-sub" id="k-result-nr-sub">—</div></div>
       <div class="card"><div class="card-label">Caixa total</div><div class="card-value" id="k-caixa">—</div><div class="card-sub">IBKR + R4</div></div>
+      <div class="card"><div class="card-label">P&L líquido total</div><div class="card-value" id="k-pnl">—</div><div class="card-sub" id="k-pnl-sub">realizado + NR + renda - custos</div></div>
     </div>
     <!-- Cards por corretora -->
     <div id="geral-corr-cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px"></div>
@@ -350,10 +351,13 @@ document.querySelectorAll('.nav-tab').forEach(t => {
 let geralEvolucaoChart = null, geralMoedaChart = null, geralVarChart = null;
 
 async function loadGeral() {
-  const [pat, posData_g, cash] = await Promise.all([
+  const [pat, posData_g, cash, rendaTot, custosTot, resultFech] = await Promise.all([
     get('/patrimonio_consolidado?select=mes,ordem,total_eur,xp_eur,av_eur,r4_eur,ibkr_eur,tem_provisorio&order=ordem.asc'),
     get('/posicoes_abertas?select=corretora,moeda,preco_atual,quantidade,custo_total'),
-    get('/operacoes?select=corretora,ticker,custo_total,preco_atual&status=eq.IGNORAR')
+    get('/operacoes?select=corretora,ticker,custo_total,preco_atual&status=eq.IGNORAR'),
+    get('/renda?select=valor_eur'),
+    get('/custos?select=valor_eur&corretora=neq.nan'),
+    get('/resultado_fechado?select=resultado_eur')
   ]);
 
   const last = pat[pat.length - 1];
@@ -402,7 +406,16 @@ async function loadGeral() {
   document.getElementById('k-investido-sub').textContent = Object.values(investCorr).filter(v=>v>0).length + ' corretoras';
   document.getElementById('k-result-nr').innerHTML = '<span style="font-size:22px;font-weight:700;color:' + (resultNR>=0?'#1a7f4b':'#c0392b') + '">' + (resultNR>=0?'+':'') + eur(resultNR) + '</span>';
   document.getElementById('k-result-nr-sub').innerHTML = '<span style="color:' + (rentNR!=null?(rentNR>=0?'#1a7f4b':'#c0392b'):'#9b9b98') + '">' + (rentNR!=null?(rentNR>=0?'+':'')+rentNR.toFixed(1)+'% sobre custo':'—') + '</span>';
+  // P&L líquido total
+  const totalRenda = rendaTot.reduce((s,r)=>s+(r.valor_eur||0),0);
+  const totalCustos = custosTot.reduce((s,r)=>s+(r.valor_eur||0),0);
+  const totalRealizado = resultFech.reduce((s,r)=>s+(r.resultado_eur||0),0);
+  const pnlLiquido = totalRealizado + resultNR + totalRenda - totalCustos;
+
   document.getElementById('k-caixa').innerHTML = '<span style="font-size:22px;font-weight:700">' + eur(totalCaixa) + '</span>';
+  document.getElementById('k-pnl').innerHTML = '<span style="font-size:22px;font-weight:700;color:' + (pnlLiquido>=0?'#1a7f4b':'#c0392b') + '">' + (pnlLiquido>=0?'+':'') + eur(pnlLiquido) + '</span>';
+  document.getElementById('k-pnl-sub').innerHTML =
+    '<span style="font-size:10px;color:#9b9b98">Real: '+eur(totalRealizado)+' · NR: '+(resultNR>=0?'+':'')+eur(resultNR)+'<br>Renda: +'+eur(totalRenda)+' · Custos: -'+eur(totalCustos)+'</span>';
 
   if (prev) {
     const d = last.total_eur - prev.total_eur;
