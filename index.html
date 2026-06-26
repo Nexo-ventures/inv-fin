@@ -235,12 +235,16 @@
   <div id="tab-cambio" class="section">
     <!-- KPIs -->
     <div id="cambio-kpis" style="margin-bottom:16px"></div>
-    <!-- Gráficos -->
+    <!-- Gráficos mensais BRL/USD -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
       <div class="card"><div class="card-label" style="margin-bottom:12px">EUR/BRL — Evolução mensal</div><div style="position:relative;height:180px"><canvas id="chart-brl"></canvas></div></div>
       <div class="card"><div class="card-label" style="margin-bottom:12px">EUR/USD — Evolução mensal</div><div style="position:relative;height:180px"><canvas id="chart-usd"></canvas></div></div>
     </div>
-    <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:12px">% vs Máximo histórico — Histórico realizado</div><div style="position:relative;height:180px"><canvas id="chart-pct-max"></canvas></div></div>
+    <!-- Gráfico % vs máx e barras enviado -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+      <div class="card"><div class="card-label" style="margin-bottom:12px">% vs Máximo histórico — Histórico realizado</div><div style="position:relative;height:200px"><canvas id="chart-pct-max"></canvas></div></div>
+      <div class="card"><div class="card-label" style="margin-bottom:12px">Valor enviado por mês (EUR)</div><div style="position:relative;height:200px"><canvas id="chart-enviado"></canvas></div></div>
+    </div>
     <!-- Histórico realizado -->
     <div class="card" style="padding:0;margin-bottom:16px">
       <div class="table-head">
@@ -1156,9 +1160,9 @@ let cambioChartBRL = null, cambioChartUSD = null, cambioChartPct = null;
 async function loadCambio() {
   const [cambio, wise] = await Promise.all([
     get('/cambio?select=*'),
-    get('/cambio_wise?select=*&order=data.desc')
+    get('/cambio_wise?select=*&order=data.asc')
   ]);
-  wiseData = wise;
+  wiseData = [...wise].reverse();
   const sorted = [...cambio].sort(mesSort);
 
   // --- KPIs ---
@@ -1168,14 +1172,29 @@ async function loadCambio() {
   const curUSD = latestUSD?.eur_usd || 0;
   const pctBRL = ((curBRL - MAX_BRL) / MAX_BRL * 100).toFixed(1);
   const pctUSD = ((curUSD - MAX_USD) / MAX_USD * 100).toFixed(1);
+
+  // KPIs Wise
+  const wiseAll = wise;
+  const totalEnviado = wiseAll.reduce((s,r) => s + (r.valor_eur||0), 0);
+  const totalTarifas = wiseAll.reduce((s,r) => s + (r.custo_pct && r.valor_eur ? r.custo_pct * r.valor_eur : 0), 0);
+  const spreads = wiseAll.filter(r => r.spread_google).map(r => r.spread_google * 100);
+  const mediaSpread = spreads.length ? spreads.reduce((s,v)=>s+v,0)/spreads.length : null;
+  const totalPerdaMax = wiseAll.reduce((s,r) => s + (r.perda_vs_max_eur||0), 0);
+  const totalGanhoAtual = wiseAll.reduce((s,r) => s + (r.ganho_vs_atual_eur||0), 0);
+
   document.getElementById('cambio-kpis').innerHTML = `
-    <div style="display:grid;grid-template-columns:repeat(3,1fr) repeat(3,1fr);gap:12px">
-      <div class="card"><div class="card-label">EUR/BRL Atual</div><div class="card-value">${num(curBRL,4)}</div><div class="card-sub">${latestBRL?.mes || ''}</div></div>
-      <div class="card"><div class="card-label">EUR/BRL Máx histórico</div><div class="card-value">${num(MAX_BRL,2)}</div><div class="card-sub">Jan/2021</div></div>
-      <div class="card"><div class="card-label">% vs Máx BRL</div><div class="card-value ${pctBRL < 0 ? 'neg' : 'pos'}">${pctBRL}%</div><div class="card-sub">distância do máximo</div></div>
-      <div class="card"><div class="card-label">EUR/USD Atual</div><div class="card-value">${num(curUSD,4)}</div><div class="card-sub">${latestUSD?.mes || ''}</div></div>
-      <div class="card"><div class="card-label">EUR/USD Máx histórico</div><div class="card-value">${num(MAX_USD,2)}</div><div class="card-sub">Dez/2017</div></div>
-      <div class="card"><div class="card-label">% vs Máx USD</div><div class="card-value ${pctUSD < 0 ? 'neg' : 'pos'}">${pctUSD}%</div><div class="card-sub">distância do máximo</div></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:12px">
+      <div class="card"><div class="card-label">EUR/BRL Atual</div><div class="card-value">${num(curBRL,4)}</div><div class="card-sub">${latestBRL?.mes||''}</div></div>
+      <div class="card"><div class="card-label">% vs Máx BRL</div><div class="card-value ${pctBRL<0?'neg':'pos'}">${pctBRL}%</div><div class="card-sub">máx ${num(MAX_BRL,2)}</div></div>
+      <div class="card"><div class="card-label">EUR/USD Atual</div><div class="card-value">${num(curUSD,4)}</div><div class="card-sub">${latestUSD?.mes||''}</div></div>
+      <div class="card"><div class="card-label">% vs Máx USD</div><div class="card-value ${pctUSD<0?'neg':'pos'}">${pctUSD}%</div><div class="card-sub">máx ${num(MAX_USD,2)}</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px">
+      <div class="card"><div class="card-label">Total enviado (Wise)</div><div class="card-value">${eur(totalEnviado)}</div><div class="card-sub">${wiseAll.length} remessas</div></div>
+      <div class="card"><div class="card-label">Total tarifas</div><div class="card-value neg">${eur(totalTarifas)}</div><div class="card-sub">custo total Wise</div></div>
+      <div class="card"><div class="card-label">Spread médio</div><div class="card-value neg">${mediaSpread!=null?mediaSpread.toFixed(2)+'%':'—'}</div><div class="card-sub">vs Google rate</div></div>
+      <div class="card"><div class="card-label">Perda vs máximo</div><div class="card-value neg">${eur(totalPerdaMax)}</div><div class="card-sub">se tivesse enviado no pico</div></div>
+      <div class="card"><div class="card-label">Ganho/Perda vs atual</div><div class="card-value ${totalGanhoAtual>=0?'pos':'neg'}">${totalGanhoAtual>=0?'+':''}${eur(totalGanhoAtual)}</div><div class="card-sub">vs taxa atual</div></div>
     </div>`;
 
   // --- Gráficos mensais ---
@@ -1194,7 +1213,7 @@ async function loadCambio() {
     },
     options: {
       responsive:true, maintainAspectRatio:false,
-      plugins:{ legend:{ labels:{ font:{size:10}, boxWidth:10 } }, tooltip:{ callbacks:{ afterLabel: (ctx) => { if (ctx.datasetIndex !== 0) return ''; const i = ctx.dataIndex; const prev = ctx.dataset.data[i-1]; if (!prev) return ''; const pct = ((ctx.parsed.y - prev) / prev * 100).toFixed(1); return (pct > 0 ? '+' : '') + pct + '% vs mês anterior'; } } } },
+      plugins:{ legend:{ labels:{ font:{size:10}, boxWidth:10 } } },
       scales:{
         x:{ grid:{display:false}, ticks:{font:{size:9}, maxTicksLimit:8} },
         y:{ grid:{color:'#f0f0ee'}, ticks:{ font:{size:9}, callback: v => v.toFixed(2) } }
@@ -1207,9 +1226,9 @@ async function loadCambio() {
   cambioChartBRL = new Chart(document.getElementById('chart-brl'), chartCfg(brlVals, MAX_BRL, '#1a7f4b'));
   cambioChartUSD = new Chart(document.getElementById('chart-usd'), chartCfg(usdVals, MAX_USD, '#1565c0'));
 
-  // --- Gráfico % vs Máx histórico (realizados) ---
-  const brlWise = [...wiseData].filter(r => r.par === 'EUR_BRL' && r.pct_vs_max_hist).sort((a,b) => a.data.localeCompare(b.data));
-  const usdWise = [...wiseData].filter(r => r.par === 'EUR_USD' && r.pct_vs_max_hist).sort((a,b) => a.data.localeCompare(b.data));
+  // --- Gráfico % vs Máx histórico (spanGaps:true para conectar pontos) ---
+  const brlWise = [...wiseAll].filter(r => r.par === 'EUR_BRL' && r.pct_vs_max_hist).sort((a,b) => a.data.localeCompare(b.data));
+  const usdWise = [...wiseAll].filter(r => r.par === 'EUR_USD' && r.pct_vs_max_hist).sort((a,b) => a.data.localeCompare(b.data));
   const allDates = [...new Set([...brlWise.map(r=>r.data), ...usdWise.map(r=>r.data)])].sort();
   const brlPctMap = Object.fromEntries(brlWise.map(r => [r.data, r.pct_vs_max_hist * 100]));
   const usdPctMap = Object.fromEntries(usdWise.map(r => [r.data, r.pct_vs_max_hist * 100]));
@@ -1220,19 +1239,34 @@ async function loadCambio() {
     data: {
       labels: allDates.map(d => dt(d)),
       datasets: [
-        { label: 'EUR/BRL % vs Máx', data: allDates.map(d => brlPctMap[d] ?? null), borderColor:'#1a7f4b', backgroundColor:'#1a7f4b22', borderWidth:2, pointRadius:4, tension:0.3, spanGaps:false },
-        { label: 'EUR/USD % vs Máx', data: allDates.map(d => usdPctMap[d] ?? null), borderColor:'#1565c0', backgroundColor:'#1565c022', borderWidth:2, pointRadius:4, tension:0.3, spanGaps:false }
+        { label: 'EUR/BRL % vs Máx', data: allDates.map(d => brlPctMap[d] ?? null), borderColor:'#1a7f4b', backgroundColor:'transparent', borderWidth:2, pointRadius:4, tension:0.3, spanGaps:true },
+        { label: 'EUR/USD % vs Máx', data: allDates.map(d => usdPctMap[d] ?? null), borderColor:'#1565c0', backgroundColor:'transparent', borderWidth:2, pointRadius:4, tension:0.3, spanGaps:true }
       ]
     },
     options: {
       responsive:true, maintainAspectRatio:false,
       plugins:{ legend:{ labels:{ font:{size:10}, boxWidth:10 } } },
       scales:{
-        x:{ grid:{display:false}, ticks:{font:{size:9}} },
+        x:{ grid:{display:false}, ticks:{font:{size:9}, maxTicksLimit:10} },
         y:{ grid:{color:'#f0f0ee'}, ticks:{ font:{size:9}, callback: v => v.toFixed(1)+'%' } }
       }
     }
   });
+
+  // --- Gráfico barras: valor enviado por mês ---
+  const byMes = {};
+  wiseAll.forEach(r => {
+    if (!r.data || !r.valor_eur) return;
+    const mes = r.data.slice(0,7);
+    byMes[mes] = (byMes[mes]||0) + r.valor_eur;
+  });
+  const mesKeys = Object.keys(byMes).sort();
+  const mesLabels = mesKeys.map(m => { const [y,mo]=m.split('-'); const mn=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']; return mn[+mo-1]+'/'+y.slice(2); });
+  const mesVals = mesKeys.map(k => byMes[k]);
+  if (!window._cambioEnviadoChart) window._cambioEnviadoChart = null;
+  if (window._cambioEnviadoChart) window._cambioEnviadoChart.destroy();
+  const ec = document.getElementById('chart-enviado');
+  if (ec) { window._cambioEnviadoChart = new Chart(ec, {type:'bar', data:{labels:mesLabels, datasets:[{data:mesVals, backgroundColor:'#1565c099', borderRadius:4}]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>' '+eur(ctx.raw)}}}, scales:{x:{grid:{display:false}, ticks:{font:{size:9}}}, y:{grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>'€'+Math.round(v/1000)+'k'}}}}}); }
 
   // --- Tabela mensal ---
   document.getElementById('cambio-body').innerHTML = `<table>
