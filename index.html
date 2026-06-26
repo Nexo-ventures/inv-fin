@@ -143,6 +143,11 @@
 
   <div id="tab-posicoes" class="section">
     <div id="pos-kpis"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+      <div class="card"><div class="card-label" style="margin-bottom:8px">Resultado não realizado por classe (EUR)</div><div style="position:relative;height:200px"><canvas id="pos-classe-chart"></canvas></div></div>
+      <div class="card"><div class="card-label" style="margin-bottom:8px">Exposição por corretora (valor mercado EUR)</div><div style="position:relative;height:200px"><canvas id="pos-corr-chart"></canvas></div></div>
+    </div>
+    <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Top ganhos e perdas não realizados (EUR)</div><div style="position:relative;height:220px"><canvas id="pos-top-chart"></canvas></div></div>
     <div class="card" style="padding:0">
       <div class="table-head">
         <span class="table-title">Posições abertas</span>
@@ -418,77 +423,93 @@ function posToEur(val, moeda) {
   return null;
 }
 
+let posClasseChart = null, posCorrChart = null, posTopChart = null;
+
 function renderPos(rows) {
   let filtered = rows;
   if (posFiltCorr !== 'TODAS') filtered = filtered.filter(r => r.corretora === posFiltCorr);
   if (posFiltClasse !== 'TODAS') filtered = filtered.filter(r => r.classe_ativo === posFiltClasse);
 
-  // KPIs
-  let totalCustoEur = 0, totalMercadoEur = 0, countComPreco = 0;
-  filtered.forEach(r => {
-    const custoEur = posToEur(r.custo_total, r.moeda);
-    if (custoEur) totalCustoEur += custoEur;
-    if (r.preco_atual && r.quantidade && r.preco_atual > 0) {
-      const valorMercado = r.preco_atual * r.quantidade;
-      const mercadoEur = posToEur(valorMercado, r.moeda);
-      if (mercadoEur) { totalMercadoEur += mercadoEur; countComPreco++; }
-    }
-  });
-  const totalResultEur = totalMercadoEur - totalCustoEur;
-  const rentPct = totalCustoEur > 0 ? (totalResultEur / totalCustoEur * 100) : null;
+  const CLASS_COLORS = {'Ação':'#1a7f4b','ETF':'#1565c0','FII':'#6a1b9a','Fundo':'#e65100','Renda Fixa':'#c0392b','Caixa':'#0288d1'};
+  const CORR_COLORS = {'XP':'#e65100','AV':'#1565c0','IBKR':'#1a7f4b','R4':'#6a1b9a'};
 
-  document.getElementById('pos-kpis').innerHTML = `
-    <div class="cards" style="margin-bottom:16px">
-      <div class="card">
-        <div class="card-label">Valor a mercado</div>
-        <div class="card-value">${eur(totalMercadoEur || null)}</div>
-        <div class="card-sub">${countComPreco} de ${filtered.length} com cotação</div>
-      </div>
-      <div class="card">
-        <div class="card-label">Custo total</div>
-        <div class="card-value">${eur(totalCustoEur || null)}</div>
-        <div class="card-sub">base de entrada</div>
-      </div>
-      <div class="card">
-        <div class="card-label">Resultado não realizado</div>
-        <div class="card-value ${dc(totalResultEur)}">${totalMercadoEur ? (totalResultEur >= 0 ? '+' : '') + eur(totalResultEur) : '—'}</div>
-        <div class="card-sub ${dc(rentPct)}">${rentPct != null ? (rentPct >= 0 ? '+' : '') + rentPct.toFixed(1) + '% sobre custo' : '—'}</div>
-      </div>
-      <div class="card">
-        <div class="card-label">Câmbio referência</div>
-        <div class="card-value" style="font-size:16px">BRL ${posCambio.brl ? num(posCambio.brl,4) : '—'}</div>
-        <div class="card-sub">USD ${posCambio.usd ? num(posCambio.usd,4) : '—'}</div>
-      </div>
-    </div>`;
+  // Calcular por row
+  const rowsCalc = filtered.map(r => {
+    const temPreco = r.preco_atual && r.preco_atual > 0 && r.quantidade;
+    const valorMercado = temPreco ? r.preco_atual * r.quantidade : null;
+    const custoEur = posToEur(r.custo_total, r.moeda);
+    const mercadoEur = posToEur(valorMercado, r.moeda);
+    const resultEur = (mercadoEur != null && custoEur != null) ? mercadoEur - custoEur : null;
+    const rentPctRow = (resultEur != null && custoEur) ? (resultEur / custoEur * 100) : null;
+    return {...r, valorMercado, custoEur, mercadoEur, resultEur, rentPctRow};
+  });
+
+  const comPreco = rowsCalc.filter(r => r.mercadoEur != null);
+  const totalCustoEur = rowsCalc.reduce((s,r) => s + (r.custoEur||0), 0);
+  const totalMercadoEur = comPreco.reduce((s,r) => s + (r.mercadoEur||0), 0);
+  const totalResultEur = totalMercadoEur - rowsCalc.filter(r=>r.mercadoEur!=null).reduce((s,r)=>s+(r.custoEur||0),0);
+  const rentPct = totalCustoEur > 0 ? (totalResultEur / totalCustoEur * 100) : null;
+  const positivas = rowsCalc.filter(r => r.resultEur != null && r.resultEur > 0);
+  const taxaAcerto = comPreco.length ? (positivas.length / comPreco.length * 100).toFixed(1) : '—';
+
+  // KPIs
+  document.getElementById('pos-kpis').innerHTML =
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px">' +
+    '<div class="card" style="padding:14px 18px"><div class="card-label">Valor a mercado</div><div style="font-size:20px;font-weight:700">' + eur(totalMercadoEur||null) + '</div><div style="font-size:11px;color:#9b9b98">' + comPreco.length + ' de ' + filtered.length + ' com cotação</div></div>' +
+    '<div class="card" style="padding:14px 18px"><div class="card-label">Custo total</div><div style="font-size:20px;font-weight:700">' + eur(totalCustoEur||null) + '</div><div style="font-size:11px;color:#9b9b98">base de entrada</div></div>' +
+    '<div class="card" style="padding:14px 18px"><div class="card-label">Resultado não realizado</div><div style="font-size:20px;font-weight:700;color:' + (totalResultEur>=0?'#1a7f4b':'#c0392b') + '">' + (totalMercadoEur ? (totalResultEur>=0?'+':'') + eur(totalResultEur) : '—') + '</div><div style="font-size:11px;color:' + (rentPct!=null?(rentPct>=0?'#1a7f4b':'#c0392b'):'#9b9b98') + '">' + (rentPct!=null?(rentPct>=0?'+':'')+rentPct.toFixed(1)+'% sobre custo':'—') + '</div></div>' +
+    '<div class="card" style="padding:14px 18px"><div class="card-label">Taxa de acerto</div><div style="font-size:20px;font-weight:700">' + taxaAcerto + '%</div><div style="font-size:11px;color:#9b9b98">' + positivas.length + ' de ' + comPreco.length + ' posições</div></div>' +
+    '<div class="card" style="padding:14px 18px"><div class="card-label">Câmbio referência</div><div style="font-size:16px;font-weight:700">BRL ' + (posCambio.brl ? num(posCambio.brl,4) : '—') + '</div><div style="font-size:11px;color:#9b9b98">USD ' + (posCambio.usd ? num(posCambio.usd,4) : '—') + '</div></div>' +
+    '</div>';
 
   if (!filtered.length) { document.getElementById('pos-body').innerHTML = '<div class="empty">Nenhuma posição encontrada</div>'; return; }
 
+  // Gráfico por classe (barras horizontais)
+  const porClasse = {};
+  rowsCalc.forEach(r => { if(r.resultEur==null) return; const c=r.classe_ativo||'Outro'; porClasse[c]=(porClasse[c]||0)+r.resultEur; });
+  const classesSorted = Object.entries(porClasse).sort((a,b)=>b[1]-a[1]);
+  const cc = document.getElementById('pos-classe-chart');
+  if (cc) { if(cc._ci) cc._ci.destroy(); cc._ci = new Chart(cc, {type:'bar', data:{labels:classesSorted.map(([c])=>c), datasets:[{data:classesSorted.map(([,v])=>v), backgroundColor:classesSorted.map(([c,v])=>(CLASS_COLORS[c]||'#9b9b98')+(v>=0?'cc':'88')), borderRadius:4}]}, options:{indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>'€'+v.toLocaleString('de-DE')}}, y:{grid:{display:false}, ticks:{font:{size:10}}}}}}); }
+
+  // Gráfico por corretora (pizza)
+  const porCorr = {};
+  rowsCalc.forEach(r => { if(r.mercadoEur==null) return; const c=r.corretora; porCorr[c]=(porCorr[c]||0)+r.mercadoEur; });
+  const corrSorted = Object.entries(porCorr).sort((a,b)=>b[1]-a[1]);
+  const pc = document.getElementById('pos-corr-chart');
+  if (pc) { if(pc._ci) pc._ci.destroy(); pc._ci = new Chart(pc, {type:'doughnut', data:{labels:corrSorted.map(([c])=>c), datasets:[{data:corrSorted.map(([,v])=>v), backgroundColor:corrSorted.map(([c])=>CORR_COLORS[c]||'#9b9b98'), borderWidth:2, borderColor:'#fff'}]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'right', labels:{font:{size:11}, boxWidth:12}}}}}); }
+
+  // Gráfico top ganhos/perdas
+  const comResultSorted = [...rowsCalc.filter(r=>r.resultEur!=null)].sort((a,b)=>b.resultEur-a.resultEur);
+  const top5g = comResultSorted.slice(0,5);
+  const top5p = [...comResultSorted].reverse().slice(0,5);
+  const topAll = [...top5g, ...top5p.filter(r=>!top5g.includes(r))];
+  const tc = document.getElementById('pos-top-chart');
+  if (tc) { if(tc._ci) tc._ci.destroy(); tc._ci = new Chart(tc, {type:'bar', data:{labels:topAll.map(r=>r.ticker), datasets:[{data:topAll.map(r=>r.resultEur), backgroundColor:topAll.map(r=>r.resultEur>=0?'#1a7f4b99':'#c0392b99'), borderRadius:4}]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{grid:{display:false}, ticks:{font:{size:10}}}, y:{grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>'€'+v.toLocaleString('de-DE')}}}}}); }
+
+  // Tabela
   document.getElementById('pos-body').innerHTML = '<table style="font-size:12px"><thead><tr>' +
-    '<th>Ativo</th><th>Corretora</th><th>Classe</th><th>Setor</th><th>Entrada</th>' +
-    '<th class="tr">Qtd</th><th class="tr">PM entrada</th><th class="tr">Preço atual</th>' +
-    '<th class="tr">Valor mercado</th><th class="tr">Result. não real.</th><th class="tr">Rent. %</th><th>Moeda</th>' +
+    '<th>Ativo</th><th>Corretora</th><th>Classe</th><th>Setor</th>' +
+    '<th class="tr" style="white-space:normal;min-width:55px">Result.<br>EUR</th>' +
+    '<th class="tr" style="white-space:normal;min-width:45px">Rent.<br>%</th>' +
+    '<th>Entrada</th><th class="tr">Qtd</th><th class="tr">PM entrada</th><th class="tr">Preço atual</th>' +
+    '<th class="tr">Valor mercado</th><th>Moeda</th>' +
     '</tr></thead><tbody>' +
-    filtered.map(r => {
-      const temPreco = r.preco_atual && r.preco_atual > 0 && r.quantidade;
-      const valorMercado = temPreco ? r.preco_atual * r.quantidade : null;
-      const resultado = (valorMercado != null && r.custo_total) ? valorMercado - r.custo_total : null;
-      const rentPctRow = (resultado != null && r.custo_total) ? (resultado / r.custo_total * 100) : null;
-      const resultEur = posToEur(resultado, r.moeda);
-      return '<tr>' +
-        '<td class="ticker" style="cursor:pointer;text-decoration:underline dotted" onclick="abrirModal(\'' + r.ticker + '\')">' + r.ticker + '</td>' +
-        '<td><span class="pill p-' + r.corretora + '">' + r.corretora + '</span></td>' +
-        '<td style="font-size:11px;color:#9b9b98">' + (r.classe_ativo || '—') + '</td>' +
-        '<td style="font-size:11px;color:#9b9b98">' + (r.setor || '—') + '</td>' +
-        '<td>' + dt(r.data_entrada) + '</td>' +
-        '<td class="tr">' + (r.quantidade ? num(r.quantidade, 3) : '—') + '</td>' +
-        '<td class="tr">' + (r.preco_entrada ? num(r.preco_entrada, 2) : '—') + '</td>' +
-        '<td class="tr" style="font-weight:500">' + (r.preco_atual ? num(r.preco_atual, 2) : '—') + '</td>' +
-        '<td class="tr">' + (valorMercado != null ? num(valorMercado, 0) : '—') + '</td>' +
-        '<td class="tr ' + dc(resultado) + '">' + (resultado != null ? (resultado >= 0 ? '+' : '') + (resultEur != null ? eur(resultEur) : num(resultado, 0)) : '—') + '</td>' +
-        '<td class="tr ' + dc(rentPctRow) + '" style="font-size:11px">' + (rentPctRow != null ? (rentPctRow >= 0 ? '+' : '') + rentPctRow.toFixed(1) + '%' : '—') + '</td>' +
-        '<td style="font-size:11px;color:#6b6b68">' + r.moeda + '</td>' +
-        '</tr>';
-    }).join('') + '</tbody></table>';
+    rowsCalc.map(r =>
+      '<tr>' +
+      '<td class="ticker" style="cursor:pointer;text-decoration:underline dotted" onclick="abrirModal(\'' + r.ticker + '\')">' + r.ticker + '</td>' +
+      '<td><span class="pill p-' + r.corretora + '">' + r.corretora + '</span></td>' +
+      '<td style="font-size:11px;color:#9b9b98">' + (r.classe_ativo || '—') + '</td>' +
+      '<td style="font-size:11px;color:#9b9b98">' + (r.setor || '—') + '</td>' +
+      '<td class="tr ' + dc(r.resultEur) + '">' + (r.resultEur != null ? (r.resultEur>=0?'+':'') + eur(r.resultEur) : '—') + '</td>' +
+      '<td class="tr ' + dc(r.rentPctRow) + '" style="font-size:11px">' + (r.rentPctRow != null ? (r.rentPctRow>=0?'+':'') + r.rentPctRow.toFixed(1) + '%' : '—') + '</td>' +
+      '<td>' + dt(r.data_entrada) + '</td>' +
+      '<td class="tr">' + (r.quantidade ? num(r.quantidade, 3) : '—') + '</td>' +
+      '<td class="tr">' + (r.preco_entrada ? num(r.preco_entrada, 2) : '—') + '</td>' +
+      '<td class="tr" style="font-weight:500">' + (r.preco_atual ? num(r.preco_atual, 2) : '—') + '</td>' +
+      '<td class="tr">' + (r.valorMercado != null ? num(r.valorMercado, 0) : '—') + '</td>' +
+      '<td style="font-size:11px;color:#6b6b68">' + r.moeda + '</td>' +
+      '</tr>'
+    ).join('') + '</tbody></table>';
 }
 
 function filtPos(btn) {
