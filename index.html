@@ -1646,8 +1646,9 @@ async function loadFluxos() {
   renderFluxos(fluxosData);
 }
 function renderFluxos(rows) {
-  const totalAporte   = rows.filter(r => r.tipo === 'APORTE').reduce((s, r) => s + (r.valor_eur || 0), 0);
-  const totalRetirada = rows.filter(r => r.tipo === 'RETIRADA').reduce((s, r) => s + (r.valor_eur || 0), 0);
+  const rowsSemCB = rows.filter(r => r.corretora !== 'CB' && r.corretora !== 'nan');
+  const totalAporte   = rowsSemCB.filter(r => r.tipo === 'APORTE').reduce((s, r) => s + (r.valor_eur || 0), 0);
+  const totalRetirada = rowsSemCB.filter(r => r.tipo === 'RETIRADA').reduce((s, r) => s + (r.valor_eur || 0), 0);
   const saldo = totalAporte - totalRetirada;
 
   // --- KPIs ---
