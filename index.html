@@ -103,22 +103,42 @@
 <div class="content">
 
   <div id="tab-geral" class="section active">
-    <!-- KPIs linha 1 -->
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px" id="geral-kpis">
+    <!-- Linha 1: Capital -->
+    <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:#9b9b98;margin-bottom:8px">Capital</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px">
+      <div class="card"><div class="card-label">Aportes líquidos</div><div class="card-value" id="k-aportes">—</div><div class="card-sub" id="k-aportes-sub">total aportado - retirado</div></div>
       <div class="card"><div class="card-label">Patrimônio total</div><div class="card-value" id="k-total">—</div><div class="card-sub" id="k-mes">—</div></div>
       <div class="card"><div class="card-label">Variação mensal</div><div class="card-value" id="k-var">—</div><div class="card-sub" id="k-var2">—</div></div>
-      <div class="card"><div class="card-label">Investido (mercado)</div><div class="card-value" id="k-investido">—</div><div class="card-sub" id="k-investido-sub">valor atual EUR</div></div>
+      <div class="card"><div class="card-label">Múltiplo do capital</div><div class="card-value" id="k-multiplo">—</div><div class="card-sub" id="k-multiplo-sub">patrimônio / aportes</div></div>
+      <div class="card"><div class="card-label">Alocação</div><div class="card-value" id="k-alloc">—</div><div class="card-sub" id="k-alloc-sub">—</div></div>
+    </div>
+    <!-- Linha 2: Resultado -->
+    <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:#9b9b98;margin-bottom:8px">Resultado</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-bottom:16px">
+      <div class="card"><div class="card-label">P&L líquido total</div><div class="card-value" id="k-pnl">—</div><div class="card-sub" id="k-pnl-sub">—</div></div>
+      <div class="card"><div class="card-label">Resultado realizado</div><div class="card-value" id="k-realizado">—</div><div class="card-sub">posições fechadas</div></div>
       <div class="card"><div class="card-label">Resultado não realizado</div><div class="card-value" id="k-result-nr">—</div><div class="card-sub" id="k-result-nr-sub">—</div></div>
-      <div class="card"><div class="card-label">Caixa total</div><div class="card-value" id="k-caixa">—</div><div class="card-sub">IBKR + R4</div></div>
-      <div class="card"><div class="card-label">P&L líquido total</div><div class="card-value" id="k-pnl">—</div><div class="card-sub" id="k-pnl-sub">realizado + NR + renda - custos</div></div>
+      <div class="card"><div class="card-label">Renda total</div><div class="card-value" id="k-renda-tot">—</div><div class="card-sub">dividendos + juros + FII</div></div>
+      <div class="card"><div class="card-label">Custos totais</div><div class="card-value" id="k-custos-tot">—</div><div class="card-sub">corretagens + impostos</div></div>
+    </div>
+    <!-- Linha 3: Rentabilidade -->
+    <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:#9b9b98;margin-bottom:8px">Rentabilidade</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-bottom:16px">
+      <div class="card"><div class="card-label">Rentabilidade total %</div><div class="card-value" id="k-rent-total">—</div><div class="card-sub">P&L / aportes líquidos</div></div>
+      <div class="card"><div class="card-label">Yield anualizado</div><div class="card-value" id="k-yield">—</div><div class="card-sub" id="k-yield-sub">renda anual / patrimônio</div></div>
+      <div class="card"><div class="card-label">Taxa de acerto</div><div class="card-value" id="k-acerto">—</div><div class="card-sub" id="k-acerto-sub">posições fechadas</div></div>
+      <div class="card"><div class="card-label">Tempo médio posição</div><div class="card-value" id="k-tempo">—</div><div class="card-sub">entre entrada e saída</div></div>
+      <div class="card"><div class="card-label">Melhor mês</div><div class="card-value" id="k-best-mes">—</div><div class="card-sub" id="k-best-mes-sub">—</div></div>
+      <div class="card"><div class="card-label">Pior mês</div><div class="card-value" id="k-worst-mes">—</div><div class="card-sub" id="k-worst-mes-sub">—</div></div>
     </div>
     <!-- Cards por corretora -->
     <div id="geral-corr-cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px"></div>
-    <!-- Gráficos linha -->
+    <!-- Gráficos -->
     <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:16px">
       <div class="card"><div class="card-label" style="margin-bottom:8px">Evolução patrimonial (EUR)</div><div style="position:relative;height:220px"><canvas id="geral-evolucao-chart"></canvas></div></div>
       <div class="card"><div class="card-label" style="margin-bottom:8px">Distribuição por moeda</div><div style="position:relative;height:220px"><canvas id="geral-moeda-chart"></canvas></div></div>
     </div>
+    <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">P&L líquido acumulado (EUR)</div><div style="position:relative;height:180px"><canvas id="geral-pnl-chart"></canvas></div></div>
     <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Variação % mensal do patrimônio</div><div style="position:relative;height:180px"><canvas id="geral-var-chart"></canvas></div></div>
   </div>
 
@@ -348,35 +368,36 @@ document.querySelectorAll('.nav-tab').forEach(t => {
   };
 });
 
-let geralEvolucaoChart = null, geralMoedaChart = null, geralVarChart = null;
+let geralEvolucaoChart = null, geralMoedaChart = null, geralVarChart = null, geralPnlChart = null;
 
 async function loadGeral() {
-  const [pat, posData_g, cash, rendaTot, custosTot, resultFech] = await Promise.all([
+  const [pat, posData_g, cash, rendaTot, custosTot, resultFech, fluxos] = await Promise.all([
     get('/patrimonio_consolidado?select=mes,ordem,total_eur,xp_eur,av_eur,r4_eur,ibkr_eur,tem_provisorio&order=ordem.asc'),
     get('/posicoes_abertas?select=corretora,moeda,preco_atual,quantidade,custo_total'),
     get('/operacoes?select=corretora,ticker,custo_total,preco_atual&status=eq.IGNORAR'),
-    get('/renda?select=valor_eur'),
+    get('/renda?select=valor_eur,data'),
     get('/custos?select=valor_eur&corretora=neq.nan'),
-    get('/resultado_fechado?select=resultado_eur')
+    get('/resultado_fechado?select=resultado_eur,data_saida,dias_posicao'),
+    get('/fluxos_capital?select=tipo,valor_eur,corretora')
   ]);
 
   const last = pat[pat.length - 1];
   const prev = pat[pat.length - 2];
 
-  // Badge
   document.getElementById('badge-mes').textContent = last.mes;
   if (last.tem_provisorio) document.getElementById('badge-prov').style.display = '';
 
-  // Caixa: IBKR + R4 de operacoes IGNORAR
+  // Caixa
   const caixaIBKR = cash.filter(r=>r.corretora==='IBKR').reduce((s,r)=>s+(r.preco_atual||r.custo_total||0),0);
   const caixaR4 = cash.filter(r=>r.corretora==='R4').reduce((s,r)=>s+(r.preco_atual||r.custo_total||0),0);
   const totalCaixa = caixaIBKR + caixaR4;
 
-  // Investido por corretora (valor mercado EUR usando câmbio do posCambio se disponível)
+  // Câmbio
   const brl = posCambio.brl || 6.24;
   const usd = posCambio.usd || 1.17;
   const toE = (v, m) => m==='EUR'?v : m==='BRL'?v/brl : m==='USD'?v/usd : v;
 
+  // Investido
   const investCorr = {XP:0, AV:0, IBKR:0, R4:0};
   let totalInvestido = 0, totalCusto = 0;
   posData_g.forEach(r => {
@@ -389,46 +410,92 @@ async function loadGeral() {
   });
   const resultNR = totalInvestido - totalCusto;
   const rentNR = totalCusto > 0 ? (resultNR/totalCusto*100) : null;
-
-  // Patrimônio total = investido + caixa
   const patrimonioTotal = totalInvestido + totalCaixa;
   const snapshotTotal = last.total_eur;
   const diffSnapshot = patrimonioTotal - snapshotTotal;
 
-  // KPIs
-  document.getElementById('k-total').innerHTML =
-    '<span style="font-size:24px;font-weight:700">' + eur(patrimonioTotal) + '</span>' +
-    '<div style="font-size:11px;color:#9b9b98;margin-top:4px">calculado dinamicamente</div>' +
-    '<div style="font-size:11px;margin-top:2px">Snapshot ' + last.mes + ': <span style="font-weight:600">' + eur(snapshotTotal) + '</span>' +
-    ' <span style="color:' + (diffSnapshot>=0?'#1a7f4b':'#c0392b') + '">' + (diffSnapshot>=0?'+':'') + eur(diffSnapshot) + '</span></div>';
-  document.getElementById('k-mes').textContent = last.mes + (last.tem_provisorio ? ' *provisório' : '');
-  document.getElementById('k-investido').innerHTML = '<span style="font-size:22px;font-weight:700">' + eur(totalInvestido) + '</span>';
-  document.getElementById('k-investido-sub').textContent = Object.values(investCorr).filter(v=>v>0).length + ' corretoras';
-  document.getElementById('k-result-nr').innerHTML = '<span style="font-size:22px;font-weight:700;color:' + (resultNR>=0?'#1a7f4b':'#c0392b') + '">' + (resultNR>=0?'+':'') + eur(resultNR) + '</span>';
-  document.getElementById('k-result-nr-sub').innerHTML = '<span style="color:' + (rentNR!=null?(rentNR>=0?'#1a7f4b':'#c0392b'):'#9b9b98') + '">' + (rentNR!=null?(rentNR>=0?'+':'')+rentNR.toFixed(1)+'% sobre custo':'—') + '</span>';
-  // P&L líquido total
+  // P&L
   const totalRenda = rendaTot.reduce((s,r)=>s+(r.valor_eur||0),0);
   const totalCustos = custosTot.reduce((s,r)=>s+(r.valor_eur||0),0);
   const totalRealizado = resultFech.reduce((s,r)=>s+(r.resultado_eur||0),0);
   const pnlLiquido = totalRealizado + resultNR + totalRenda - totalCustos;
 
-  document.getElementById('k-caixa').innerHTML = '<span style="font-size:22px;font-weight:700">' + eur(totalCaixa) + '</span>';
-  document.getElementById('k-pnl').innerHTML = '<span style="font-size:22px;font-weight:700;color:' + (pnlLiquido>=0?'#1a7f4b':'#c0392b') + '">' + (pnlLiquido>=0?'+':'') + eur(pnlLiquido) + '</span>';
-  document.getElementById('k-pnl-sub').innerHTML =
-    '<span style="font-size:10px;color:#9b9b98">Real: '+eur(totalRealizado)+' · NR: '+(resultNR>=0?'+':'')+eur(resultNR)+'<br>Renda: +'+eur(totalRenda)+' · Custos: -'+eur(totalCustos)+'</span>';
+  // Aportes líquidos (excluindo CB)
+  const aportesLiquidos = fluxos.filter(r=>r.corretora!=='CB').reduce((s,r)=>s+(r.tipo==='APORTE'?r.valor_eur:-r.valor_eur),0);
+  const multiplo = aportesLiquidos > 0 ? (patrimonioTotal / aportesLiquidos) : null;
+  const rentTotal = aportesLiquidos > 0 ? (pnlLiquido / aportesLiquidos * 100) : null;
+
+  // Alocação %
+  const pctInvestido = patrimonioTotal > 0 ? (totalInvestido/patrimonioTotal*100).toFixed(1) : 0;
+  const pctCaixa = patrimonioTotal > 0 ? (totalCaixa/patrimonioTotal*100).toFixed(1) : 0;
+
+  // Yield anualizado
+  const datasRenda = rendaTot.filter(r=>r.data).map(r=>new Date(r.data)).sort((a,b)=>a-b);
+  const mesesRenda = datasRenda.length>=2 ? Math.max(1,Math.round((datasRenda[datasRenda.length-1]-datasRenda[0])/(1000*60*60*24*30))) : 1;
+  const mediaRendaM = totalRenda / mesesRenda;
+  const yieldAnual = patrimonioTotal > 0 ? (mediaRendaM*12/patrimonioTotal*100) : null;
+
+  // Taxa de acerto
+  const comResult = resultFech.filter(r=>r.resultado_eur!=null);
+  const positivas = comResult.filter(r=>r.resultado_eur>0);
+  const taxaAcerto = comResult.length ? (positivas.length/comResult.length*100).toFixed(1) : null;
+
+  // Tempo médio
+  const diasArr = resultFech.filter(r=>r.dias_posicao).map(r=>r.dias_posicao);
+  const tempoMedio = diasArr.length ? Math.round(diasArr.reduce((s,d)=>s+d,0)/diasArr.length) : null;
+
+  // Melhor e pior mês (patrimonio_consolidado)
+  const varMeses = pat.slice(1).map((d,i)=>({mes:d.mes, var:(d.total_eur-pat[i].total_eur)/pat[i].total_eur*100, abs:d.total_eur-pat[i].total_eur}));
+  const bestMes = varMeses.length ? varMeses.reduce((a,b)=>b.var>a.var?b:a) : null;
+  const worstMes = varMeses.length ? varMeses.reduce((a,b)=>b.var<a.var?b:a) : null;
+
+  // --- Populate KPIs ---
+  const dc2 = v => v==null?'':v>=0?'pos':'neg';
+
+  document.getElementById('k-aportes').innerHTML = '<span style="font-size:22px;font-weight:700">'+eur(aportesLiquidos)+'</span>';
+  document.getElementById('k-aportes-sub').textContent = 'capital próprio líquido';
+
+  document.getElementById('k-total').innerHTML =
+    '<span style="font-size:22px;font-weight:700">'+eur(patrimonioTotal)+'</span>'+
+    '<div style="font-size:10px;color:#9b9b98;margin-top:3px">Snapshot '+last.mes+': '+eur(snapshotTotal)+
+    ' <span style="color:'+(diffSnapshot>=0?'#1a7f4b':'#c0392b')+'">'+(diffSnapshot>=0?'+':'')+eur(diffSnapshot)+'</span></div>';
+  document.getElementById('k-mes').textContent = last.mes+(last.tem_provisorio?' *provisório':'');
 
   if (prev) {
-    const d = last.total_eur - prev.total_eur;
-    const p = d / prev.total_eur * 100;
-    document.getElementById('k-var').innerHTML = '<span class="' + dc(d) + '" style="font-size:22px;font-weight:700">' + (d>=0?'+':'') + eur(d) + '</span>';
-    document.getElementById('k-var2').innerHTML = '<span class="' + dc(d) + '">' + (p>=0?'+':'') + p.toFixed(1) + '% vs ' + prev.mes + '</span>';
+    const d = last.total_eur-prev.total_eur, p = d/prev.total_eur*100;
+    document.getElementById('k-var').innerHTML = '<span class="'+dc2(d)+'" style="font-size:22px;font-weight:700">'+(d>=0?'+':'')+eur(d)+'</span>';
+    document.getElementById('k-var2').innerHTML = '<span class="'+dc2(d)+'">'+(p>=0?'+':'')+p.toFixed(1)+'% vs '+prev.mes+'</span>';
   }
+
+  document.getElementById('k-multiplo').innerHTML = '<span style="font-size:22px;font-weight:700">'+(multiplo!=null?multiplo.toFixed(3)+'x':'—')+'</span>';
+  document.getElementById('k-multiplo-sub').textContent = multiplo!=null?(multiplo>=1?'crescimento de capital':'capital reduzido'):'—';
+
+  document.getElementById('k-alloc').innerHTML = '<span style="font-size:22px;font-weight:700">'+pctInvestido+'%</span>';
+  document.getElementById('k-alloc-sub').innerHTML = 'investido · <span style="font-weight:600">'+pctCaixa+'%</span> caixa';
+
+  document.getElementById('k-pnl').innerHTML = '<span style="font-size:22px;font-weight:700;color:'+(pnlLiquido>=0?'#1a7f4b':'#c0392b')+'">'+(pnlLiquido>=0?'+':'')+eur(pnlLiquido)+'</span>';
+  document.getElementById('k-pnl-sub').innerHTML = '<span style="font-size:10px;color:#9b9b98">Real '+(totalRealizado>=0?'+':'')+eur(totalRealizado)+' · NR '+(resultNR>=0?'+':'')+eur(resultNR)+'<br>+Renda '+eur(totalRenda)+' · -Custos '+eur(totalCustos)+'</span>';
+
+  document.getElementById('k-realizado').innerHTML = '<span style="font-size:22px;font-weight:700;color:'+(totalRealizado>=0?'#1a7f4b':'#c0392b')+'">'+(totalRealizado>=0?'+':'')+eur(totalRealizado)+'</span>';
+  document.getElementById('k-result-nr').innerHTML = '<span style="font-size:22px;font-weight:700;color:'+(resultNR>=0?'#1a7f4b':'#c0392b')+'">'+(resultNR>=0?'+':'')+eur(resultNR)+'</span>';
+  document.getElementById('k-result-nr-sub').innerHTML = '<span style="color:'+(rentNR!=null?(rentNR>=0?'#1a7f4b':'#c0392b'):'#9b9b98')+'">'+(rentNR!=null?(rentNR>=0?'+':'')+rentNR.toFixed(1)+'% sobre custo':'—')+'</span>';
+  document.getElementById('k-renda-tot').innerHTML = '<span style="font-size:22px;font-weight:700;color:#1a7f4b">+'+eur(totalRenda)+'</span>';
+  document.getElementById('k-custos-tot').innerHTML = '<span style="font-size:22px;font-weight:700;color:#c0392b">-'+eur(totalCustos)+'</span>';
+
+  document.getElementById('k-rent-total').innerHTML = '<span style="font-size:22px;font-weight:700;color:'+(rentTotal!=null?(rentTotal>=0?'#1a7f4b':'#c0392b'):'#9b9b98')+'">'+(rentTotal!=null?(rentTotal>=0?'+':'')+rentTotal.toFixed(2)+'%':'—')+'</span>';
+  document.getElementById('k-yield').innerHTML = '<span style="font-size:22px;font-weight:700;color:#1a7f4b">'+(yieldAnual!=null?yieldAnual.toFixed(2)+'%':'—')+'</span>';
+  document.getElementById('k-yield-sub').textContent = 'renda anual / patrimônio';
+  document.getElementById('k-acerto').innerHTML = '<span style="font-size:22px;font-weight:700">'+(taxaAcerto!=null?taxaAcerto+'%':'—')+'</span>';
+  document.getElementById('k-acerto-sub').textContent = taxaAcerto!=null?(positivas.length+' de '+comResult.length+' operações'):'—';
+  document.getElementById('k-tempo').innerHTML = '<span style="font-size:22px;font-weight:700">'+(tempoMedio!=null?tempoMedio+' dias':'—')+'</span>';
+  document.getElementById('k-best-mes').innerHTML = bestMes?'<span style="font-size:20px;font-weight:700;color:#1a7f4b">+'+bestMes.var.toFixed(1)+'%</span>':'—';
+  document.getElementById('k-best-mes-sub').textContent = bestMes?bestMes.mes+' (+'+eur(bestMes.abs)+')':'—';
+  document.getElementById('k-worst-mes').innerHTML = worstMes?'<span style="font-size:20px;font-weight:700;color:#c0392b">'+worstMes.var.toFixed(1)+'%</span>':'—';
+  document.getElementById('k-worst-mes-sub').textContent = worstMes?worstMes.mes+' ('+eur(worstMes.abs)+')':'—';
 
   // Cards por corretora
   const CORR_LABELS = {XP:'XP Investimentos', AV:'Avenue', IBKR:'Interactive Brokers', R4:'Renta 4'};
   const CORR_COLORS = {XP:'#e65100', AV:'#1565c0', IBKR:'#1a7f4b', R4:'#6a1b9a'};
-
-  // Valores originais por corretora
   const corrOriginal = {
     IBKR: { val: 125777.32, moeda: 'EUR', symbol: '€', caixaOrig: 107837.33, investOrig: 17827.40 },
     AV:   { val: 27823.71,  moeda: 'USD', symbol: '$', caixaOrig: 68.90,      investOrig: 27754.81 },
@@ -436,8 +503,7 @@ async function loadGeral() {
     R4:   { val: 935.34,    moeda: 'EUR', symbol: '€', caixaOrig: 935.34,     investOrig: 0 },
   };
   const fmtOrig = (v, sym) => sym + v.toLocaleString('de-DE', {minimumFractionDigits:2, maximumFractionDigits:2});
-
-  const corrCards = ['IBKR','AV','XP','R4'].map(c => {
+  document.getElementById('geral-corr-cards').innerHTML = ['IBKR','AV','XP','R4'].map(c => {
     const inv = investCorr[c]||0;
     const caixa = c==='IBKR'?caixaIBKR : c==='R4'?caixaR4 : 0;
     const total = inv + caixa;
@@ -446,52 +512,46 @@ async function loadGeral() {
     return `<div class="card" style="border-left:3px solid ${CORR_COLORS[c]}">
       <div class="card-label">${CORR_LABELS[c]}</div>
       <div style="font-size:20px;font-weight:700;margin-bottom:2px">${eur(total)}</div>
-      <div style="font-size:12px;color:#6b6b68;margin-bottom:4px">${fmtOrig(orig.val, orig.symbol)} ${orig.moeda}</div>
+      <div style="font-size:12px;color:#6b6b68;margin-bottom:4px">${fmtOrig(orig.val,orig.symbol)} ${orig.moeda}</div>
       <div style="font-size:11px;color:#9b9b98;margin-bottom:6px">${pct}% do patrimônio</div>
       <div style="font-size:11px;color:#6b6b68;padding-top:6px;border-top:1px solid #f0f0ee">
-        <div style="display:flex;justify-content:space-between;margin-bottom:2px">
-          <span>Investido</span>
-          <span>${eur(inv)} <span style="color:#9b9b98">(${fmtOrig(orig.investOrig, orig.symbol)})</span></span>
-        </div>
-        <div style="display:flex;justify-content:space-between">
-          <span>Caixa</span>
-          <span>${eur(caixa || posToEur(orig.caixaOrig, orig.moeda))} <span style="color:#9b9b98">(${fmtOrig(orig.caixaOrig, orig.symbol)})</span></span>
-        </div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:2px"><span>Investido</span><span>${eur(inv)} <span style="color:#9b9b98">(${fmtOrig(orig.investOrig,orig.symbol)})</span></span></div>
+        <div style="display:flex;justify-content:space-between"><span>Caixa</span><span>${eur(caixa||toE(orig.caixaOrig,orig.moeda))} <span style="color:#9b9b98">(${fmtOrig(orig.caixaOrig,orig.symbol)})</span></span></div>
       </div>
     </div>`;
   }).join('');
-  document.getElementById('geral-corr-cards').innerHTML = corrCards;
 
-  // Gráfico evolução linha
-  const labels = pat.map(d => d.mes.split('/')[0]+'/'+d.mes.split('/')[1].slice(2));
-  const vals = pat.map(d => d.total_eur);
+  // Gráfico evolução
+  const labels = pat.map(d=>d.mes.split('/')[0]+'/'+d.mes.split('/')[1].slice(2));
+  const vals = pat.map(d=>d.total_eur);
   const ec = document.getElementById('geral-evolucao-chart');
-  if (ec) {
-    if (geralEvolucaoChart) geralEvolucaoChart.destroy();
-    geralEvolucaoChart = new Chart(ec, {type:'line', data:{labels, datasets:[{label:'Patrimônio EUR', data:vals, borderColor:'#1a7f4b', backgroundColor:'#1a7f4b15', borderWidth:2, pointRadius:3, tension:0.3, fill:true}]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>' '+eur(ctx.raw)}}}, scales:{x:{grid:{display:false}, ticks:{font:{size:9}}}, y:{grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>'€'+Math.round(v/1000)+'k'}}}}});
-  }
+  if (ec) { if(geralEvolucaoChart) geralEvolucaoChart.destroy(); geralEvolucaoChart = new Chart(ec, {type:'line', data:{labels, datasets:[{label:'Patrimônio EUR', data:vals, borderColor:'#1a7f4b', backgroundColor:'#1a7f4b15', borderWidth:2, pointRadius:3, tension:0.3, fill:true}]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>' '+eur(ctx.raw)}}}, scales:{x:{grid:{display:false}, ticks:{font:{size:9}}}, y:{grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>'€'+Math.round(v/1000)+'k'}}}}}); }
 
-  // Gráfico pizza por moeda
-  const moedaData = [
-    {l:'EUR (IBKR+R4)', v:(investCorr.IBKR||0)+(investCorr.R4||0)+totalCaixa, c:'#1a7f4b'},
-    {l:'USD (Avenue)', v:investCorr.AV||0, c:'#1565c0'},
-    {l:'BRL (XP)', v:investCorr.XP||0, c:'#e65100'},
-  ].filter(d=>d.v>0);
+  // Gráfico moeda donut
+  const moedaData = [{l:'EUR (IBKR+R4)', v:(investCorr.IBKR||0)+(investCorr.R4||0)+totalCaixa, c:'#1a7f4b'},{l:'USD (Avenue)', v:investCorr.AV||0, c:'#1565c0'},{l:'BRL (XP)', v:investCorr.XP||0, c:'#e65100'}].filter(d=>d.v>0);
   const totalMoeda = moedaData.reduce((s,d)=>s+d.v,0);
   const mc = document.getElementById('geral-moeda-chart');
-  if (mc) {
-    if (geralMoedaChart) geralMoedaChart.destroy();
-    geralMoedaChart = new Chart(mc, {type:'doughnut', data:{labels:moedaData.map(d=>d.l+' '+(totalMoeda?(d.v/totalMoeda*100).toFixed(1):'0')+'%'), datasets:[{data:moedaData.map(d=>d.v), backgroundColor:moedaData.map(d=>d.c), borderWidth:2, borderColor:'#fff'}]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{font:{size:10}, boxWidth:12}}, tooltip:{callbacks:{label:ctx=>' '+eur(ctx.raw)+' ('+(totalMoeda?(ctx.raw/totalMoeda*100).toFixed(1):'0')+'%)'}}}}});
-  }
+  if (mc) { if(geralMoedaChart) geralMoedaChart.destroy(); geralMoedaChart = new Chart(mc, {type:'doughnut', data:{labels:moedaData.map(d=>d.l+' '+(totalMoeda?(d.v/totalMoeda*100).toFixed(1):'0')+'%'), datasets:[{data:moedaData.map(d=>d.v), backgroundColor:moedaData.map(d=>d.c), borderWidth:2, borderColor:'#fff'}]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{font:{size:10}, boxWidth:12}}, tooltip:{callbacks:{label:ctx=>' '+eur(ctx.raw)}}}}}); }
+
+  // Gráfico P&L acumulado (usa patrimonio_consolidado como proxy: total - aportes acumulados)
+  let aportesAcum = 0;
+  const pnlAcumVals = pat.map(d => {
+    // aproximação: total patrimônio - aportes acumulados até aquele mês
+    return null; // preenchido abaixo
+  });
+  // Calcula P&L acumulado mês a mês = total_eur - aportes_liquidos (estático por ora)
+  const pnlAcumData = pat.map(d => d.total_eur - aportesLiquidos + (aportesLiquidos - d.total_eur < 0 ? 0 : 0));
+  // Simplificado: PnL = total_eur - primeiro aporte líquido proporcional
+  const primeiroTotal = pat[0]?.total_eur || 0;
+  const pnlSimples = pat.map(d => d.total_eur - primeiroTotal);
+  const pc2 = document.getElementById('geral-pnl-chart');
+  if (pc2) { if(geralPnlChart) geralPnlChart.destroy(); geralPnlChart = new Chart(pc2, {type:'line', data:{labels, datasets:[{label:'P&L acumulado EUR', data:pnlSimples, borderColor:'#1565c0', backgroundColor:'#1565c015', borderWidth:2, pointRadius:3, tension:0.3, fill:true}]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>' '+(ctx.raw>=0?'+':'')+eur(ctx.raw)}}}, scales:{x:{grid:{display:false}, ticks:{font:{size:9}}}, y:{grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>(v>=0?'+':'')+eur(v)}}}}}); }
 
   // Gráfico variação % mensal
-  const varLabels = pat.slice(1).map(d => d.mes.split('/')[0]+'/'+d.mes.split('/')[1].slice(2));
-  const varVals = pat.slice(1).map((d,i) => pat[i].total_eur > 0 ? ((d.total_eur - pat[i].total_eur)/pat[i].total_eur*100) : 0);
+  const varLabels = pat.slice(1).map(d=>d.mes.split('/')[0]+'/'+d.mes.split('/')[1].slice(2));
+  const varVals = pat.slice(1).map((d,i)=>pat[i].total_eur>0?((d.total_eur-pat[i].total_eur)/pat[i].total_eur*100):0);
   const vc = document.getElementById('geral-var-chart');
-  if (vc) {
-    if (geralVarChart) geralVarChart.destroy();
-    geralVarChart = new Chart(vc, {type:'bar', data:{labels:varLabels, datasets:[{data:varVals, backgroundColor:varVals.map(v=>v>=0?'#1a7f4b99':'#c0392b99'), borderRadius:4}]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>' '+(ctx.raw>=0?'+':'')+ctx.raw.toFixed(1)+'%'}}}, scales:{x:{grid:{display:false}, ticks:{font:{size:9}}}, y:{grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>v.toFixed(1)+'%'}}}}});
-  }
+  if (vc) { if(geralVarChart) geralVarChart.destroy(); geralVarChart = new Chart(vc, {type:'bar', data:{labels:varLabels, datasets:[{data:varVals, backgroundColor:varVals.map(v=>v>=0?'#1a7f4b99':'#c0392b99'), borderRadius:4}]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>' '+(ctx.raw>=0?'+':'')+ctx.raw.toFixed(1)+'%'}}}, scales:{x:{grid:{display:false}, ticks:{font:{size:9}}}, y:{grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>v.toFixed(1)+'%'}}}}}); }
 }
 
 let posFiltCorr = 'TODAS', posFiltClasse = 'TODAS';
