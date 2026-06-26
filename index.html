@@ -1003,8 +1003,22 @@ function renderCustos(rows) {
   const anosM = Object.keys(matriz).sort((a,b) => b-a);
   const TIPO_COLORS = ['#1a7f4b','#1565c0','#6a1b9a','#e65100','#c0392b','#0288d1','#558b2f','#f57f17'];
 
-  // --- Tabela matriz KPI ---
+  // --- KPI cards ---
+  const totalCorretagem = rows.filter(r=>r.tipo==='CORRETAGEM').reduce((s,r)=>s+(r.valor_eur||0),0);
+  const nOrdens = rows.filter(r=>r.tipo==='CORRETAGEM').length;
+  const custoMedio = nOrdens > 0 ? totalCorretagem / nOrdens : null;
+  const patrimonioRef = 49250; // valor a mercado atual aproximado
+  const custoPctPatrimonio = patrimonioRef > 0 ? (total / patrimonioRef * 100) : null;
+  const maiorCusto = rows.filter(r=>r.valor_eur).reduce((max,r)=>r.valor_eur>max.valor_eur?r:max, {valor_eur:0});
+
   document.getElementById('custos-kpis').innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:12px">
+      <div class="card"><div class="card-label">Total custos EUR</div><div style="font-size:20px;font-weight:700;color:#c0392b">-${eur(total)}</div><div style="font-size:11px;color:#9b9b98">${rows.length} registros</div></div>
+      <div class="card"><div class="card-label">Corretagem total</div><div style="font-size:20px;font-weight:700;color:#c0392b">-${eur(totalCorretagem)}</div><div style="font-size:11px;color:#9b9b98">${nOrdens} ordens</div></div>
+      <div class="card"><div class="card-label">Custo médio/ordem</div><div style="font-size:20px;font-weight:700;color:#c0392b">${custoMedio!=null?'-'+eur(custoMedio):'—'}</div><div style="font-size:11px;color:#9b9b98">por operação</div></div>
+      <div class="card"><div class="card-label">Custo % patrimônio</div><div style="font-size:20px;font-weight:700;color:#c0392b">${custoPctPatrimonio!=null?custoPctPatrimonio.toFixed(2)+'%':'—'}</div><div style="font-size:11px;color:#9b9b98">sobre valor a mercado</div></div>
+      <div class="card"><div class="card-label">Maior custo único</div><div style="font-size:20px;font-weight:700;color:#c0392b">${maiorCusto.valor_eur?'-'+eur(maiorCusto.valor_eur):'—'}</div><div style="font-size:11px;color:#9b9b98">${maiorCusto.descricao||'—'}</div></div>
+    </div>
     <div class="card" style="padding:0;margin-bottom:12px;overflow-x:auto">
       <table style="width:100%;border-collapse:collapse;min-width:400px">
         <thead><tr style="background:#fafaf9">
