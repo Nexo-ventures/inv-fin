@@ -1062,6 +1062,26 @@ function renderCustos(rows, patrimonioTotal) {
       <div class="card"><div class="card-label">Custo % patrimônio</div><div style="font-size:20px;font-weight:700;color:#c0392b">${custoPctPatrimonio!=null?custoPctPatrimonio.toFixed(2)+'%':'—'}</div><div style="font-size:11px;color:#9b9b98">sobre valor a mercado</div></div>
       <div class="card"><div class="card-label">Maior custo único</div><div style="font-size:20px;font-weight:700;color:#c0392b">${maiorCusto.valor_eur?'-'+eur(maiorCusto.valor_eur):'—'}</div><div style="font-size:11px;color:#9b9b98">${maiorCusto.descricao||'—'}</div></div>
     </div>
+    <div class="card" style="padding:14px 18px;margin-bottom:12px">
+      <div class="card-label" style="margin-bottom:12px">% médio de custo por corretora</div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px">
+        ${CORRETORAS.map(c => {
+          const rCorr = rows.filter(r => r.corretora===c && r.valor_eur && r.valor_operacao_eur);
+          const sumCusto = rCorr.reduce((s,r)=>s+(r.valor_eur||0),0);
+          const sumOp = rCorr.reduce((s,r)=>s+(r.valor_operacao_eur||0),0);
+          const pct = sumOp > 0 ? (sumCusto/sumOp*100) : null;
+          const CORR_COLORS = {XP:'#e65100',AV:'#1565c0',IBKR:'#1a7f4b',R4:'#6a1b9a'};
+          return `<div style="display:flex;align-items:center;gap:10px;background:#f9f9f8;border-radius:8px;padding:10px 14px;min-width:140px">
+            <div style="width:10px;height:10px;border-radius:50%;background:${CORR_COLORS[c]||'#9b9b98'};flex-shrink:0"></div>
+            <div>
+              <div style="font-size:11px;color:#6b6b68">${c}</div>
+              <div style="font-size:16px;font-weight:600;color:#c0392b">${pct!=null?pct.toFixed(3)+'%':'—'}</div>
+              <div style="font-size:10px;color:#9b9b98">${rCorr.length} ordens</div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
     <div class="card" style="padding:0;margin-bottom:12px;overflow-x:auto">
       <table style="width:100%;border-collapse:collapse;min-width:400px">
         <thead><tr style="background:#fafaf9">
