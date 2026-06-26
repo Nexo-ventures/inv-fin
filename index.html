@@ -151,7 +151,7 @@
     <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Rentabilidade acumulada mês a mês (%)</div><div style="position:relative;height:200px"><canvas id="pos-rent-chart"></canvas></div></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
       <div class="card"><div class="card-label" style="margin-bottom:8px">Resultado não realizado por classe (EUR)</div><div style="position:relative;height:200px"><canvas id="pos-classe-chart"></canvas></div></div>
-      <div class="card"><div class="card-label" style="margin-bottom:8px">Exposição por corretora (valor mercado EUR)</div><div style="position:relative;height:200px"><canvas id="pos-corr-chart"></canvas></div></div>
+      <div class="card"><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><div class="card-label" style="margin-bottom:4px;font-size:10px">Por corretora</div><div style="position:relative;height:180px"><canvas id="pos-corr-chart"></canvas></div></div><div><div class="card-label" style="margin-bottom:4px;font-size:10px">Por moeda</div><div style="position:relative;height:180px"><canvas id="pos-moeda-chart"></canvas></div></div></div></div>
     </div>
     <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Resultado não realizado por setor (EUR)</div><div style="position:relative;height:240px"><canvas id="pos-setor-chart"></canvas></div></div>
     <div class="card" style="padding:0">
@@ -521,7 +521,15 @@ function renderPos(rows) {
   rowsCalc.forEach(r => { if(r.mercadoEur==null) return; const c=r.corretora; porCorr[c]=(porCorr[c]||0)+r.mercadoEur; });
   const corrSorted = Object.entries(porCorr).sort((a,b)=>b[1]-a[1]);
   const pc = document.getElementById('pos-corr-chart');
-  if (pc) { if(posCorrChart) posCorrChart.destroy(); posCorrChart = new Chart(pc, {type:'doughnut', data:{labels:corrSorted.map(([c])=>c), datasets:[{data:corrSorted.map(([,v])=>v), backgroundColor:corrSorted.map(([c])=>CORR_COLORS[c]||'#9b9b98'), borderWidth:2, borderColor:'#fff'}]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'right', labels:{font:{size:11}, boxWidth:12}}}}}); }
+  if (pc) { if(posCorrChart) posCorrChart.destroy(); posCorrChart = new Chart(pc, {type:'doughnut', data:{labels:corrSorted.map(([c])=>c), datasets:[{data:corrSorted.map(([,v])=>v), backgroundColor:corrSorted.map(([c])=>CORR_COLORS[c]||'#9b9b98'), borderWidth:2, borderColor:'#fff'}]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{font:{size:9}, boxWidth:10}}}}}); }
+
+  // Gráfico por moeda (donut)
+  const MOEDA_COLORS = {'BRL':'#e65100','USD':'#1565c0','EUR':'#1a7f4b'};
+  const porMoeda = {};
+  rowsCalc.forEach(r => { if(r.mercadoEur==null) return; const m=r.moeda||'?'; porMoeda[m]=(porMoeda[m]||0)+r.mercadoEur; });
+  const moedaSorted = Object.entries(porMoeda).sort((a,b)=>b[1]-a[1]);
+  const pm = document.getElementById('pos-moeda-chart');
+  if (pm) { if(pm._ci) pm._ci.destroy(); pm._ci = new Chart(pm, {type:'doughnut', data:{labels:moedaSorted.map(([m])=>m), datasets:[{data:moedaSorted.map(([,v])=>v), backgroundColor:moedaSorted.map(([m])=>MOEDA_COLORS[m]||'#9b9b98'), borderWidth:2, borderColor:'#fff'}]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{font:{size:9}, boxWidth:10}}}}}); }
 
   // Gráfico por setor (barras horizontais)
   const porSetor = {};
@@ -530,31 +538,80 @@ function renderPos(rows) {
   const sc = document.getElementById('pos-setor-chart');
   if (sc) { if(posSetorChart) posSetorChart.destroy(); posSetorChart = new Chart(sc, {type:'bar', data:{labels:setoresSorted.map(([s])=>s), datasets:[{data:setoresSorted.map(([,v])=>v), backgroundColor:setoresSorted.map(([,v])=>v>=0?'#1a7f4b99':'#c0392b99'), borderRadius:4}]}, options:{indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>'€'+v.toLocaleString('de-DE')}}, y:{grid:{display:false}, ticks:{font:{size:10}}}}}}); }
 
-  // Tabela
-  document.getElementById('pos-body').innerHTML = '<table style="font-size:12px"><thead><tr>' +
-    '<th>Ativo</th><th>Corretora</th><th>Classe</th><th>Setor</th>' +
-    '<th class="tr" style="white-space:normal;min-width:55px">Result.<br>EUR</th>' +
-    '<th class="tr" style="white-space:normal;min-width:45px">Rent.<br>%</th>' +
-    '<th>Entrada</th><th class="tr">Qtd</th><th class="tr">PM entrada</th><th class="tr">Preço atual</th>' +
-    '<th class="tr">Valor mercado</th><th>Moeda</th>' +
-    '</tr></thead><tbody>' +
-    rowsCalc.map(r =>
-      '<tr>' +
-      '<td class="ticker" style="cursor:pointer;text-decoration:underline dotted" onclick="abrirModal(\'' + r.ticker + '\')">' + r.ticker + '</td>' +
-      '<td><span class="pill p-' + r.corretora + '">' + r.corretora + '</span></td>' +
-      '<td style="font-size:11px;color:#9b9b98">' + (r.classe_ativo || '—') + '</td>' +
-      '<td style="font-size:11px;color:#9b9b98">' + (r.setor || '—') + '</td>' +
-      '<td class="tr ' + dc(r.resultEur) + '">' + (r.resultEur != null ? (r.resultEur>=0?'+':'') + eur(r.resultEur) : '—') + '</td>' +
-      '<td class="tr ' + dc(r.rentPctRow) + '" style="font-size:11px">' + (r.rentPctRow != null ? (r.rentPctRow>=0?'+':'') + r.rentPctRow.toFixed(1) + '%' : '—') + '</td>' +
-      '<td>' + dt(r.data_entrada) + '</td>' +
-      '<td class="tr">' + (r.quantidade ? num(r.quantidade, 3) : '—') + '</td>' +
-      '<td class="tr">' + (r.preco_entrada ? num(r.preco_entrada, 2) : '—') + '</td>' +
-      '<td class="tr" style="font-weight:500">' + (r.preco_atual ? num(r.preco_atual, 2) : '—') + '</td>' +
-      '<td class="tr">' + (r.valorMercado != null ? num(r.valorMercado, 0) : '—') + '</td>' +
-      '<td style="font-size:11px;color:#6b6b68">' + r.moeda + '</td>' +
-      '</tr>'
-    ).join('') + '</tbody></table>';
+  // Ordenação default: rentPctRow ascendente (piores primeiro)
+  if (!window.posSortCol) { window.posSortCol = 'rentPctRow'; window.posSortDir = 1; }
+  renderPosTable(rowsCalc);
 }
+
+function renderPosTable(rowsCalc) {
+  const col = window.posSortCol || 'rentPctRow';
+  const dir = window.posSortDir || 1;
+  const today = new Date();
+
+  const sorted = [...rowsCalc].sort((a,b) => {
+    let va = a[col], vb = b[col];
+    if (va == null) return 1; if (vb == null) return -1;
+    if (typeof va === 'string') return dir * va.localeCompare(vb);
+    return dir * (va - vb);
+  });
+
+  const cols = [
+    {key:'ticker', label:'Ativo', cls:''},
+    {key:'corretora', label:'Corretora', cls:''},
+    {key:'classe_ativo', label:'Classe', cls:''},
+    {key:'setor', label:'Setor', cls:''},
+    {key:'resultEur', label:'Result.<br>EUR', cls:'tr'},
+    {key:'rentPctRow', label:'Rent.<br>%', cls:'tr'},
+    {key:'data_entrada', label:'Entrada', cls:''},
+    {key:'dias', label:'Dias', cls:'tr'},
+    {key:'quantidade', label:'Qtd', cls:'tr'},
+    {key:'preco_entrada', label:'PM entrada', cls:'tr'},
+    {key:'preco_atual', label:'Preço atual', cls:'tr'},
+    {key:'valorMercado', label:'Valor mercado', cls:'tr'},
+    {key:'moeda', label:'Moeda', cls:''},
+  ];
+
+  const thStyle = (k) => 'cursor:pointer;user-select:none;white-space:normal;min-width:50px' + (col===k ? ';color:#1a7f4b' : '');
+  const arrow = (k) => col===k ? (dir===1?' ↑':' ↓') : '';
+
+  document.getElementById('pos-body').innerHTML = '<table style="font-size:12px"><thead><tr>' +
+    cols.map(c => '<th class="' + c.cls + '" style="' + thStyle(c.key) + '" onclick="sortPos(\'' + c.key + '\')">' + c.label + arrow(c.key) + '</th>').join('') +
+    '</tr></thead><tbody>' +
+    sorted.map(r => {
+      const dias = r.data_entrada ? Math.floor((today - new Date(r.data_entrada)) / 86400000) : null;
+      return '<tr>' +
+        '<td class="ticker" style="cursor:pointer;text-decoration:underline dotted" onclick="abrirModal(\'' + r.ticker + '\')">' + r.ticker + '</td>' +
+        '<td><span class="pill p-' + r.corretora + '">' + r.corretora + '</span></td>' +
+        '<td style="font-size:11px;color:#9b9b98">' + (r.classe_ativo||'—') + '</td>' +
+        '<td style="font-size:11px;color:#9b9b98">' + (r.setor||'—') + '</td>' +
+        '<td class="tr ' + dc(r.resultEur) + '">' + (r.resultEur!=null?(r.resultEur>=0?'+':'')+eur(r.resultEur):'—') + '</td>' +
+        '<td class="tr ' + dc(r.rentPctRow) + '" style="font-size:11px">' + (r.rentPctRow!=null?(r.rentPctRow>=0?'+':'')+r.rentPctRow.toFixed(1)+'%':'—') + '</td>' +
+        '<td>' + dt(r.data_entrada) + '</td>' +
+        '<td class="tr" style="font-size:11px;color:#9b9b98">' + (dias!=null?dias:'—') + '</td>' +
+        '<td class="tr">' + (r.quantidade?num(r.quantidade,3):'—') + '</td>' +
+        '<td class="tr">' + (r.preco_entrada?num(r.preco_entrada,2):'—') + '</td>' +
+        '<td class="tr" style="font-weight:500">' + (r.preco_atual?num(r.preco_atual,2):'—') + '</td>' +
+        '<td class="tr">' + (r.valorMercado!=null?num(r.valorMercado,0):'—') + '</td>' +
+        '<td style="font-size:11px;color:#6b6b68">' + r.moeda + '</td>' +
+        '</tr>';
+    }).join('') + '</tbody></table>';
+}
+
+function sortPos(col) {
+  if (window.posSortCol === col) { window.posSortDir *= -1; } else { window.posSortCol = col; window.posSortDir = 1; }
+  // recalc from posData with current filters
+  const filtered = posData.filter(r => (posFiltCorr==='TODAS'||r.corretora===posFiltCorr) && (posFiltClasse==='TODAS'||r.classe_ativo===posFiltClasse));
+  const rowsCalc = filtered.map(r => {
+    const temPreco = r.preco_atual && r.preco_atual > 0 && r.quantidade;
+    const valorMercado = temPreco ? r.preco_atual * r.quantidade : null;
+    const custoEur = posToEur(r.custo_total, r.moeda);
+    const mercadoEur = posToEur(valorMercado, r.moeda);
+    const resultEur = (mercadoEur!=null&&custoEur!=null) ? mercadoEur-custoEur : null;
+    const resultMoeda = (valorMercado!=null&&r.custo_total) ? valorMercado-r.custo_total : null;
+    const rentPctRow = (resultMoeda!=null&&r.custo_total) ? (resultMoeda/r.custo_total*100) : null;
+    return {...r, valorMercado, custoEur, mercadoEur, resultEur, rentPctRow};
+  });
+  renderPosTable(rowsCalc);
 
 function filtPos(btn) {
   const dim = btn.dataset.dim, val = btn.dataset.v;
