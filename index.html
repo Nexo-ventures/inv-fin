@@ -382,7 +382,7 @@ async function loadGeral() {
     get('/fluxos_capital?select=tipo,valor_eur,corretora,data'),
     get('/cambio_wise?select=custo_pct,valor_eur'),
     get('/cambio?select=mes,eur_brl,eur_usd&order=mes.desc&limit=1'),
-    get('/cambio?select=mes,eur_brl,eur_usd&order=ordem.asc')
+    get('/cambio?select=mes,eur_brl,eur_usd&order=mes.asc')
   ]);
 
   const last = pat[pat.length - 1];
