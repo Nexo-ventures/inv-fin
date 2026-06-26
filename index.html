@@ -388,9 +388,15 @@ async function loadGeral() {
 
   // Patrimônio total = investido + caixa
   const patrimonioTotal = totalInvestido + totalCaixa;
+  const snapshotTotal = last.total_eur;
+  const diffSnapshot = patrimonioTotal - snapshotTotal;
 
   // KPIs
-  document.getElementById('k-total').innerHTML = '<span style="font-size:24px;font-weight:700">' + eur(patrimonioTotal) + '</span>';
+  document.getElementById('k-total').innerHTML =
+    '<span style="font-size:24px;font-weight:700">' + eur(patrimonioTotal) + '</span>' +
+    '<div style="font-size:11px;color:#9b9b98;margin-top:4px">calculado dinamicamente</div>' +
+    '<div style="font-size:11px;margin-top:2px">Snapshot ' + last.mes + ': <span style="font-weight:600">' + eur(snapshotTotal) + '</span>' +
+    ' <span style="color:' + (diffSnapshot>=0?'#1a7f4b':'#c0392b') + '">' + (diffSnapshot>=0?'+':'') + eur(diffSnapshot) + '</span></div>';
   document.getElementById('k-mes').textContent = last.mes + (last.tem_provisorio ? ' *provisório' : '');
   document.getElementById('k-investido').innerHTML = '<span style="font-size:22px;font-weight:700">' + eur(totalInvestido) + '</span>';
   document.getElementById('k-investido-sub').textContent = Object.values(investCorr).filter(v=>v>0).length + ' corretoras';
