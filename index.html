@@ -1368,7 +1368,7 @@ function renderFluxos(rows) {
   const totA = years.reduce((s,y) => s + byYear[y].a, 0);
   const totR = years.reduce((s,y) => s + byYear[y].r, 0);
   document.getElementById('fluxos-anual').innerHTML = `
-    <div class="card" style="padding:0">
+    <div class="card" style="padding:0;margin-bottom:12px">
       <div class="table-head"><span class="table-title">Resumo anual</span></div>
       <div class="tbl-scroll"><table>
         <thead><tr><th>Ano</th><th class="tr">Aportes</th><th class="tr">Retiradas</th><th class="tr">Saldo</th></tr></thead>
@@ -1389,6 +1389,55 @@ function renderFluxos(rows) {
             <td class="tr ${(totA-totR)>=0?'pos':'neg'}">${(totA-totR)>=0?'':'-'}${eur(Math.abs(totA-totR))}</td>
           </tr>
         </tfoot>
+      </table></div>
+    </div>
+    <div class="card" style="padding:0">
+      <div class="table-head"><span class="table-title">Fluxo líquido por corretora (EUR)</span></div>
+      <div class="tbl-scroll"><table>
+        <thead><tr>
+          <th>Corretora</th>
+          <th class="tr">Aportes 2025</th><th class="tr">Retiradas 2025</th><th class="tr">Líquido 2025</th>
+          <th class="tr">Aportes 2026</th><th class="tr">Retiradas 2026</th><th class="tr">Líquido 2026</th>
+          <th class="tr">Total líquido</th>
+        </tr></thead>
+        <tbody>${(() => {
+          const corrs = ['XP','AV','IBKR','R4','CB'];
+          const byCorr = {};
+          fluxosData.forEach(r => {
+            const ano = r.data ? new Date(r.data).getFullYear() : null;
+            if (!ano) return;
+            if (!byCorr[r.corretora]) byCorr[r.corretora] = {a25:0,r25:0,a26:0,r26:0};
+            const v = r.valor_eur || 0;
+            if (ano === 2025) { r.tipo==='APORTE' ? byCorr[r.corretora].a25+=v : byCorr[r.corretora].r25+=v; }
+            if (ano === 2026) { r.tipo==='APORTE' ? byCorr[r.corretora].a26+=v : byCorr[r.corretora].r26+=v; }
+          });
+          const active = corrs.filter(c => byCorr[c]);
+          let totA25=0,totR25=0,totA26=0,totR26=0;
+          const rows = active.map(c => {
+            const d = byCorr[c];
+            const l25 = d.a25-d.r25, l26 = d.a26-d.r26, tot = l25+l26;
+            totA25+=d.a25; totR25+=d.r25; totA26+=d.a26; totR26+=d.r26;
+            return `<tr>
+              <td><span class="pill p-${c}">${c}</span></td>
+              <td class="tr">${d.a25?'<span class="pos">'+eur(d.a25)+'</span>':'—'}</td>
+              <td class="tr">${d.r25?'<span class="neg">-'+eur(d.r25)+'</span>':'—'}</td>
+              <td class="tr ${l25>=0?'pos':'neg'}" style="font-weight:500">${l25>=0?'':'-'}${eur(Math.abs(l25))}</td>
+              <td class="tr">${d.a26?'<span class="pos">'+eur(d.a26)+'</span>':'—'}</td>
+              <td class="tr">${d.r26?'<span class="neg">-'+eur(d.r26)+'</span>':'—'}</td>
+              <td class="tr ${l26>=0?'pos':'neg'}" style="font-weight:500">${l26>=0?'':'-'}${eur(Math.abs(l26))}</td>
+              <td class="tr ${tot>=0?'pos':'neg'}" style="font-weight:600">${tot>=0?'':'-'}${eur(Math.abs(tot))}</td>
+            </tr>`;
+          }).join('');
+          const totL25=totA25-totR25, totL26=totA26-totR26, totTot=totL25+totL26;
+          return rows + `<tr style="font-weight:600;background:#fafaf9">
+            <td>Total</td>
+            <td class="tr pos">${eur(totA25)}</td><td class="tr neg">-${eur(totR25)}</td>
+            <td class="tr ${totL25>=0?'pos':'neg'}">${totL25>=0?'':'-'}${eur(Math.abs(totL25))}</td>
+            <td class="tr pos">${eur(totA26)}</td><td class="tr neg">-${eur(totR26)}</td>
+            <td class="tr ${totL26>=0?'pos':'neg'}">${totL26>=0?'':'-'}${eur(Math.abs(totL26))}</td>
+            <td class="tr ${totTot>=0?'pos':'neg'}">${totTot>=0?'':'-'}${eur(Math.abs(totTot))}</td>
+          </tr>`;
+        })()}</tbody>
       </table></div>
     </div>`;
 
