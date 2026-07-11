@@ -1830,7 +1830,8 @@ function renderFluxos(rows) {
           const rows = active.map(c => {
             const d = byCorr[c];
             const l25 = d.a25-d.r25, l26 = d.a26-d.r26, tot = l25+l26;
-            totA25+=d.a25; totR25+=d.r25; totA26+=d.a26; totR26+=d.r26;
+            // Exclui CB dos totais (dupla contagem)
+            if (c !== 'CB') { totA25+=d.a25; totR25+=d.r25; totA26+=d.a26; totR26+=d.r26; }
             return `<tr>
               <td><span class="pill p-${c}">${c}</span></td>
               <td class="tr">${d.a25?'<span class="pos">'+eur(d.a25)+'</span>':'€0'}</td>
