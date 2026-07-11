@@ -1471,16 +1471,16 @@ function renderCustos(rows, patrimonioTotal) {
       },
       options: {
         responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
         plugins:{
           legend:{ labels:{ font:{size:10}, boxWidth:10 } },
           tooltip:{
-            mode: 'index',
             callbacks:{
-              afterBody: (items) => {
-                const total = items.filter(i=>i.dataset.stack==='custos').reduce((s,i)=>s+(i.raw||0),0);
-                return total > 0 ? ['─────────', 'Total: €' + total.toLocaleString('de-DE',{minimumFractionDigits:2})] : [];
-              },
-              label: ctx => ` ${ctx.dataset.label}: €${(ctx.raw||0).toLocaleString('de-DE',{minimumFractionDigits:2})}`
+              label: ctx => ` ${ctx.dataset.label}: €${(ctx.raw||0).toLocaleString('de-DE',{minimumFractionDigits:2})}`,
+              footer: (items) => {
+                const total = items.filter(i=>i.dataset.label!=='Total mensal').reduce((s,i)=>s+(i.raw||0),0);
+                return 'Total: €' + total.toLocaleString('de-DE',{minimumFractionDigits:2});
+              }
             }
           }
         },
