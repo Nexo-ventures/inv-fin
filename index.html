@@ -1477,10 +1477,7 @@ function renderCustos(rows, patrimonioTotal) {
           tooltip:{
             callbacks:{
               label: ctx => ` ${ctx.dataset.label}: €${(ctx.raw||0).toLocaleString('de-DE',{minimumFractionDigits:2})}`,
-              footer: (items) => {
-                const total = items.filter(i=>i.dataset.label!=='Total mensal').reduce((s,i)=>s+(i.raw||0),0);
-                return 'Total: €' + total.toLocaleString('de-DE',{minimumFractionDigits:2});
-              }
+              footer: (items) => 'Total: €' + items.filter(i=>i.dataset.label!=='Total mensal').reduce((s,i)=>s+(i.raw||0),0).toLocaleString('de-DE',{minimumFractionDigits:2})
             }
           }
         },
