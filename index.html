@@ -709,28 +709,6 @@ function renderPos(rows) {
   document.getElementById('pos-top5p').innerHTML = '<div class="card-label" style="margin-bottom:10px">Top 5 Perdas</div>' +
     top5p.map((r,i) => '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #f0f0ee"><div style="font-size:12px;font-weight:500">'+(i+1)+'. '+r.ticker+'<span style="font-size:10px;color:#9b9b98;margin-left:6px">'+dt(r.data_entrada)+'</span></div><div style="font-size:12px;font-weight:600;color:#c0392b">'+num(r.resultEur,2)+'</div></div>').join('');
 
-  // Gráfico rentabilidade acumulada mês a mês (por data de entrada)
-  const byMonthRent = {};
-  rowsCalc.forEach(r => {
-    if (!r.data_entrada || r.resultEur == null || !r.custoEur) return;
-    const d = new Date(r.data_entrada);
-    const key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
-    if (!byMonthRent[key]) byMonthRent[key] = {res:0, custo:0};
-    byMonthRent[key].res += r.resultEur;
-    byMonthRent[key].custo += r.custoEur;
-  });
-  const rentMonths = Object.keys(byMonthRent).sort();
-  let cumRes = 0, cumCusto = 0;
-  const cumResArr = [], cumRentArr = [];
-  rentMonths.forEach(m => { cumRes += byMonthRent[m].res; cumCusto += byMonthRent[m].custo; cumResArr.push(cumRes); cumRentArr.push(cumCusto>0 ? cumRes/cumCusto*100 : 0); });
-  const rentLabels = rentMonths.map(m => { const [y,mo]=m.split('-'); const mn=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; return mn[+mo-1]+'/'+y.slice(2); });
-  const rc = document.getElementById('pos-rent-chart');
-  if (rc) { if(posRentChart) posRentChart.destroy(); posRentChart = new Chart(rc, {data:{labels:rentLabels, datasets:[
-    {type:'line', label:'Resultado acumulado (EUR)', data:cumResArr, borderColor:'#1a7f4b', backgroundColor:'#1a7f4b22', borderWidth:2, pointRadius:3, tension:0.3, yAxisID:'yEur'},
-    {type:'line', label:'Rentabilidade acumulada (%)', data:cumRentArr, borderColor:'#1565c0', backgroundColor:'transparent', borderWidth:2, pointRadius:3, tension:0.3, yAxisID:'yPct'},
-    {type:'line', label:'Zero', data:rentMonths.map(()=>0), borderColor:'#e5e5e3', borderWidth:1, pointRadius:0, borderDash:[4,4], yAxisID:'yPct'}
-  ]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{labels:{font:{size:10}, boxWidth:10}}}, scales:{x:{grid:{display:false}, ticks:{font:{size:9}}}, yEur:{position:'left', grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>'€'+v.toLocaleString('de-DE')}}, yPct:{position:'right', grid:{display:false}, ticks:{font:{size:9}, callback:v=>v.toFixed(1)+'%'}}}}}); }
-
   // Gráfico por classe (barras horizontais)
   const totalResultEurAbs = klassesSorted.reduce((s,[,v])=>s+Math.abs(v),0);
   const cc = document.getElementById('pos-classe-chart');
