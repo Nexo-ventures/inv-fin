@@ -1503,7 +1503,7 @@ function renderCustos(rows, patrimonioTotal) {
       <td style="font-size:11px">${r.moeda}</td>
       <td class="tr neg">-${num(r.valor_eur, 2)}</td>
       <td class="tr" style="color:#6b6b68">${r.valor_operacao_eur ? num(r.valor_operacao_eur,2) : '—'}</td>
-      <td class="tr" style="font-size:11px;color:#9b9b98">${r.pct_custo ? (r.pct_custo * 100).toFixed(2) + '%' : '—'}</td>
+      <td class="tr" style="font-size:11px;color:#9b9b98">${r.pct_custo != null ? (r.pct_custo * 100).toFixed(2) + '%' : '—'}</td>
     </tr>`).join('')}</tbody>
     <tfoot><tr>
       <td colspan="6" style="text-align:right;font-weight:500;padding:10px 8px;font-size:12px">Total</td>
