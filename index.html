@@ -1471,7 +1471,18 @@ function renderCustos(rows, patrimonioTotal) {
       },
       options: {
         responsive: true, maintainAspectRatio: false,
-        plugins:{ legend:{ labels:{ font:{size:10}, boxWidth:10 } } },
+        plugins:{
+          legend:{ labels:{ font:{size:10}, boxWidth:10 } },
+          tooltip:{
+            callbacks:{
+              afterBody: (items) => {
+                const total = items.filter(i=>i.dataset.type!=='line').reduce((s,i)=>s+i.raw,0);
+                return ['─────────', 'Total: €' + total.toLocaleString('de-DE',{minimumFractionDigits:2})];
+              },
+              label: ctx => ` ${ctx.dataset.label}: €${ctx.raw.toLocaleString('de-DE',{minimumFractionDigits:2})}`
+            }
+          }
+        },
         scales:{
           x:{ stacked:true, grid:{display:false}, ticks:{font:{size:9}} },
           y:{ stacked:true, grid:{color:'#f0f0ee'}, ticks:{ font:{size:9}, callback: v => '€'+v.toLocaleString('de-DE') } }
