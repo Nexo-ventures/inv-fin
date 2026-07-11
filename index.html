@@ -1771,7 +1771,7 @@ function renderFluxos(rows) {
 
   // --- Tabela anual ---
   const byYear = {};
-  rows.forEach(r => {
+  rows.filter(r => r.corretora !== 'CB' && r.corretora !== 'nan').forEach(r => {
     if (!r.data) return;
     const y = new Date(r.data).getFullYear();
     if (!byYear[y]) byYear[y] = {a:0, r:0};
