@@ -161,8 +161,9 @@
       <div id="pos-top5g" class="card" style="padding:14px 18px"></div>
       <div id="pos-top5p" class="card" style="padding:14px 18px"></div>
     </div>
-    <div style="margin-bottom:16px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
       <div class="card"><div class="card-label" style="margin-bottom:8px">Resultado não realizado por classe (EUR)</div><div style="position:relative;height:200px"><canvas id="pos-classe-chart"></canvas></div></div>
+      <div class="card"><div class="card-label" style="margin-bottom:8px">Maiores posições (% do valor a mercado)</div><div style="position:relative;height:200px"><canvas id="pos-conc-chart"></canvas></div></div>
     </div>
     <div id="pos-por-corretora" style="margin-bottom:16px"></div>
     <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Resultado não realizado por setor (EUR)</div><div style="position:relative;height:240px"><canvas id="pos-setor-chart"></canvas></div></div>
@@ -729,6 +730,8 @@ function renderPos(rows) {
   const rentPct = totalCustoEntryComPreco > 0 ? (totalResultEur / totalCustoEntryComPreco * 100) : null;
   const positivas = rowsCalc.filter(r => r.resultEur != null && r.resultEur > 0);
   const taxaAcerto = comPreco.length ? (positivas.length / comPreco.length * 100).toFixed(1) : '—';
+  const STOP_ALERTA = -8; // limite inferior do stop 8-10%
+  const emAlerta = rowsCalc.filter(r => r.rentPctRow != null && r.rentPctRow <= STOP_ALERTA);
 
   // KPIs — linha 1 (ciclo) + linha 2 (métricas)
   document.getElementById('pos-kpis').innerHTML =
@@ -742,6 +745,7 @@ function renderPos(rows) {
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px">' +
     '<div class="card" style="padding:14px 18px"><div class="card-label">Rentabilidade</div><div style="font-size:20px;font-weight:700;color:' + (rentPct!=null?(rentPct>=0?'#1a7f4b':'#c0392b'):'#1c1c1a') + '">' + (rentPct!=null?(rentPct>=0?'+':'')+rentPct.toFixed(2)+'%':'—') + '</div><div style="font-size:11px;color:#9b9b98">não realizado sobre custo</div></div>' +
     '<div class="card" style="padding:14px 18px"><div class="card-label">Taxa de acerto</div><div style="font-size:20px;font-weight:700">' + taxaAcerto + '%</div><div style="font-size:11px;color:#9b9b98">' + positivas.length + ' de ' + comPreco.length + ' posições</div></div>' +
+    '<div class="card" style="padding:14px 18px' + (emAlerta.length?';border:1px solid #f0c8c0':'') + '"><div class="card-label">Posições em alerta</div><div style="font-size:20px;font-weight:700;color:' + (emAlerta.length?'#c0392b':'#1a7f4b') + '">' + emAlerta.length + '</div><div style="font-size:11px;color:#9b9b98">abaixo de −8% (stop 8–10%)</div></div>' +
     '</div>';
 
   if (!filtered.length) { document.getElementById('pos-body').innerHTML = '<div class="empty">Nenhuma posição encontrada</div>'; return; }
@@ -764,6 +768,14 @@ function renderPos(rows) {
   const totalResultEurAbs = klassesSorted.reduce((s,[,v])=>s+Math.abs(v),0);
   const cc = document.getElementById('pos-classe-chart');
   if (cc) { if(posClasseChart) posClasseChart.destroy(); posClasseChart = new Chart(cc, {type:'bar', data:{labels:klassesSorted.map(([c,v])=>c+' ('+(totalResultEurAbs?((Math.abs(v)/totalResultEurAbs)*100).toFixed(1):'0')+'%)'), datasets:[{data:klassesSorted.map(([,v])=>v), backgroundColor:klassesSorted.map(([c,v])=>(CLASS_COLORS[c]||'#9b9b98')+(v>=0?'cc':'88')), borderRadius:4}]}, options:{indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>{const v=ctx.raw; return ' €'+v.toLocaleString('de-DE',{minimumFractionDigits:2});}}}}, scales:{x:{grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>'€'+v.toLocaleString('de-DE')}}, y:{grid:{display:false}, ticks:{font:{size:10}}}}}}); }
+
+  // Gráfico de concentração — top 8 posições por peso (% do valor a mercado)
+  const totalMercConc = rowsCalc.reduce((s,r)=>s+(r.mercadoEur||0),0);
+  const concSorted = rowsCalc.filter(r=>r.mercadoEur!=null && totalMercConc>0)
+    .map(r=>({ticker:r.ticker, corretora:r.corretora, peso:r.mercadoEur/totalMercConc*100}))
+    .sort((a,b)=>b.peso-a.peso).slice(0,8);
+  const conc = document.getElementById('pos-conc-chart');
+  if (conc) { if(window._posConcChart) window._posConcChart.destroy(); window._posConcChart = new Chart(conc, {type:'bar', data:{labels:concSorted.map(o=>o.ticker), datasets:[{data:concSorted.map(o=>o.peso), backgroundColor:concSorted.map(o=>(CORR_COLORS[o.corretora]||'#9b9b98')+'cc'), borderRadius:4}]}, options:{indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>' '+ctx.raw.toFixed(1)+'% do total'}}}, scales:{x:{grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>v.toFixed(0)+'%'}}, y:{grid:{display:false}, ticks:{font:{size:10}}}}}}); }
 
   // Tabela por corretora (custo na compra · mercado · result. mercado · efeito cambial · não realizado)
   const byCorrPos = {};
@@ -878,8 +890,9 @@ function renderPosTable(rowsCalc) {
     sorted.map(r => {
       const dias = r.data_entrada ? Math.floor((today - new Date(r.data_entrada)) / 86400000) : null;
       const peso = (r.mercadoEur != null && totalMercadoEurAll > 0) ? (r.mercadoEur / totalMercadoEurAll * 100) : null;
-      return '<tr>' +
-        '<td class="ticker" style="cursor:pointer;text-decoration:underline dotted" onclick="abrirModal(\'' + r.ticker + '\')">' + r.ticker + '</td>' +
+      const alerta = r.rentPctRow != null && r.rentPctRow <= -8;
+      return '<tr style="' + (alerta?'background:#fdf3f1;box-shadow:inset 3px 0 0 #c0392b':'') + '">' +
+        '<td class="ticker" style="cursor:pointer;text-decoration:underline dotted" onclick="abrirModal(\'' + r.ticker + '\')">' + (alerta?'⚠ ':'') + r.ticker + '</td>' +
         '<td><span class="pill p-' + r.corretora + '">' + r.corretora + '</span></td>' +
         '<td style="font-size:11px;color:#9b9b98">' + (r.classe_ativo||'—') + '</td>' +
         '<td style="font-size:11px;color:#9b9b98">' + (r.setor||'—') + '</td>' +
