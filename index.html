@@ -197,6 +197,7 @@
   <div id="tab-historico" class="section">
     <div id="hist-kpis" style="margin-bottom:16px"></div>
     <div class="card" id="hist-mensal-card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:12px">Resultado mensal realizado (EUR)</div><div style="position:relative;height:220px"><canvas id="hist-chart"></canvas></div></div>
+    <div class="card" id="hist-cvr-card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:12px">Compras, vendas e resultado por mês (EUR)</div><div style="position:relative;height:220px"><canvas id="hist-cvr-chart"></canvas></div></div>
     <div id="hist-anual" style="margin-bottom:16px"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
       <div class="card">
@@ -958,6 +959,9 @@ function renderHist(rows) {
     return s;
   }, 0);
   const rentTotal = totalCustoEur ? (totalEur / totalCustoEur * 100) : null;
+  // Total compras/vendas em EUR (item: conferência vendas − compras ≈ resultado)
+  const totalComprasEur = rows.reduce((s,r) => s + (toEur(r.custo_total, r.moeda, getMesKey(r.data_entrada)) || 0), 0);
+  const totalVendasEur = rows.reduce((s,r) => s + (toEur(r.receita_total, r.moeda, getMesKey(r.data_saida)) || 0), 0);
 
   // Top 5 ganhos e perdas
   const sorted = [...comResult].sort((a,b)=>b.resultado_eur-a.resultado_eur);
@@ -989,6 +993,8 @@ function renderHist(rows) {
   if (document.getElementById('hist-kpis')) {
     document.getElementById('hist-kpis').innerHTML =
       '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px">'+
+      '<div class="card" style="padding:14px 18px"><div class="card-label">Total compras</div><div style="font-size:20px;font-weight:700;color:#6b6b68">€'+num(totalComprasEur,2)+'</div><div style="font-size:11px;color:#9b9b98">capital investido (saídas)</div></div>'+
+      '<div class="card" style="padding:14px 18px"><div class="card-label">Total vendas</div><div style="font-size:20px;font-weight:700;color:#6b6b68">€'+num(totalVendasEur,2)+'</div><div style="font-size:11px;color:#9b9b98">capital resgatado</div></div>'+
       '<div class="card" style="padding:14px 18px"><div class="card-label">Resultado total</div><div style="font-size:20px;font-weight:700;color:'+(totalEur>=0?'#1a7f4b':'#c0392b')+'">'+'€'+num(totalEur,2)+'</div></div>'+
       '<div class="card" style="padding:14px 18px"><div class="card-label">Rentabilidade total</div><div style="font-size:20px;font-weight:700;color:'+(rentTotal!=null?(rentTotal>=0?'#1a7f4b':'#c0392b'):'#9b9b98')+'">'+(rentTotal!=null?rentTotal.toFixed(2)+'%':'—')+'</div><div style="font-size:11px;color:#9b9b98">sobre capital investido</div></div>'+
       '<div class="card" style="padding:14px 18px"><div class="card-label">Taxa de acerto</div><div style="font-size:20px;font-weight:700;color:#1c1c1a">'+taxaAcerto+'%</div><div style="font-size:11px;color:#9b9b98">'+positivas.length+' de '+comResult.length+' operações</div></div>'+
@@ -1008,7 +1014,7 @@ function renderHist(rows) {
       '<div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Rentabilidade acumulada mês a mês (%)</div><div style="position:relative;height:200px"><canvas id="hist-rent-chart"></canvas></div></div>'+
       // Linha 5: resultado por setor barras
       '<div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Resultado por setor (EUR)</div><div style="position:relative;height:240px"><canvas id="hist-setor-chart"></canvas></div></div>';
-    { const _cl=document.getElementById('hist-classe-card'), _me=document.getElementById('hist-mensal-card'); if(_cl&&_me) _cl.after(_me); }
+    { const _cl=document.getElementById('hist-classe-card'), _me=document.getElementById('hist-mensal-card'); if(_cl&&_me) _cl.after(_me); const _cvr=document.getElementById('hist-cvr-card'); if(_me&&_cvr) _me.after(_cvr); }
 
     // Gráfico rentabilidade acumulada
     const byMonthRent = {};
@@ -1092,7 +1098,22 @@ function renderHist(rows) {
     ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{font:{size:10},boxWidth:10}}},scales:{x:{stacked:true,grid:{display:false},ticks:{font:{size:9}}},y:{stacked:true,grid:{color:'#f0f0ee'},ticks:{font:{size:9},callback:v=>'€'+v.toLocaleString('de-DE')}}}}});
   }
 
-  // --- Tabela anual ---
+  // --- Gráfico compras/vendas/resultado por mês (compra pela data de compra; venda e resultado pela data de venda) ---
+  const cvr = {};
+  const ymK = ds => { const d=new Date(ds); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); };
+  rows.forEach(r => {
+    if (r.custo_total && r.data_entrada) { const k=ymK(r.data_entrada); (cvr[k]=cvr[k]||{c:0,v:0,r:0}).c += (toEur(r.custo_total, r.moeda, getMesKey(r.data_entrada)) || 0); }
+    if (r.data_saida) { const k=ymK(r.data_saida); const o=(cvr[k]=cvr[k]||{c:0,v:0,r:0}); o.v += (toEur(r.receita_total, r.moeda, getMesKey(r.data_saida)) || 0); o.r += (r.resultado_eur || 0); }
+  });
+  const cvrKeys = Object.keys(cvr).sort();
+  const cvrLabels = cvrKeys.map(k => { const [y,mo]=k.split('-'); const mn=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; return mn[+mo-1]+'/'+y.slice(2); });
+  if (window._histCvrChart) window._histCvrChart.destroy();
+  const cvrCtx = document.getElementById('hist-cvr-chart');
+  if (cvrCtx) { window._histCvrChart = new Chart(cvrCtx, {type:'bar', data:{labels:cvrLabels, datasets:[
+      { label:'Compras', data:cvrKeys.map(k=>cvr[k].c), backgroundColor:'#9b9b9855', borderRadius:4, order:2 },
+      { label:'Vendas', data:cvrKeys.map(k=>cvr[k].v), backgroundColor:'#1565c088', borderRadius:4, order:2 },
+      { type:'line', label:'Resultado', data:cvrKeys.map(k=>cvr[k].r), borderColor:'#1a7f4b', backgroundColor:'transparent', borderWidth:2, pointRadius:3, tension:0.3, order:0 }
+    ]}, options:{responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false}, plugins:{legend:{labels:{font:{size:10},boxWidth:10}}, tooltip:{callbacks:{label:ctx=>' '+ctx.dataset.label+': €'+(ctx.raw||0).toLocaleString('de-DE',{minimumFractionDigits:2})}}}, scales:{x:{grid:{display:false}, ticks:{font:{size:9}}}, y:{grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>'€'+v.toLocaleString('de-DE')}}}}}); }
   const CORRS=['XP','AV','R4','IBKR'];
   const byYear={};
   rows.forEach(r=>{if(!r.data_saida)return;const y=new Date(r.data_saida).getFullYear();if(!byYear[y])byYear[y]={};byYear[y][r.corretora]=(byYear[y][r.corretora]||0)+(r.resultado_eur||0);});
