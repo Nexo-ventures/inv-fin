@@ -194,9 +194,15 @@
     <div id="hist-kpis" style="margin-bottom:16px"></div>
     <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:12px">Resultado mensal realizado (EUR)</div><div style="position:relative;height:220px"><canvas id="hist-chart"></canvas></div></div>
     <div id="hist-anual" style="margin-bottom:16px"></div>
-    <div class="card" style="margin-bottom:16px">
-      <div class="card-label" style="margin-bottom:8px">Resultado por ativo (EUR)</div>
-      <div id="hist-pagadores-wrap" style="overflow-y:auto;max-height:500px"><canvas id="hist-pagadores-chart"></canvas></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+      <div class="card">
+        <div class="card-label" style="margin-bottom:8px">Ganhos por ativo (EUR)</div>
+        <div id="hist-ativos-pos-wrap" style="overflow-y:auto;max-height:520px"><canvas id="hist-ativos-pos-chart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-label" style="margin-bottom:8px">Perdas por ativo (EUR)</div>
+        <div id="hist-ativos-neg-wrap" style="overflow-y:auto;max-height:520px"><canvas id="hist-ativos-neg-chart"></canvas></div>
+      </div>
     </div>
     <div class="card" style="padding:0">
       <div class="table-head">
@@ -386,6 +392,8 @@ async function loadGeral() {
   ]);
 
   const last = pat[pat.length - 1];
+  // Chave YYYY-MM do último mês do patrimônio (reutilizada por outros gráficos p/ estender eixo)
+  { const _M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; const [_mn,_yr]=(last.mes||'').split('/'); const _i=_M.indexOf(_mn); window._patrimMaxKey = _i<0?null:`${_yr}-${String(_i+1).padStart(2,'0')}`; }
   const prev = pat[pat.length - 2];
 
   document.getElementById('badge-mes').textContent = last.mes;
@@ -1017,7 +1025,18 @@ function renderHist(rows) {
     const c=r.classe_ativo||'Outro';
     byMonth[key][c]=(byMonth[key][c]||0)+(r.resultado_eur||0);
   });
-  const months=Object.keys(byMonth).sort();
+  const monthsRaw = Object.keys(byMonth).sort();
+  // Estende o eixo até o mês do patrimônio (meses sem venda entram com zero), igual à aba Fluxos
+  let months = monthsRaw;
+  if (monthsRaw.length) {
+    const startKey = monthsRaw[0];
+    const endKey = [monthsRaw[monthsRaw.length-1], window._patrimMaxKey].filter(Boolean).sort().pop();
+    const range = []; let [yy, mm] = startKey.split('-').map(Number);
+    const [ey, em] = endKey.split('-').map(Number);
+    while (yy < ey || (yy === ey && mm <= em)) { range.push(`${yy}-${String(mm).padStart(2,'0')}`); mm++; if (mm > 12) { mm = 1; yy++; } }
+    months = range;
+    months.forEach(m => { if (!byMonth[m]) byMonth[m] = {}; });
+  }
   const mlabels=months.map(m=>{const [y,mo]=m.split('-');const mn=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];return mn[+mo-1]+'/'+y.slice(2);});
   const classes=Object.keys(CLASS_COLORS);
   if (histChart) histChart.destroy();
@@ -1038,41 +1057,34 @@ function renderHist(rows) {
     document.getElementById('hist-anual').innerHTML='<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:400px"><thead><tr style="background:#fafaf9"><th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;border-bottom:1px solid #f0f0ee">Ano</th>'+CORRS.map(c=>'<th style="padding:10px 14px;text-align:right;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;border-bottom:1px solid #f0f0ee">'+c+'</th>').join('')+'<th style="padding:10px 14px;text-align:right;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;border-bottom:1px solid #f0f0ee">Total</th></tr></thead><tbody>'+years.map(y=>{const rowTot=CORRS.reduce((s,c)=>s+(byYear[y][c]||0),0);return'<tr><td style="padding:10px 14px;font-size:13px;font-weight:500;border-bottom:1px solid #f0f0ee">'+y+'</td>'+CORRS.map(c=>'<td style="padding:10px 14px;text-align:right;font-size:13px;border-bottom:1px solid #f0f0ee;color:'+(byYear[y][c]?(byYear[y][c]>=0?'#1a7f4b':'#c0392b'):'#9b9b98')+'">'+(byYear[y][c]?'€'+num(byYear[y][c],2):'€0')+'</td>').join('')+'<td style="padding:10px 14px;text-align:right;font-size:13px;font-weight:600;color:'+(rowTot>=0?'#1a7f4b':'#c0392b')+';border-bottom:1px solid #f0f0ee">'+'€'+num(rowTot,2)+'</td></tr>';}).join('')+'</tbody><tfoot><tr style="background:#fafaf9"><td style="padding:10px 14px;font-size:13px;font-weight:600;border-top:1px solid #e5e5e3">Total</td>'+CORRS.map(c=>{const v=years.reduce((s,y)=>s+(byYear[y][c]||0),0);return'<td style="padding:10px 14px;text-align:right;font-size:13px;font-weight:600;color:'+(v?(v>=0?'#1a7f4b':'#c0392b'):'#9b9b98')+';border-top:1px solid #e5e5e3">'+(v?'€'+num(v,2):'€0')+'</td>';}).join('')+'<td style="padding:10px 14px;text-align:right;font-size:13px;font-weight:700;color:'+(totalEur>=0?'#1a7f4b':'#c0392b')+';border-top:1px solid #e5e5e3">'+'€'+num(totalEur,2)+'</td></tr></tfoot></table></div>';
   }
 
-  // --- Gráfico resultado por ativo ---
-  const porAtivo = {};
-  rows.forEach(r => { if(r.resultado_eur==null) return; porAtivo[r.ticker]=(porAtivo[r.ticker]||0)+r.resultado_eur; });
-  const ativosSorted = Object.entries(porAtivo).sort((a,b)=>b[1]-a[1]);
-  const alturaAtivos = Math.max(200, ativosSorted.length * 28);
-  const wrapA = document.getElementById('hist-pagadores-wrap');
-  if (wrapA) {
-    wrapA.style.height = alturaAtivos + 'px';
-    const canvasA = document.getElementById('hist-pagadores-chart');
-    if (canvasA) {
-      canvasA.height = alturaAtivos;
-      if (window._histPagadoresChart) window._histPagadoresChart.destroy();
-      window._histPagadoresChart = new Chart(canvasA, {
-        type: 'bar',
-        data: {
-          labels: ativosSorted.map(([t])=>t),
-          datasets: [{
-            data: ativosSorted.map(([,v])=>v),
-            backgroundColor: ativosSorted.map(([,v])=>v>=0?'#1a7f4b99':'#c0392b99'),
-            borderRadius: 4
-          }]
-        },
-        options: {
-          indexAxis: 'y',
-          responsive: false,
-          maintainAspectRatio: false,
-          plugins: { legend:{display:false}, tooltip:{callbacks:{label:ctx=>' '+eur(ctx.raw)}} },
-          scales: {
-            x: { grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>'€'+v.toLocaleString('de-DE')} },
-            y: { grid:{display:false}, ticks:{font:{size:10}} }
-          }
+  // --- Gráficos resultado por ativo (ganhos | perdas, lado a lado) ---
+  const porAtivoR = {};
+  rows.forEach(r => { if(r.resultado_eur==null) return; porAtivoR[r.ticker]=(porAtivoR[r.ticker]||0)+r.resultado_eur; });
+  const ativosPos = Object.entries(porAtivoR).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+  const ativosNeg = Object.entries(porAtivoR).filter(([,v])=>v<0).sort((a,b)=>a[1]-b[1]);
+  const renderAtivoChart = (canvasId, wrapId, entries, color, chartKey) => {
+    const wrap = document.getElementById(wrapId);
+    const canvas = document.getElementById(canvasId);
+    if (!wrap || !canvas) return;
+    const altura = Math.max(160, entries.length * 26);
+    wrap.style.height = altura + 'px';
+    canvas.height = altura;
+    if (window[chartKey]) window[chartKey].destroy();
+    window[chartKey] = new Chart(canvas, {
+      type: 'bar',
+      data: { labels: entries.map(([t])=>t), datasets: [{ data: entries.map(([,v])=>v), backgroundColor: color, borderRadius: 4 }] },
+      options: {
+        indexAxis: 'y', responsive: false, maintainAspectRatio: false,
+        plugins: { legend:{display:false}, tooltip:{callbacks:{label:ctx=>' €'+ctx.raw.toLocaleString('de-DE',{minimumFractionDigits:2})}} },
+        scales: {
+          x: { grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>'€'+v.toLocaleString('de-DE')} },
+          y: { grid:{display:false}, ticks:{font:{size:10}} }
         }
-      });
-    }
-  }
+      }
+    });
+  };
+  renderAtivoChart('hist-ativos-pos-chart', 'hist-ativos-pos-wrap', ativosPos, '#1a7f4b99', '_histAtivosPosChart');
+  renderAtivoChart('hist-ativos-neg-chart', 'hist-ativos-neg-wrap', ativosNeg, '#c0392b99', '_histAtivosNegChart');
 
   // --- Tabela com ordenação ---
   if (!window.histSortCol) { window.histSortCol = 'data_saida'; window.histSortDir = -1; }
