@@ -571,11 +571,13 @@ async function loadGeral() {
   // Gráfico P&L acumulado mês a mês
   // Calcula aportes acumulados até cada mês usando fluxos com data
   const MES_ORDER2 = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const MES_NUM_G={Jan:0,Fev:1,Feb:1,Mar:2,Abr:3,Apr:3,Mai:4,May:4,Jun:5,Jul:6,Ago:7,Aug:7,Set:8,Sep:8,Out:9,Oct:9,Nov:10,Dez:11,Dec:11};
+  const mesToIdx = mn => (mn in MES_NUM_G) ? MES_NUM_G[mn] : MES_ORDER2.indexOf(mn);
   const fluxosSemCB = fluxos.filter(r=>r.corretora!=='CB'&&r.corretora!=='nan'&&r.tipo!=='TRANSFERENCIA_INTERNA'&&r.data);
   const pnlAcumLabels = pat.map(d=>d.mes.split('/')[0]+'/'+d.mes.split('/')[1].slice(2));
   const pnlAcumVals = pat.map(d => {
     const [mn, yr] = d.mes.split('/');
-    const mesIdx = MES_ORDER2.indexOf(mn);
+    const mesIdx = mesToIdx(mn);
     const yrNum = parseInt(yr);
     const aportesAte = fluxosSemCB.reduce((s,r) => {
       const rd = new Date(r.data);
@@ -597,7 +599,7 @@ async function loadGeral() {
   // "sem câmbio" = variação excluindo aportes do mês
   const varSemAportes = pat.slice(1).map((d,i) => {
     const [mn, yr] = d.mes.split('/');
-    const mesIdx = MES_ORDER2.indexOf(mn);
+    const mesIdx = mesToIdx(mn);
     const patYr = parseInt(yr) < 100 ? 2000+parseInt(yr) : parseInt(yr);
     const aportesDoMes = fluxosSemCB.reduce((s,r) => {
       const rd = new Date(r.data);
@@ -630,7 +632,8 @@ async function loadGeral() {
   // === Tabela mensal consolidada ===
   {
     const MES3=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    const keyOf = mes => { const [mn,yr]=mes.split('/'); return yr+'-'+String(MES3.indexOf(mn)+1).padStart(2,'0'); };
+    const MES_NUM={Jan:1,Fev:2,Feb:2,Mar:3,Abr:4,Apr:4,Mai:5,May:5,Jun:6,Jul:7,Ago:8,Aug:8,Set:9,Sep:9,Out:10,Oct:10,Nov:11,Dez:12,Dec:12};
+    const keyOf = mes => { const [mn,yr]=mes.split('/'); const m=MES_NUM[mn]||(MES3.indexOf(mn)+1); return yr+'-'+String(m).padStart(2,'0'); };
     const dateKey = d => { const dt=new Date(d); return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0'); };
     const apMes={}, retMes={}, rendaMes={}, custoMes={};
     fluxosSemCB.forEach(r=>{ const k=dateKey(r.data); if(r.tipo==='APORTE') apMes[k]=(apMes[k]||0)+r.valor_eur; else if(r.tipo==='RETIRADA') retMes[k]=(retMes[k]||0)+r.valor_eur; });
