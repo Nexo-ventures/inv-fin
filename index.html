@@ -109,7 +109,6 @@
       <div class="card"><div class="card-label">Patrimônio total</div><div class="card-value" id="k-total">—</div><div class="card-sub" id="k-mes">—</div></div>
       <div class="card"><div class="card-label">Variação mensal</div><div class="card-value" id="k-var">—</div><div class="card-sub" id="k-var2">—</div></div>
       <div class="card"><div class="card-label">Múltiplo do capital</div><div class="card-value" id="k-multiplo">—</div><div class="card-sub" id="k-multiplo-sub">patrimônio / aportes</div></div>
-      <div class="card"><div class="card-label">Alocação</div><div class="card-value" id="k-alloc">—</div><div class="card-sub" id="k-alloc-sub">—</div></div>
     </div>
     <!-- Linha 2: Resultado -->
     <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:#9b9b98;margin-bottom:8px">Resultado</div>
@@ -132,8 +131,8 @@
       <div class="card"><div class="card-label">Pior mês</div><div class="card-value" id="k-worst-mes">—</div><div class="card-sub" id="k-worst-mes-sub">—</div></div>
       <div class="card"><div class="card-label">Efeito cambial est.</div><div class="card-value" id="k-cambial">—</div><div class="card-sub" id="k-cambial-sub">estimativa</div></div>
     </div>
-    <!-- Cards por corretora -->
-    <div id="geral-corr-cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px"></div>
+    <!-- Gráfico evolução Investido vs Caixa -->
+    <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Investido vs Caixa — evolução (EUR)</div><div style="position:relative;height:200px"><canvas id="geral-inv-caixa-chart"></canvas></div></div>
     <!-- Tabela mensal consolidada -->
     <div class="card" style="padding:0;margin-bottom:16px;overflow-x:auto">
       <div class="card-label" style="padding:14px 18px 8px">Resumo mensal consolidado (EUR)</div>
@@ -381,7 +380,7 @@ document.querySelectorAll('.nav-tab').forEach(t => {
 let geralEvolucaoChart = null, geralMoedaChart = null, geralVarChart = null, geralPnlChart = null;
 
 async function loadGeral() {
-  const [pat, posData_g, cash, rendaTot, custosTot, resultFech, fluxos, wiseData_g, cambioG, cambioHist, patMensal] = await Promise.all([
+  const [pat, posData_g, cash, rendaTot, custosTot, resultFech, fluxos, wiseData_g, cambioG, cambioHist, patMensal, snapsHist] = await Promise.all([
     get('/patrimonio_consolidado?select=mes,ordem,total_eur,xp_eur,av_eur,r4_eur,ibkr_eur,tem_provisorio&order=ordem.asc'),
     get('/posicoes_abertas?select=corretora,moeda,preco_atual,quantidade,custo_total'),
     get('/operacoes?select=corretora,ticker,custo_total,preco_atual&status=eq.IGNORAR'),
@@ -392,7 +391,8 @@ async function loadGeral() {
     get('/cambio_wise?select=custo_pct,valor_eur'),
     get('/cambio?select=mes,eur_brl,eur_usd&order=mes.desc&limit=1'),
     get('/cambio?select=mes,eur_brl,eur_usd&order=mes.asc'),
-    get('/patrimonio_mensal?select=corretora,valor_orig,moeda,mes')
+    get('/patrimonio_mensal?select=corretora,valor_orig,moeda,mes'),
+    get('/precos_historico?select=corretora,ticker,custo_total,moeda,data&order=data.asc')
   ]);
 
   const last = pat[pat.length - 1];
@@ -498,9 +498,6 @@ async function loadGeral() {
   document.getElementById('k-multiplo').innerHTML = '<span style="font-size:22px;font-weight:700">'+(multiplo!=null?multiplo.toFixed(3)+'x':'—')+'</span>';
   document.getElementById('k-multiplo-sub').textContent = multiplo!=null?(multiplo>=1?'crescimento de capital':'capital reduzido'):'—';
 
-  document.getElementById('k-alloc').innerHTML = '<span style="font-size:22px;font-weight:700">'+pctInvestido+'%</span>';
-  document.getElementById('k-alloc-sub').innerHTML = 'investido · <span style="font-weight:600">'+pctCaixa+'%</span> caixa';
-
   document.getElementById('k-pnl').innerHTML = '<span style="font-size:22px;font-weight:700;color:'+(pnlLiquido>=0?'#1a7f4b':'#c0392b')+'">'+(pnlLiquido>=0?'+':'')+eur(pnlLiquido)+'</span>';
   document.getElementById('k-pnl-sub').innerHTML = '<span style="font-size:10px;color:#9b9b98">Real '+(totalRealizado>=0?'+':'')+eur(totalRealizado)+' · NR '+(resultNR!=null?(resultNR>=0?'+':'')+eur(resultNR):'n/d')+'<br>+Renda '+eur(totalRenda)+' · -Custos '+eur(totalCustos)+' · -Wise '+eur(totalTarifasWise)+'</span>';
 
@@ -530,27 +527,7 @@ async function loadGeral() {
   const CORR_LABELS = {XP:'XP Investimentos', AV:'Avenue', IBKR:'Interactive Brokers', R4:'Renta 4'};
   const CORR_COLORS = {XP:'#e65100', AV:'#1565c0', IBKR:'#1a7f4b', R4:'#6a1b9a'};
   const fmtOrig = (v, sym) => sym + (v||0).toLocaleString('de-DE', {minimumFractionDigits:2, maximumFractionDigits:2});
-  document.getElementById('geral-corr-cards').innerHTML = ['IBKR','AV','XP','R4'].map(c => {
-    const total = invCorrSnap[c]||0;
-    const pct = patrimonioTotal > 0 ? (total/patrimonioTotal*100).toFixed(1) : '0';
-    const orig = origMap[c];
-    const origLine = orig ? `${fmtOrig(orig.val, SYM[orig.moeda]||'')} ${orig.moeda}` : 'referência EUR';
-    return `<div class="card" style="border-left:3px solid ${CORR_COLORS[c]}">
-      <div class="card-label">${CORR_LABELS[c]}</div>
-      <div style="font-size:20px;font-weight:700;margin-bottom:2px">${eur(total)}</div>
-      <div style="font-size:12px;color:#6b6b68;margin-bottom:4px">${origLine}</div>
-      <div style="font-size:11px;color:#9b9b98">${pct}% do patrimônio</div>
-    </div>`;
-  }).concat([`<div class="card" style="border-left:3px solid #1c1c1a;background:#fafaf9">
-    <div class="card-label">Total</div>
-    <div style="font-size:20px;font-weight:700;margin-bottom:2px">${eur(patrimonioTotal)}</div>
-    <div style="font-size:12px;color:#6b6b68;margin-bottom:4px">referência EUR · ${last.mes}</div>
-    <div style="font-size:11px;color:#9b9b98;margin-bottom:6px">100%</div>
-    <div style="font-size:11px;color:#6b6b68;padding-top:6px;border-top:1px solid #f0f0ee">
-      <div style="display:flex;justify-content:space-between;margin-bottom:2px"><span>Investido</span><span>${eur(totalInvestido)} (${pctInvestido}%)</span></div>
-      <div style="display:flex;justify-content:space-between"><span>Caixa</span><span>${eur(totalCaixa)} (${pctCaixa}%)</span></div>
-    </div>
-  </div>`]).join('');
+  // Cards de corretora removidos — info agora no tooltip do gráfico de contribuição
 
   // Gráfico evolução
   const labels = pat.map(d=>d.mes.split('/')[0]+'/'+d.mes.split('/')[1].slice(2));
@@ -621,13 +598,51 @@ async function loadGeral() {
 
   // Gráfico contribuição por corretora (área empilhada)
   const CORR_COLORS_G = {XP:'#e65100cc',AV:'#1565c0cc',IBKR:'#1a7f4bcc',R4:'#6a1b9acc'};
+  // === Gráfico Investido vs Caixa — evolução (usa snapshots de fechamento + ponto atual) ===
+  {
+    const M_EN={Jan:1,Feb:2,Mar:3,Apr:4,May:5,Jun:6,Jul:7,Aug:8,Sep:9,Oct:10,Nov:11,Dec:12};
+    const M_PT={Jan:1,Fev:2,Mar:3,Abr:4,Mai:5,Jun:6,Jul:7,Ago:8,Set:9,Out:10,Nov:11,Dez:12};
+    const ymMes=(mes,map)=>{ const [mn,yr]=mes.split('/'); const m=map[mn]||M_EN[mn]||M_PT[mn]; return yr+'-'+String(m).padStart(2,'0'); };
+    const ymDate=d=>{ const dt=new Date(d); return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0'); };
+    const rateMap={}; (cambioHist||[]).forEach(c=>{ rateMap[ymMes(c.mes,M_EN)]={brl:c.eur_brl,usd:c.eur_usd}; });
+    const patMap={}; pat.forEach(d=>{ patMap[ymMes(d.mes,M_PT)]=d.total_eur; });
+    const byDate={}; (snapsHist||[]).forEach(s=>{ (byDate[s.data]=byDate[s.data]||[]).push(s); });
+    const snapDates=Object.keys(byDate).sort();
+    const icLabels=[], icInvest=[], icCaixa=[];
+    snapDates.forEach(dt=>{
+      const ym=ymDate(dt), rate=rateMap[ym];
+      let inv=0;
+      byDate[dt].forEach(s=>{ const v=s.custo_total||0; if(s.moeda==='EUR') inv+=v; else if(rate){ if(s.moeda==='BRL'&&rate.brl) inv+=v/rate.brl; else if(s.moeda==='USD'&&rate.usd) inv+=v/rate.usd; } });
+      const patTot=patMap[ym];
+      icLabels.push(dt.slice(8,10)+'/'+dt.slice(5,7));
+      icInvest.push(inv);
+      icCaixa.push(patTot!=null?Math.max(0,patTot-inv):0);
+    });
+    icLabels.push('Atual'); icInvest.push(totalInvestido); icCaixa.push(totalCaixa);
+    const icC=document.getElementById('geral-inv-caixa-chart');
+    if(icC){ if(window._geralInvCaixaChart) window._geralInvCaixaChart.destroy(); window._geralInvCaixaChart=new Chart(icC,{type:'bar',data:{labels:icLabels,datasets:[
+      {label:'Investido',data:icInvest,backgroundColor:'#1565c0cc',stack:'ic'},
+      {label:'Caixa',data:icCaixa,backgroundColor:'#b8b8b4cc',stack:'ic'}
+    ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{font:{size:10},boxWidth:10}},tooltip:{callbacks:{label:ctx=>{const t=(ctx.chart.data.datasets[0].data[ctx.dataIndex]||0)+(ctx.chart.data.datasets[1].data[ctx.dataIndex]||0); const pct=t>0?(ctx.raw/t*100).toFixed(1):'0'; return ' '+ctx.dataset.label+': '+eur(ctx.raw)+' ('+pct+'%)';},footer:items=>{const t=items.reduce((s,it)=>s+(it.raw||0),0);return 'Total: '+eur(t);}},footerFont:{weight:'bold'},footerColor:'#1c1c1a'}},scales:{x:{stacked:true,grid:{display:false},ticks:{font:{size:9}}},y:{stacked:true,grid:{color:'#f0f0ee'},ticks:{font:{size:9},callback:v=>'€'+Math.round(v/1000)+'k'}}}}}); }
+  }
+
+  const origByMonthCorr = {};
+  (patMensal||[]).forEach(r => { if(!origByMonthCorr[r.mes]) origByMonthCorr[r.mes]={}; origByMonthCorr[r.mes][r.corretora]={val:r.valor_orig, moeda:r.moeda}; });
   const corrHistC = document.getElementById('geral-corr-hist-chart');
   if (corrHistC) { if(window._geralCorrHistChart) window._geralCorrHistChart.destroy(); window._geralCorrHistChart = new Chart(corrHistC, {type:'bar', data:{labels:cambioPatlabels, datasets:[
     {label:'XP', data:pat.map(d=>d.xp_eur||0), backgroundColor:'#e6510099', stack:'s'},
     {label:'AV', data:pat.map(d=>d.av_eur||0), backgroundColor:'#1565c099', stack:'s'},
     {label:'IBKR', data:pat.map(d=>d.ibkr_eur||0), backgroundColor:'#1a7f4b99', stack:'s'},
     {label:'R4', data:pat.map(d=>d.r4_eur||0), backgroundColor:'#6a1b9a99', stack:'s'},
-  ]}, options:{responsive:true, maintainAspectRatio:false, interaction:{mode:'index', intersect:false}, plugins:{legend:{labels:{font:{size:10},boxWidth:10}}, tooltip:{mode:'index', intersect:false, callbacks:{label:ctx=>' '+ctx.dataset.label+': '+eur(ctx.raw), footer:items=>{const t=items.reduce((s,it)=>s+(it.raw||0),0); return 'Total: '+eur(t);}}, footerFont:{weight:'bold'}, footerColor:'#1c1c1a'}}, scales:{x:{stacked:true, grid:{display:false}, ticks:{font:{size:9}}}, y:{stacked:true, grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>'€'+Math.round(v/1000)+'k'}}}}}); }
+  ]}, options:{responsive:true, maintainAspectRatio:false, interaction:{mode:'index', intersect:false}, plugins:{legend:{labels:{font:{size:10},boxWidth:10}}, tooltip:{mode:'index', intersect:false, callbacks:{label:ctx=>{
+      const mes = pat[ctx.dataIndex] ? pat[ctx.dataIndex].mes : null;
+      const corr = ctx.dataset.label;
+      const total = pat[ctx.dataIndex] ? pat[ctx.dataIndex].total_eur : 0;
+      const pct = total>0 ? (ctx.raw/total*100).toFixed(1) : '0';
+      const o = mes && origByMonthCorr[mes] ? origByMonthCorr[mes][corr] : null;
+      const origStr = o ? ' ('+fmtOrig(o.val, SYM[o.moeda]||'')+' '+o.moeda+')' : '';
+      return ' '+corr+': '+eur(ctx.raw)+origStr+' · '+pct+'%';
+    }, footer:items=>{const t=items.reduce((s,it)=>s+(it.raw||0),0); return 'Total: '+eur(t);}}, footerFont:{weight:'bold'}, footerColor:'#1c1c1a'}}, scales:{x:{stacked:true, grid:{display:false}, ticks:{font:{size:9}}}, y:{stacked:true, grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>'€'+Math.round(v/1000)+'k'}}}}}); }
 
   // === Tabela mensal consolidada ===
   {
@@ -1995,3 +2010,171 @@ function renderFluxos(rows) {
   const ctx = document.getElementById('fluxos-chart');
   if (ctx) {
     fluxosChart = new Chart(ctx, {
+      data: {
+        labels,
+        datasets: [
+          { type:'bar', label:'Aportes', data: months.map(m => byMonth[m].a), backgroundColor:'rgba(26,127,75,0.7)', order:2 },
+          { type:'bar', label:'Retiradas', data: months.map(m => -byMonth[m].r), backgroundColor:'rgba(192,57,43,0.7)', order:2 },
+          { type:'line', label:'Saldo líquido', data: saldoAcum, borderColor:'#1c1c1a', backgroundColor:'transparent', borderWidth:2, pointRadius:3, tension:0.3, order:1, yAxisID:'y' },
+          { type:'line', label:'Saldo do mês', data: saldoMes, borderColor:'#6a1b9a', backgroundColor:'transparent', borderWidth:2, pointRadius:3, tension:0.3, order:1, borderDash:[4,3], yAxisID:'y' }
+        ]
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{ labels:{ font:{size:11}, boxWidth:12 } } },
+        scales:{
+          x:{ grid:{display:false}, ticks:{font:{size:10}} },
+          y:{ grid:{color:'#f0f0ee'}, ticks:{ font:{size:10}, callback: v => '€'+v.toLocaleString('de-DE') } }
+        }
+      }
+    });
+  }
+
+  // --- Tabela anual ---
+  const byYear = {};
+  rows.filter(r => r.corretora !== 'CB' && r.corretora !== 'nan').forEach(r => {
+    if (!r.data) return;
+    const y = new Date(r.data).getFullYear();
+    if (!byYear[y]) byYear[y] = {a:0, r:0};
+    if (r.tipo === 'APORTE')   byYear[y].a += (r.valor_eur || 0);
+    if (r.tipo === 'RETIRADA') byYear[y].r += (r.valor_eur || 0);
+  });
+  const years = Object.keys(byYear).sort((a,b) => b-a);
+  const totA = years.reduce((s,y) => s + byYear[y].a, 0);
+  const totR = years.reduce((s,y) => s + byYear[y].r, 0);
+  document.getElementById('fluxos-anual').innerHTML = `
+    <div class="card" style="padding:0">
+      <div class="table-head"><span class="table-title">Fluxo líquido por corretora (EUR)</span></div>
+      <div class="tbl-scroll"><table>
+        <thead><tr>
+          <th>Corretora</th>
+          <th class="tr">Aportes 2025</th><th class="tr">Retiradas 2025</th><th class="tr">Líquido 2025</th>
+          <th class="tr">Aportes 2026</th><th class="tr">Retiradas 2026</th><th class="tr">Líquido 2026</th>
+          <th class="tr">Total líquido</th>
+          <th class="tr">Total aportes</th><th class="tr">Total retiradas</th>
+        </tr></thead>
+        <tbody>${(() => {
+          const corrs = ['XP','AV','IBKR','R4'];
+          const byCorr = {};
+          fluxosData.forEach(r => {
+            if (r.corretora==='CB' || r.corretora==='nan') return;
+            if (r.tipo!=='APORTE' && r.tipo!=='RETIRADA') return; // exclui TRANSFERENCIA_INTERNA
+            const ano = r.data ? new Date(r.data).getFullYear() : null;
+            if (!ano) return;
+            if (!byCorr[r.corretora]) byCorr[r.corretora] = {a25:0,r25:0,a26:0,r26:0};
+            const v = Math.abs(r.valor_eur || 0);
+            if (ano === 2025) { r.tipo==='APORTE' ? byCorr[r.corretora].a25+=v : byCorr[r.corretora].r25+=v; }
+            if (ano === 2026) { r.tipo==='APORTE' ? byCorr[r.corretora].a26+=v : byCorr[r.corretora].r26+=v; }
+          });
+          const active = corrs.filter(c => byCorr[c]);
+          let totA25=0,totR25=0,totA26=0,totR26=0;
+          const rows = active.map(c => {
+            const d = byCorr[c];
+            const l25 = d.a25-d.r25, l26 = d.a26-d.r26, tot = l25+l26;
+            totA25+=d.a25; totR25+=d.r25; totA26+=d.a26; totR26+=d.r26;
+            return `<tr>
+              <td><span class="pill p-${c}">${c}</span></td>
+              <td class="tr">${d.a25?'<span class="pos">'+eur(d.a25)+'</span>':'€0'}</td>
+              <td class="tr">${d.r25?'<span class="neg">-'+eur(d.r25)+'</span>':'€0'}</td>
+              <td class="tr ${l25>=0?'pos':'neg'}" style="font-weight:500">${l25>=0?'':'-'}${eur(Math.abs(l25))}</td>
+              <td class="tr">${d.a26?'<span class="pos">'+eur(d.a26)+'</span>':'€0'}</td>
+              <td class="tr">${d.r26?'<span class="neg">-'+eur(d.r26)+'</span>':'€0'}</td>
+              <td class="tr ${l26>=0?'pos':'neg'}" style="font-weight:500">${l26>=0?'':'-'}${eur(Math.abs(l26))}</td>
+              <td class="tr ${tot>=0?'pos':'neg'}" style="font-weight:600">${tot>=0?'':'-'}${eur(Math.abs(tot))}</td>
+              <td class="tr pos">${eur(d.a25+d.a26)}</td>
+              <td class="tr neg">${(d.r25+d.r26)?'-'+eur(d.r25+d.r26):'€0'}</td>
+            </tr>`;
+          }).join('');
+          const totL25=totA25-totR25, totL26=totA26-totR26, totTot=totL25+totL26;
+          return rows + `<tr style="font-weight:600;background:#fafaf9">
+            <td>Total</td>
+            <td class="tr pos">${eur(totA25)}</td><td class="tr neg">-${eur(totR25)}</td>
+            <td class="tr ${totL25>=0?'pos':'neg'}">${totL25>=0?'':'-'}${eur(Math.abs(totL25))}</td>
+            <td class="tr pos">${eur(totA26)}</td><td class="tr neg">-${eur(totR26)}</td>
+            <td class="tr ${totL26>=0?'pos':'neg'}">${totL26>=0?'':'-'}${eur(Math.abs(totL26))}</td>
+            <td class="tr ${totTot>=0?'pos':'neg'}">${totTot>=0?'':'-'}${eur(Math.abs(totTot))}</td>
+            <td class="tr pos">${eur(totA25+totA26)}</td>
+            <td class="tr neg">-${eur(totR25+totR26)}</td>
+          </tr>`;
+        })()}</tbody>
+      </table></div>
+    </div>`;
+
+  // --- Tabela de transações ---
+  document.getElementById('fluxos-body').innerHTML = `<table>
+    <thead><tr>
+      <th>Data</th><th>Corretora</th><th>Tipo</th><th class="tr">EUR</th><th class="tr">Valor</th><th>Moeda</th>
+    </tr></thead>
+    <tbody>${rows.filter(r => r.corretora !== 'CB' && r.corretora !== 'nan').map(r => {
+      const isAp = r.tipo === 'APORTE', isRet = r.tipo === 'RETIRADA';
+      const tipoCor = isAp ? '#2d7a4f' : isRet ? '#c0392b' : '#6b6b68';
+      const valCor = isAp ? 'color:#1a7f4b' : isRet ? 'color:#c0392b' : 'color:#6b6b68';
+      const sinal = (isRet || (r.valor_eur || 0) < 0) ? '-' : '';
+      return `<tr>
+      <td>${dt(r.data)}</td>
+      <td><span class="pill p-${r.corretora}">${r.corretora}</span></td>
+      <td style="font-size:11px;color:${tipoCor}">${r.tipo}</td>
+      <td class="tr" style="${valCor};font-weight:500">${sinal}${eur(Math.abs(r.valor_eur))}</td>
+      <td class="tr" style="${valCor}">${sinal}${num(Math.abs(r.valor), 2)}</td>
+      <td style="font-size:11px;color:#9b9b98">${r.moeda}</td>
+    </tr>`;
+    }).join('')}</tbody>
+  </table>`;
+}
+function filtFluxos(c, btn) {
+  document.querySelectorAll('#tab-fluxos .fbtn').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  renderFluxos(c === 'TODAS' ? fluxosData : fluxosData.filter(r => r.corretora === c));
+}
+
+
+
+(async () => {
+  try {
+    await Promise.all([loadGeral(), loadPosicoes()]);
+  } catch(e) {
+    console.error(e);
+    document.querySelectorAll('.loading').forEach(el => {
+      el.className = 'err';
+      el.textContent = 'Erro ao conectar ao banco: ' + e.message;
+    });
+  }
+})();
+
+function abrirModal(ticker) {
+  const all = [...(posData||[]), ...(histData||[])];
+  const r = all.find(x => x.ticker === ticker);
+  if (!r) return;
+  document.getElementById('modal-ticker').textContent = r.ticker;
+  document.getElementById('modal-classe').textContent = [r.classe_ativo, r.tipo_ativo].filter(Boolean).join(' · ');
+  const fields = [
+    ['Setor', r.setor], ['Subsetor', r.subsetor],
+    ['Bolsa', r.bolsa], ['País', r.pais],
+    ['Região', r.regiao_macro], ['Moeda negoc.', r.moeda_negociacao],
+    ['Moeda exp.', r.moeda_exposicao], ['Benchmark', r.benchmark],
+    ['Emissor', r.emissor], ['Driver econômico', r.driver_economico],
+    ['Status', r.status], ['Classificação', r.classificacao],
+  ];
+  document.getElementById('modal-body').innerHTML =
+    fields.filter(([,v])=>v&&v!=='—').map(([l,v])=>`<div class="modal-item"><div class="modal-label">${l}</div><div class="modal-value">${v}</div></div>`).join('') +
+    (r.tese_curta||r.tese ? `<div class="modal-item modal-tese"><div class="modal-label">Tese</div><div class="modal-value" style="font-size:12px;line-height:1.5">${r.tese_curta||r.tese}</div></div>` : '') +
+    (r.nota ? `<div class="modal-item modal-tese"><div class="modal-label">Nota</div><div class="modal-value" style="font-size:12px;line-height:1.5">${r.nota}</div></div>` : '');
+  document.getElementById('ativo-modal').style.display = 'block';
+}
+function fecharModal() { document.getElementById('ativo-modal').style.display = 'none'; }
+document.addEventListener('keydown', e => { if(e.key==='Escape') fecharModal(); });
+</script>
+  <div id="ativo-modal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.4);backdrop-filter:blur(2px)" onclick="if(event.target===this)fecharModal()">
+    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:16px;padding:28px;min-width:320px;max-width:520px;width:90%;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.2)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+        <div>
+          <div id="modal-ticker" style="font-size:22px;font-weight:700;color:#1c1c1a"></div>
+          <div id="modal-classe" style="font-size:12px;color:#9b9b98;margin-top:2px"></div>
+        </div>
+        <button onclick="fecharModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#9b9b98;padding:4px 8px">✕</button>
+      </div>
+      <div id="modal-body" style="display:grid;grid-template-columns:1fr 1fr;gap:12px"></div>
+    </div>
+  </div>
+</body>
+</html>
