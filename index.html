@@ -295,10 +295,12 @@
       <div class="card"><div class="card-label" style="margin-bottom:12px">EUR/BRL — Evolução mensal</div><div style="position:relative;height:180px"><canvas id="chart-brl"></canvas></div></div>
       <div class="card"><div class="card-label" style="margin-bottom:12px">EUR/USD — Evolução mensal</div><div style="position:relative;height:180px"><canvas id="chart-usd"></canvas></div></div>
     </div>
+    <!-- Novo: câmbio realizado 2 linhas (primeiro gráfico) -->
+    <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:12px">Câmbio realizado no tempo — EUR/BRL e EUR/USD</div><div style="position:relative;height:220px"><canvas id="chart-cambio-realizado"></canvas></div></div>
     <!-- Gráfico % vs máx e barras enviado -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
       <div class="card"><div class="card-label" style="margin-bottom:12px">% vs Máximo histórico — Histórico realizado</div><div style="position:relative;height:200px"><canvas id="chart-pct-max"></canvas></div></div>
-      <div class="card"><div class="card-label" style="margin-bottom:12px">Valor enviado por mês (EUR)</div><div style="position:relative;height:200px"><canvas id="chart-enviado"></canvas></div></div>
+      <div class="card"><div class="card-label" style="margin-bottom:12px">Valor convertido por mês (EUR)</div><div style="position:relative;height:200px"><canvas id="chart-enviado"></canvas></div></div>
     </div>
     <!-- Histórico realizado -->
     <div class="card" style="padding:0;margin-bottom:16px">
@@ -1691,6 +1693,18 @@ async function loadCambio() {
   if (window._cambioEnviadoChart) window._cambioEnviadoChart.destroy();
   const ec = document.getElementById('chart-enviado');
   if (ec) { window._cambioEnviadoChart = new Chart(ec, {type:'bar', data:{labels:mesLabels, datasets:[{data:mesVals, backgroundColor:'#1565c099', borderRadius:4}]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>' '+eur(ctx.raw)}}}, scales:{x:{grid:{display:false}, ticks:{font:{size:9}}}, y:{grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>'€'+Math.round(v/1000)+'k'}}}}}); }
+
+  // --- Novo: câmbio realizado no tempo (2 linhas EUR/BRL e EUR/USD) ---
+  const realDatas = [...new Set(wiseAll.filter(r=>r.data && r.taxa).map(r=>r.data))].sort();
+  const brlTaxaMap = {}, usdTaxaMap = {};
+  wiseAll.forEach(r => { if(!r.data||!r.taxa) return; if(r.par==='EUR_BRL') brlTaxaMap[r.data]=r.taxa; else if(r.par==='EUR_USD') usdTaxaMap[r.data]=r.taxa; });
+  const realLabels = realDatas.map(d => dt(d));
+  if (window._cambioRealizadoChart) window._cambioRealizadoChart.destroy();
+  const rc = document.getElementById('chart-cambio-realizado');
+  if (rc) { window._cambioRealizadoChart = new Chart(rc, {type:'line', data:{labels:realLabels, datasets:[
+      { label:'EUR/BRL', data:realDatas.map(d=>brlTaxaMap[d] ?? null), borderColor:'#1a7f4b', backgroundColor:'transparent', borderWidth:2, pointRadius:4, tension:0.3, spanGaps:true, yAxisID:'yBRL' },
+      { label:'EUR/USD', data:realDatas.map(d=>usdTaxaMap[d] ?? null), borderColor:'#1565c0', backgroundColor:'transparent', borderWidth:2, pointRadius:4, tension:0.3, spanGaps:true, yAxisID:'yUSD' }
+    ]}, options:{responsive:true, maintainAspectRatio:false, interaction:{mode:'nearest', intersect:false}, plugins:{legend:{labels:{font:{size:10},boxWidth:10}}, tooltip:{callbacks:{label:ctx=>' '+ctx.dataset.label+': '+num(ctx.raw,4)}}}, scales:{yBRL:{position:'left', grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>num(v,2)}, title:{display:true,text:'EUR/BRL',font:{size:9},color:'#1a7f4b'}}, yUSD:{position:'right', grid:{display:false}, ticks:{font:{size:9}, callback:v=>num(v,3)}, title:{display:true,text:'EUR/USD',font:{size:9},color:'#1565c0'}}, x:{grid:{display:false}, ticks:{font:{size:8}, maxRotation:45, minRotation:45}}}}}); }
 
   // --- Tabela mensal ---
   document.getElementById('cambio-body').innerHTML = `<table>
