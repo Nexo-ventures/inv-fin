@@ -635,10 +635,11 @@ async function loadGeral() {
     const MES_NUM={Jan:1,Fev:2,Feb:2,Mar:3,Abr:4,Apr:4,Mai:5,May:5,Jun:6,Jul:7,Ago:8,Aug:8,Set:9,Sep:9,Out:10,Oct:10,Nov:11,Dez:12,Dec:12};
     const keyOf = mes => { const [mn,yr]=mes.split('/'); const m=MES_NUM[mn]||(MES3.indexOf(mn)+1); return yr+'-'+String(m).padStart(2,'0'); };
     const dateKey = d => { const dt=new Date(d); return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0'); };
-    const apMes={}, retMes={}, rendaMes={}, custoMes={};
+    const apMes={}, retMes={}, rendaMes={}, custoMes={}, realizMes={};
     fluxosSemCB.forEach(r=>{ const k=dateKey(r.data); if(r.tipo==='APORTE') apMes[k]=(apMes[k]||0)+r.valor_eur; else if(r.tipo==='RETIRADA') retMes[k]=(retMes[k]||0)+r.valor_eur; });
     (rendaTot||[]).forEach(r=>{ if(!r.data)return; const k=dateKey(r.data); rendaMes[k]=(rendaMes[k]||0)+(r.valor_eur||0); });
     (custosTot||[]).forEach(r=>{ if(!r.data)return; const k=dateKey(r.data); custoMes[k]=(custoMes[k]||0)+(r.valor_eur||0); });
+    (resultFech||[]).forEach(r=>{ if(!r.data_saida)return; const k=dateKey(r.data_saida); realizMes[k]=(realizMes[k]||0)+(r.resultado_eur||0); });
     const th='padding:9px 12px;text-align:right;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.3px;color:#9b9b98;border-bottom:1px solid #f0f0ee;white-space:nowrap';
     const thL=th.replace('text-align:right','text-align:left');
     const td='padding:9px 12px;text-align:right;font-size:12px;border-bottom:1px solid #f5f5f4;white-space:nowrap';
@@ -650,6 +651,8 @@ async function loadGeral() {
       const final = d.total_eur;
       const ap=apMes[k]||0, ret=retMes[k]||0, rd=rendaMes[k]||0, ct=custoMes[k]||0;
       const mercado = final - inicial - ap + ret;
+      const realizado = realizMes[k]||0;
+      const naoRealizado = mercado - realizado;
       const varPct = inicial>0 ? (final-inicial)/inicial*100 : null;
       body += '<tr>'
         + '<td style="'+td+';text-align:left;font-weight:500">'+d.mes+'</td>'
@@ -658,14 +661,15 @@ async function loadGeral() {
         + '<td style="'+td+';color:'+(ret?'#c0392b':'#c9c9c6')+'">'+(ret?'−'+eur(ret):'—')+'</td>'
         + '<td style="'+td+';color:'+(rd?'#1a7f4b':'#c9c9c6')+'">'+(rd?eur(rd):'—')+'</td>'
         + '<td style="'+td+';color:'+(ct?'#c0392b':'#c9c9c6')+'">'+(ct?eur(ct):'—')+'</td>'
-        + '<td style="'+td+';font-weight:600;color:'+col(mercado)+'">'+(mercado>=0?'+':'')+eur(mercado)+'</td>'
+        + '<td style="'+td+';color:'+(realizado?col(realizado):'#c9c9c6')+'">'+(realizado?(realizado>=0?'+':'')+eur(realizado):'—')+'</td>'
+        + '<td style="'+td+';font-weight:600;color:'+col(naoRealizado)+'">'+(naoRealizado>=0?'+':'')+eur(naoRealizado)+'</td>'
         + '<td style="'+td+';font-weight:600">'+eur(final)+'</td>'
         + '<td style="'+td+';color:'+(varPct==null?'#9b9b98':col(varPct))+'">'+(varPct==null?'—':(varPct>=0?'+':'')+varPct.toFixed(1)+'%')+'</td>'
         + '</tr>';
     }
     const head='<tr style="background:#fafaf9">'
       +'<th style="'+thL+'">Mês</th><th style="'+th+'">Valor inicial</th><th style="'+th+'">Aportes</th><th style="'+th+'">Retiradas</th>'
-      +'<th style="'+th+'">Renda</th><th style="'+th+'">Custos</th><th style="'+th+'">Result. mercado</th><th style="'+th+'">Valor final</th><th style="'+th+'">Var %</th></tr>';
+      +'<th style="'+th+'">Renda</th><th style="'+th+'">Custos</th><th style="'+th+'">Realizado</th><th style="'+th+'">Não realizado</th><th style="'+th+'">Valor final</th><th style="'+th+'">Var %</th></tr>';
     const el=document.getElementById('geral-tabela-mensal');
     if(el) el.innerHTML='<table style="width:100%;border-collapse:collapse;min-width:820px"><thead>'+head+'</thead><tbody>'+body+'</tbody></table>';
   }
