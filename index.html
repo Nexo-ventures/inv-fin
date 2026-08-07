@@ -134,17 +134,21 @@
     </div>
     <!-- Cards por corretora -->
     <div id="geral-corr-cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px"></div>
+    <!-- Tabela mensal consolidada -->
+    <div class="card" style="padding:0;margin-bottom:16px;overflow-x:auto">
+      <div class="card-label" style="padding:14px 18px 8px">Resumo mensal consolidado (EUR)</div>
+      <div id="geral-tabela-mensal"></div>
+    </div>
     <!-- Gráficos linha 1 -->
-    <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:16px">
-      <div class="card"><div class="card-label" style="margin-bottom:8px">Evolução patrimonial (EUR)</div><div style="position:relative;height:220px"><canvas id="geral-evolucao-chart"></canvas></div></div>
+    <div style="margin-bottom:16px">
       <div class="card"><div class="card-label" style="margin-bottom:8px">Distribuição por moeda</div><div style="position:relative;height:220px"><canvas id="geral-moeda-chart"></canvas></div></div>
     </div>
     <!-- Gráfico P&L acumulado -->
     <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">P&L acumulado mês a mês (EUR)</div><div style="position:relative;height:200px"><canvas id="geral-pnl-acum-chart"></canvas></div></div>
     <!-- Gráfico variação mensal com/sem câmbio -->
-    <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Ganho/Perda mensal — com e sem efeito cambial (EUR)</div><div style="position:relative;height:200px"><canvas id="geral-vs-cambio-chart"></canvas></div></div>
+    <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Ganho/Perda mensal — com e sem aporte (EUR)</div><div style="position:relative;height:200px"><canvas id="geral-vs-cambio-chart"></canvas></div></div>
     <!-- Gráfico câmbio + patrimônio -->
-    <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">EUR/BRL vs Patrimônio total</div><div style="position:relative;height:200px"><canvas id="geral-cambio-pat-chart"></canvas></div></div>
+    <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Patrimônio em EUR e BRL</div><div style="position:relative;height:200px"><canvas id="geral-cambio-pat-chart"></canvas></div></div>
     <!-- Gráfico alocação histórica -->
     <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Contribuição por corretora — patrimônio mensal (EUR)</div><div style="position:relative;height:220px"><canvas id="geral-corr-hist-chart"></canvas></div></div>
     <!-- Gráfico variação % mensal -->
@@ -382,7 +386,7 @@ async function loadGeral() {
     get('/posicoes_abertas?select=corretora,moeda,preco_atual,quantidade,custo_total'),
     get('/operacoes?select=corretora,ticker,custo_total,preco_atual&status=eq.IGNORAR'),
     get('/renda?select=valor_eur,data'),
-    get('/custos?select=valor_eur&corretora=neq.nan'),
+    get('/custos?select=valor_eur,data&corretora=neq.nan'),
     get('/resultado_fechado?select=resultado_eur,data_saida,dias_posicao'),
     get('/fluxos_capital?select=tipo,valor_eur,corretora,data'),
     get('/cambio_wise?select=custo_pct,valor_eur'),
@@ -551,8 +555,6 @@ async function loadGeral() {
   // Gráfico evolução
   const labels = pat.map(d=>d.mes.split('/')[0]+'/'+d.mes.split('/')[1].slice(2));
   const vals = pat.map(d=>d.total_eur);
-  const ec = document.getElementById('geral-evolucao-chart');
-  if (ec) { if(geralEvolucaoChart) geralEvolucaoChart.destroy(); geralEvolucaoChart = new Chart(ec, {type:'line', data:{labels, datasets:[{label:'Patrimônio EUR', data:vals, borderColor:'#1a7f4b', backgroundColor:'#1a7f4b15', borderWidth:2, pointRadius:3, tension:0.3, fill:true}]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>' '+eur(ctx.raw)}}}, scales:{x:{grid:{display:false}, ticks:{font:{size:9}}}, y:{grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>'€'+Math.round(v/1000)+'k'}}}}}); }
 
   // Gráfico moeda donut
   const moedaData = [{l:'EUR (IBKR+R4)', v:(invCorrSnap.IBKR||0)+(invCorrSnap.R4||0), c:'#1a7f4b'},{l:'USD (Avenue)', v:invCorrSnap.AV||0, c:'#1565c0'},{l:'BRL (XP)', v:invCorrSnap.XP||0, c:'#e65100'}].filter(d=>d.v>0);
@@ -569,7 +571,7 @@ async function loadGeral() {
   // Gráfico P&L acumulado mês a mês
   // Calcula aportes acumulados até cada mês usando fluxos com data
   const MES_ORDER2 = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const fluxosSemCB = fluxos.filter(r=>r.corretora!=='CB'&&r.corretora!=='nan'&&r.data);
+  const fluxosSemCB = fluxos.filter(r=>r.corretora!=='CB'&&r.corretora!=='nan'&&r.tipo!=='TRANSFERENCIA_INTERNA'&&r.data);
   const pnlAcumLabels = pat.map(d=>d.mes.split('/')[0]+'/'+d.mes.split('/')[1].slice(2));
   const pnlAcumVals = pat.map(d => {
     const [mn, yr] = d.mes.split('/');
@@ -607,13 +609,13 @@ async function loadGeral() {
   const vsCambioC = document.getElementById('geral-vs-cambio-chart');
   if (vsCambioC) { if(window._geralVsCambioChart) window._geralVsCambioChart.destroy(); window._geralVsCambioChart = new Chart(vsCambioC, {type:'bar', data:{labels:vsCambioLabels, datasets:[{label:'Variação total', data:varAbsVals, backgroundColor:varAbsVals.map(v=>v>=0?'#1a7f4b55':'#c0392b55'), borderRadius:4},{label:'Excl. aportes', data:varSemAportes, backgroundColor:varSemAportes.map(v=>v>=0?'#1a7f4bcc':'#c0392bcc'), borderRadius:4}]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{labels:{font:{size:10},boxWidth:10}}, tooltip:{callbacks:{label:ctx=>' '+(ctx.raw>=0?'+':'')+eur(ctx.raw)}}}, scales:{x:{grid:{display:false}, ticks:{font:{size:9}}}, y:{grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>eur(v)}}}}}); }
 
-  // Gráfico EUR/BRL vs Patrimônio
+  // Gráfico Patrimônio em EUR e BRL
   const cambioMap = {};
   (cambioHist||[]).forEach(r=>{ cambioMap[r.mes]=r.eur_brl; });
   const cambioPatlabels = pat.map(d=>d.mes.split('/')[0]+'/'+d.mes.split('/')[1].slice(2));
-  const cambioPatBRL = pat.map(d=>cambioMap[d.mes]||null);
+  const patBRL = pat.map(d=>{ const rate=cambioMap[d.mes]; return rate? d.total_eur*rate : null; });
   const cambioPatC = document.getElementById('geral-cambio-pat-chart');
-  if (cambioPatC) { if(window._geralCambioPatChart) window._geralCambioPatChart.destroy(); window._geralCambioPatChart = new Chart(cambioPatC, {type:'line', data:{labels:cambioPatlabels, datasets:[{label:'Patrimônio EUR', data:pat.map(d=>d.total_eur), borderColor:'#1a7f4b', backgroundColor:'transparent', borderWidth:2, pointRadius:3, tension:0.3, yAxisID:'yPat'},{label:'EUR/BRL', data:cambioPatBRL, borderColor:'#e65100', backgroundColor:'transparent', borderWidth:2, pointRadius:3, tension:0.3, borderDash:[5,4], yAxisID:'yBRL'}]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{labels:{font:{size:10},boxWidth:10}}, tooltip:{callbacks:{label:ctx=>ctx.datasetIndex===0?' '+eur(ctx.raw):' '+ctx.raw?.toFixed(4)}}}, scales:{yPat:{position:'left', grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>'€'+Math.round(v/1000)+'k'}}, yBRL:{position:'right', grid:{display:false}, ticks:{font:{size:9}, callback:v=>v.toFixed(2)}}, x:{grid:{display:false}, ticks:{font:{size:9}}}}}}); }
+  if (cambioPatC) { if(window._geralCambioPatChart) window._geralCambioPatChart.destroy(); window._geralCambioPatChart = new Chart(cambioPatC, {type:'line', data:{labels:cambioPatlabels, datasets:[{label:'Patrimônio EUR', data:pat.map(d=>d.total_eur), borderColor:'#1a7f4b', backgroundColor:'transparent', borderWidth:2, pointRadius:3, tension:0.3, yAxisID:'yPat'},{label:'Patrimônio BRL', data:patBRL, borderColor:'#e65100', backgroundColor:'transparent', borderWidth:2, pointRadius:3, tension:0.3, yAxisID:'yBRL'}]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{labels:{font:{size:10},boxWidth:10}}, tooltip:{callbacks:{label:ctx=>ctx.datasetIndex===0?' €'+Math.round(ctx.raw).toLocaleString('de-DE'):' R$'+Math.round(ctx.raw).toLocaleString('de-DE')}}}, scales:{yPat:{position:'left', grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>'€'+Math.round(v/1000)+'k'}}, yBRL:{position:'right', grid:{display:false}, ticks:{font:{size:9}, callback:v=>'R$'+Math.round(v/1000)+'k'}}, x:{grid:{display:false}, ticks:{font:{size:9}}}}}}); }
 
   // Gráfico contribuição por corretora (área empilhada)
   const CORR_COLORS_G = {XP:'#e65100cc',AV:'#1565c0cc',IBKR:'#1a7f4bcc',R4:'#6a1b9acc'};
@@ -623,7 +625,47 @@ async function loadGeral() {
     {label:'AV', data:pat.map(d=>d.av_eur||0), backgroundColor:'#1565c099', stack:'s'},
     {label:'IBKR', data:pat.map(d=>d.ibkr_eur||0), backgroundColor:'#1a7f4b99', stack:'s'},
     {label:'R4', data:pat.map(d=>d.r4_eur||0), backgroundColor:'#6a1b9a99', stack:'s'},
-  ]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{labels:{font:{size:10},boxWidth:10}}, tooltip:{callbacks:{label:ctx=>' '+ctx.dataset.label+': '+eur(ctx.raw)}}}, scales:{x:{stacked:true, grid:{display:false}, ticks:{font:{size:9}}}, y:{stacked:true, grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>'€'+Math.round(v/1000)+'k'}}}}}); }
+  ]}, options:{responsive:true, maintainAspectRatio:false, interaction:{mode:'index', intersect:false}, plugins:{legend:{labels:{font:{size:10},boxWidth:10}}, tooltip:{mode:'index', intersect:false, callbacks:{label:ctx=>' '+ctx.dataset.label+': '+eur(ctx.raw), footer:items=>{const t=items.reduce((s,it)=>s+(it.raw||0),0); return 'Total: '+eur(t);}}, footerFont:{weight:'bold'}, footerColor:'#1c1c1a'}}, scales:{x:{stacked:true, grid:{display:false}, ticks:{font:{size:9}}}, y:{stacked:true, grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>'€'+Math.round(v/1000)+'k'}}}}}); }
+
+  // === Tabela mensal consolidada ===
+  {
+    const MES3=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const keyOf = mes => { const [mn,yr]=mes.split('/'); return yr+'-'+String(MES3.indexOf(mn)+1).padStart(2,'0'); };
+    const dateKey = d => { const dt=new Date(d); return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0'); };
+    const apMes={}, retMes={}, rendaMes={}, custoMes={};
+    fluxosSemCB.forEach(r=>{ const k=dateKey(r.data); if(r.tipo==='APORTE') apMes[k]=(apMes[k]||0)+r.valor_eur; else if(r.tipo==='RETIRADA') retMes[k]=(retMes[k]||0)+r.valor_eur; });
+    (rendaTot||[]).forEach(r=>{ if(!r.data)return; const k=dateKey(r.data); rendaMes[k]=(rendaMes[k]||0)+(r.valor_eur||0); });
+    (custosTot||[]).forEach(r=>{ if(!r.data)return; const k=dateKey(r.data); custoMes[k]=(custoMes[k]||0)+(r.valor_eur||0); });
+    const th='padding:9px 12px;text-align:right;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.3px;color:#9b9b98;border-bottom:1px solid #f0f0ee;white-space:nowrap';
+    const thL=th.replace('text-align:right','text-align:left');
+    const td='padding:9px 12px;text-align:right;font-size:12px;border-bottom:1px solid #f5f5f4;white-space:nowrap';
+    const col=v=>v>=0?'#1a7f4b':'#c0392b';
+    let body='';
+    for(let i=pat.length-1;i>=0;i--){
+      const d=pat[i], k=keyOf(d.mes);
+      const inicial = i>0? pat[i-1].total_eur : 0;
+      const final = d.total_eur;
+      const ap=apMes[k]||0, ret=retMes[k]||0, rd=rendaMes[k]||0, ct=custoMes[k]||0;
+      const mercado = final - inicial - ap + ret;
+      const varPct = inicial>0 ? (final-inicial)/inicial*100 : null;
+      body += '<tr>'
+        + '<td style="'+td+';text-align:left;font-weight:500">'+d.mes+'</td>'
+        + '<td style="'+td+';color:#6b6b68">'+(inicial?eur(inicial):'—')+'</td>'
+        + '<td style="'+td+';color:'+(ap?'#1a7f4b':'#c9c9c6')+'">'+(ap?'+'+eur(ap):'—')+'</td>'
+        + '<td style="'+td+';color:'+(ret?'#c0392b':'#c9c9c6')+'">'+(ret?'−'+eur(ret):'—')+'</td>'
+        + '<td style="'+td+';color:'+(rd?'#1a7f4b':'#c9c9c6')+'">'+(rd?eur(rd):'—')+'</td>'
+        + '<td style="'+td+';color:'+(ct?'#c0392b':'#c9c9c6')+'">'+(ct?eur(ct):'—')+'</td>'
+        + '<td style="'+td+';font-weight:600;color:'+col(mercado)+'">'+(mercado>=0?'+':'')+eur(mercado)+'</td>'
+        + '<td style="'+td+';font-weight:600">'+eur(final)+'</td>'
+        + '<td style="'+td+';color:'+(varPct==null?'#9b9b98':col(varPct))+'">'+(varPct==null?'—':(varPct>=0?'+':'')+varPct.toFixed(1)+'%')+'</td>'
+        + '</tr>';
+    }
+    const head='<tr style="background:#fafaf9">'
+      +'<th style="'+thL+'">Mês</th><th style="'+th+'">Valor inicial</th><th style="'+th+'">Aportes</th><th style="'+th+'">Retiradas</th>'
+      +'<th style="'+th+'">Renda</th><th style="'+th+'">Custos</th><th style="'+th+'">Result. mercado</th><th style="'+th+'">Valor final</th><th style="'+th+'">Var %</th></tr>';
+    const el=document.getElementById('geral-tabela-mensal');
+    if(el) el.innerHTML='<table style="width:100%;border-collapse:collapse;min-width:820px"><thead>'+head+'</thead><tbody>'+body+'</tbody></table>';
+  }
 }
 
 let posFiltCorr = 'TODAS', posFiltClasse = 'TODAS';
