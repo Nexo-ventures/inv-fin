@@ -157,15 +157,14 @@
 
   <div id="tab-posicoes" class="section">
     <div id="pos-kpis"></div>
-    <div id="pos-por-classe" style="margin-bottom:16px"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
       <div id="pos-top5g" class="card" style="padding:14px 18px"></div>
       <div id="pos-top5p" class="card" style="padding:14px 18px"></div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+    <div style="margin-bottom:16px">
       <div class="card"><div class="card-label" style="margin-bottom:8px">Resultado não realizado por classe (EUR)</div><div style="position:relative;height:200px"><canvas id="pos-classe-chart"></canvas></div></div>
-      <div class="card"><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><div class="card-label" style="margin-bottom:4px;font-size:10px">Por corretora</div><div style="position:relative;height:180px"><canvas id="pos-corr-chart"></canvas></div></div><div><div class="card-label" style="margin-bottom:4px;font-size:10px">Por moeda</div><div style="position:relative;height:180px"><canvas id="pos-moeda-chart"></canvas></div></div></div></div>
     </div>
+    <div id="pos-por-corretora" style="margin-bottom:16px"></div>
     <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Resultado não realizado por setor (EUR)</div><div style="position:relative;height:240px"><canvas id="pos-setor-chart"></canvas></div></div>
     <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Resultado não realizado por subsetor (EUR)</div><div style="position:relative;height:280px"><canvas id="pos-subsetor-chart"></canvas></div></div>
     <div class="card" style="padding:0">
@@ -674,12 +673,16 @@ let posCambio = {};
 async function loadPosicoes() {
   const [pos, cambio] = await Promise.all([
     get('/posicoes_abertas?select=*&order=data_entrada.asc'),
-    get('/cambio?select=mes,eur_brl,eur_usd&order=mes.desc&limit=1')
+    get('/cambio?select=mes,eur_brl,eur_usd')
   ]);
   posData = pos;
-  if (cambio && cambio.length) {
-    posCambio = { brl: cambio[0].eur_brl, usd: cambio[0].eur_usd };
-  }
+  cambioRates = {};
+  (cambio||[]).forEach(c => { cambioRates[c.mes] = { brl: c.eur_brl, usd: c.eur_usd }; });
+  // taxa atual = mês mais recente (parse correto, não string sort)
+  const _MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  let _best=null, _bk=-1;
+  (cambio||[]).forEach(c => { const [mn,yr]=(c.mes||'').split('/'); const k=(+yr)*12+_MO.indexOf(mn); if(k>_bk){_bk=k;_best=c;} });
+  if (_best) posCambio = { brl: _best.eur_brl, usd: _best.eur_usd };
   posFiltCorr = 'TODAS'; posFiltClasse = 'TODAS';
   renderPos(posData);
 }
@@ -707,42 +710,46 @@ function renderPos(rows) {
     const temPreco = r.preco_atual && r.preco_atual > 0 && r.quantidade;
     const valorMercado = temPreco ? r.preco_atual * r.quantidade : null;
     const custoEur = posToEur(r.custo_total, r.moeda);
+    const custoEurEntry = (r.moeda === 'EUR') ? r.custo_total : toEur(r.custo_total, r.moeda, getMesKey(r.data_entrada));
     const mercadoEur = posToEur(valorMercado, r.moeda);
     const resultEur = (mercadoEur != null && custoEur != null) ? mercadoEur - custoEur : null;
     const resultMoeda = (valorMercado != null && r.custo_total) ? valorMercado - r.custo_total : null;
     const rentPctRow = (resultMoeda != null && r.custo_total) ? (resultMoeda / r.custo_total * 100) : null;
-    return {...r, valorMercado, custoEur, mercadoEur, resultEur, rentPctRow};
+    return {...r, valorMercado, custoEur, custoEurEntry, mercadoEur, resultEur, rentPctRow};
   });
 
   const comPreco = rowsCalc.filter(r => r.mercadoEur != null);
-  const totalCustoEur = rowsCalc.reduce((s,r) => s + (r.custoEur||0), 0);
-  const totalCustoComPrecoEur = rowsCalc.filter(r=>r.mercadoEur!=null).reduce((s,r)=>s+(r.custoEur||0),0);
+  const totalCustoEur = rowsCalc.reduce((s,r) => s + (r.custoEurEntry||0), 0);
+  const totalCustoTodayComPreco = comPreco.reduce((s,r)=>s+(r.custoEur||0),0);
+  const totalCustoEntryComPreco = comPreco.reduce((s,r)=>s+(r.custoEurEntry||0),0);
   const totalMercadoEur = comPreco.reduce((s,r) => s + (r.mercadoEur||0), 0);
-  const totalResultEur = totalMercadoEur - totalCustoComPrecoEur;
-  const rentPct = totalCustoComPrecoEur > 0 ? (totalResultEur / totalCustoComPrecoEur * 100) : null;
+  const totalResultMercado = totalMercadoEur - totalCustoTodayComPreco;   // puro preço (mesma taxa hoje)
+  const totalEfeitoCambial = totalCustoTodayComPreco - totalCustoEntryComPreco; // câmbio sobre o custo
+  const totalResultEur = totalResultMercado + totalEfeitoCambial;          // não realizado = mercado + câmbio
+  const rentPct = totalCustoEntryComPreco > 0 ? (totalResultEur / totalCustoEntryComPreco * 100) : null;
   const positivas = rowsCalc.filter(r => r.resultEur != null && r.resultEur > 0);
   const taxaAcerto = comPreco.length ? (positivas.length / comPreco.length * 100).toFixed(1) : '—';
 
-  // KPIs linha 1
+  // KPIs — linha 1 (ciclo) + linha 2 (métricas)
   document.getElementById('pos-kpis').innerHTML =
-    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px">' +
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:12px">' +
     '<div class="card" style="padding:14px 18px"><div class="card-label">Valor a mercado</div><div style="font-size:20px;font-weight:700">' + eur(totalMercadoEur||null) + '</div><div style="font-size:11px;color:#9b9b98">' + comPreco.length + ' de ' + filtered.length + ' com cotação</div></div>' +
-    '<div class="card" style="padding:14px 18px"><div class="card-label">Custo total</div><div style="font-size:20px;font-weight:700">' + eur(totalCustoEur||null) + '</div><div style="font-size:11px;color:#9b9b98">base de entrada</div></div>' +
+    '<div class="card" style="padding:14px 18px"><div class="card-label">Custo total</div><div style="font-size:20px;font-weight:700">' + eur(totalCustoEur||null) + '</div><div style="font-size:11px;color:#9b9b98">taxa da compra</div></div>' +
+    '<div class="card" style="padding:14px 18px"><div class="card-label">Resultado de mercado</div><div style="font-size:20px;font-weight:700;color:' + (totalResultMercado>=0?'#1a7f4b':'#c0392b') + '">' + (totalMercadoEur?(totalResultMercado>=0?'+':'')+eur(totalResultMercado):'—') + '</div><div style="font-size:11px;color:#9b9b98">preço do ativo</div></div>' +
+    '<div class="card" style="padding:14px 18px"><div class="card-label">Efeito cambial</div><div style="font-size:20px;font-weight:700;color:' + (totalEfeitoCambial>=0?'#1a7f4b':'#c0392b') + '">' + (totalMercadoEur?(totalEfeitoCambial>=0?'+':'')+eur(totalEfeitoCambial):'—') + '</div><div style="font-size:11px;color:#9b9b98">câmbio desde a compra</div></div>' +
     '<div class="card" style="padding:14px 18px"><div class="card-label">Resultado não realizado</div><div style="font-size:20px;font-weight:700;color:' + (totalResultEur>=0?'#1a7f4b':'#c0392b') + '">' + (totalMercadoEur ? (totalResultEur>=0?'+':'') + eur(totalResultEur) : '—') + '</div><div style="font-size:11px;color:' + (rentPct!=null?(rentPct>=0?'#1a7f4b':'#c0392b'):'#9b9b98') + '">' + (rentPct!=null?(rentPct>=0?'+':'')+rentPct.toFixed(1)+'% sobre custo':'—') + '</div></div>' +
-    '<div class="card" style="padding:14px 18px"><div class="card-label">Rentabilidade</div><div style="font-size:20px;font-weight:700;color:' + (rentPct!=null?(rentPct>=0?'#1a7f4b':'#c0392b'):'#1c1c1a') + '">' + (rentPct!=null?(rentPct>=0?'+':'')+rentPct.toFixed(2)+'%':'—') + '</div><div style="font-size:11px;color:#9b9b98">sobre capital com cotação</div></div>' +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px">' +
+    '<div class="card" style="padding:14px 18px"><div class="card-label">Rentabilidade</div><div style="font-size:20px;font-weight:700;color:' + (rentPct!=null?(rentPct>=0?'#1a7f4b':'#c0392b'):'#1c1c1a') + '">' + (rentPct!=null?(rentPct>=0?'+':'')+rentPct.toFixed(2)+'%':'—') + '</div><div style="font-size:11px;color:#9b9b98">não realizado sobre custo</div></div>' +
     '<div class="card" style="padding:14px 18px"><div class="card-label">Taxa de acerto</div><div style="font-size:20px;font-weight:700">' + taxaAcerto + '%</div><div style="font-size:11px;color:#9b9b98">' + positivas.length + ' de ' + comPreco.length + ' posições</div></div>' +
     '</div>';
 
   if (!filtered.length) { document.getElementById('pos-body').innerHTML = '<div class="empty">Nenhuma posição encontrada</div>'; return; }
 
-  // Resultado por classe (pills)
+  // Resultado por classe (dados p/ o gráfico de barras)
   const porClasse = {};
   rowsCalc.forEach(r => { if(r.resultEur==null) return; const c=r.classe_ativo||'Outro'; porClasse[c]=(porClasse[c]||0)+r.resultEur; });
   const klassesSorted = Object.entries(porClasse).sort((a,b)=>b[1]-a[1]);
-  document.getElementById('pos-por-classe').innerHTML =
-    '<div class="card" style="padding:14px 18px"><div class="card-label" style="margin-bottom:12px">Resultado não realizado por classe (EUR)</div><div style="display:flex;flex-wrap:wrap;gap:10px">' +
-    klassesSorted.map(([c,v]) => { const color=CLASS_COLORS[c]||'#9b9b98'; return '<div style="display:flex;align-items:center;gap:8px;background:#f9f9f8;border-radius:8px;padding:8px 12px;min-width:160px"><div style="width:10px;height:10px;border-radius:50%;background:'+color+';flex-shrink:0"></div><div><div style="font-size:11px;color:#6b6b68">'+c+'</div><div style="font-size:13px;font-weight:600;color:'+(v>=0?'#1a7f4b':'#c0392b')+'">'+num(v,2)+'</div></div></div>'; }).join('') +
-    '</div></div>';
 
   // Top 5 ganhos e perdas
   const comResultSorted = [...rowsCalc.filter(r=>r.resultEur!=null)].sort((a,b)=>b.resultEur-a.resultEur);
@@ -758,22 +765,55 @@ function renderPos(rows) {
   const cc = document.getElementById('pos-classe-chart');
   if (cc) { if(posClasseChart) posClasseChart.destroy(); posClasseChart = new Chart(cc, {type:'bar', data:{labels:klassesSorted.map(([c,v])=>c+' ('+(totalResultEurAbs?((Math.abs(v)/totalResultEurAbs)*100).toFixed(1):'0')+'%)'), datasets:[{data:klassesSorted.map(([,v])=>v), backgroundColor:klassesSorted.map(([c,v])=>(CLASS_COLORS[c]||'#9b9b98')+(v>=0?'cc':'88')), borderRadius:4}]}, options:{indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>{const v=ctx.raw; return ' €'+v.toLocaleString('de-DE',{minimumFractionDigits:2});}}}}, scales:{x:{grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>'€'+v.toLocaleString('de-DE')}}, y:{grid:{display:false}, ticks:{font:{size:10}}}}}}); }
 
-  // Gráfico por corretora (donut)
-  const porCorr = {};
-  rowsCalc.forEach(r => { if(r.mercadoEur==null) return; const c=r.corretora; porCorr[c]=(porCorr[c]||0)+r.mercadoEur; });
-  const corrSorted = Object.entries(porCorr).sort((a,b)=>b[1]-a[1]);
-  const totalCorr = corrSorted.reduce((s,[,v])=>s+v,0);
-  const pc = document.getElementById('pos-corr-chart');
-  if (pc) { if(posCorrChart) posCorrChart.destroy(); posCorrChart = new Chart(pc, {type:'doughnut', data:{labels:corrSorted.map(([c,v])=>c+' '+(totalCorr?(v/totalCorr*100).toFixed(1):'0')+'%'), datasets:[{data:corrSorted.map(([,v])=>v), backgroundColor:corrSorted.map(([c])=>CORR_COLORS[c]||'#9b9b98'), borderWidth:2, borderColor:'#fff'}]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{font:{size:9}, boxWidth:10}}, tooltip:{callbacks:{label:ctx=>{const v=ctx.raw; const pct=totalCorr?(v/totalCorr*100).toFixed(1):'0'; return ' €'+v.toLocaleString('de-DE',{minimumFractionDigits:0})+' ('+pct+'%)';}}}}}}); }
-
-  // Gráfico por moeda (donut)
-  const MOEDA_COLORS = {'BRL':'#e65100','USD':'#1565c0','EUR':'#1a7f4b'};
-  const porMoeda = {};
-  rowsCalc.forEach(r => { if(r.mercadoEur==null) return; const m=r.moeda||'?'; porMoeda[m]=(porMoeda[m]||0)+r.mercadoEur; });
-  const moedaSorted = Object.entries(porMoeda).sort((a,b)=>b[1]-a[1]);
-  const totalMoeda = moedaSorted.reduce((s,[,v])=>s+v,0);
-  const pm = document.getElementById('pos-moeda-chart');
-  if (pm) { if(pm._ci) pm._ci.destroy(); pm._ci = new Chart(pm, {type:'doughnut', data:{labels:moedaSorted.map(([m,v])=>m+' '+(totalMoeda?(v/totalMoeda*100).toFixed(1):'0')+'%'), datasets:[{data:moedaSorted.map(([,v])=>v), backgroundColor:moedaSorted.map(([m])=>MOEDA_COLORS[m]||'#9b9b98'), borderWidth:2, borderColor:'#fff'}]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{font:{size:9}, boxWidth:10}}, tooltip:{callbacks:{label:ctx=>{const v=ctx.raw; const pct=totalMoeda?(v/totalMoeda*100).toFixed(1):'0'; return ' €'+v.toLocaleString('de-DE',{minimumFractionDigits:0})+' ('+pct+'%)';}}}}}}); }
+  // Tabela por corretora (custo na compra · mercado · result. mercado · efeito cambial · não realizado)
+  const byCorrPos = {};
+  rowsCalc.forEach(r => {
+    if (r.mercadoEur == null) return;
+    const c = r.corretora;
+    if (!byCorrPos[c]) byCorrPos[c] = { moedas:new Set(), custoEntry:0, custoToday:0, mercado:0 };
+    const o = byCorrPos[c];
+    o.moedas.add(r.moeda);
+    o.custoEntry += (r.custoEurEntry||0);
+    o.custoToday += (r.custoEur||0);
+    o.mercado += (r.mercadoEur||0);
+  });
+  const corrPosSorted = Object.entries(byCorrPos).sort((a,b)=>(b[1].mercado)-(a[1].mercado));
+  const pcorr = document.getElementById('pos-por-corretora');
+  if (pcorr) {
+    const th='padding:9px 12px;text-align:right;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.3px;color:#9b9b98;border-bottom:1px solid #f0f0ee;white-space:nowrap';
+    const thL=th.replace('text-align:right','text-align:left');
+    const td='padding:9px 12px;text-align:right;font-size:12px;border-bottom:1px solid #f5f5f4;white-space:nowrap';
+    const cor=v=>v>=0?'#1a7f4b':'#c0392b';
+    let tot={custoEntry:0,custoToday:0,mercado:0};
+    let body='';
+    corrPosSorted.forEach(([c,o])=>{
+      const mercadoRes=o.mercado-o.custoToday, efeito=o.custoToday-o.custoEntry, naoReal=o.mercado-o.custoEntry;
+      const pct=o.custoEntry?(naoReal/o.custoEntry*100):null;
+      tot.custoEntry+=o.custoEntry; tot.custoToday+=o.custoToday; tot.mercado+=o.mercado;
+      body+='<tr>'
+        +'<td style="'+td+';text-align:left"><span class="pill p-'+c+'">'+c+'</span></td>'
+        +'<td style="'+td+';color:#6b6b68;font-size:11px">'+[...o.moedas].join(', ')+'</td>'
+        +'<td style="'+td+';color:#6b6b68">'+eur(o.custoEntry)+'</td>'
+        +'<td style="'+td+'">'+eur(o.mercado)+'</td>'
+        +'<td style="'+td+';color:'+cor(mercadoRes)+'">'+(mercadoRes>=0?'+':'')+eur(mercadoRes)+'</td>'
+        +'<td style="'+td+';color:'+cor(efeito)+'">'+(efeito>=0?'+':'')+eur(efeito)+'</td>'
+        +'<td style="'+td+';font-weight:600;color:'+cor(naoReal)+'">'+(naoReal>=0?'+':'')+eur(naoReal)+'</td>'
+        +'<td style="'+td+';color:'+(pct==null?'#9b9b98':cor(pct))+'">'+(pct==null?'—':(pct>=0?'+':'')+pct.toFixed(1)+'%')+'</td>'
+        +'</tr>';
+    });
+    const tMercRes=tot.mercado-tot.custoToday, tEfeito=tot.custoToday-tot.custoEntry, tNao=tot.mercado-tot.custoEntry;
+    const tPct=tot.custoEntry?(tNao/tot.custoEntry*100):null;
+    const foot='<tr style="background:#fafaf9;font-weight:600;border-top:2px solid #e5e5e3">'
+      +'<td style="'+td+';text-align:left">Total</td><td style="'+td+'"></td>'
+      +'<td style="'+td+';color:#6b6b68">'+eur(tot.custoEntry)+'</td>'
+      +'<td style="'+td+'">'+eur(tot.mercado)+'</td>'
+      +'<td style="'+td+';color:'+cor(tMercRes)+'">'+(tMercRes>=0?'+':'')+eur(tMercRes)+'</td>'
+      +'<td style="'+td+';color:'+cor(tEfeito)+'">'+(tEfeito>=0?'+':'')+eur(tEfeito)+'</td>'
+      +'<td style="'+td+';color:'+cor(tNao)+'">'+(tNao>=0?'+':'')+eur(tNao)+'</td>'
+      +'<td style="'+td+';color:'+(tPct==null?'#9b9b98':cor(tPct))+'">'+(tPct==null?'—':(tPct>=0?'+':'')+tPct.toFixed(1)+'%')+'</td></tr>';
+    const head='<tr style="background:#fafaf9"><th style="'+thL+'">Corretora</th><th style="'+thL+'">Moeda</th><th style="'+th+'">Custo (compra)</th><th style="'+th+'">Valor mercado</th><th style="'+th+'">Result. mercado</th><th style="'+th+'">Efeito cambial</th><th style="'+th+'">Não realizado</th><th style="'+th+'">%</th></tr>';
+    pcorr.innerHTML='<div class="card" style="padding:0;overflow-x:auto"><div class="card-label" style="padding:14px 18px 8px">Resultado não realizado por corretora (EUR)</div><table style="width:100%;border-collapse:collapse;min-width:720px"><thead>'+head+'</thead><tbody>'+body+'</tbody><tfoot>'+foot+'</tfoot></table></div>';
+  }
 
   // Gráfico por setor (barras horizontais)
   const porSetor = {};
