@@ -894,6 +894,7 @@ function renderPosTable(rowsCalc) {
     {key:'classe_ativo', label:'Classe', cls:''},
     {key:'setor', label:'Setor', cls:''},
     {key:'resultEur', label:'Result.<br>EUR', cls:'tr'},
+    {key:'deltaFechEur', label:'Δ desde<br>fecho', cls:'tr'},
     {key:'rentPctRow', label:'Rent.<br>%', cls:'tr'},
     {key:'mercadoEur', label:'Mercado<br>EUR', cls:'tr'},
     {key:'peso', label:'Peso<br>%', cls:'tr'},
@@ -906,7 +907,6 @@ function renderPosTable(rowsCalc) {
     {key:'moeda', label:'Moeda', cls:''},
     {key:'precoFech', label:'Preço<br>fech', cls:'tr'},
     {key:'valorFechEur', label:'V.fech<br>EUR', cls:'tr'},
-    {key:'deltaFechEur', label:'Δ desde<br>fecho', cls:'tr'},
   ];
 
   const thStyle = (k) => 'cursor:pointer;user-select:none;white-space:normal;min-width:50px' + (col===k ? ';color:#1a7f4b' : '');
@@ -925,6 +925,7 @@ function renderPosTable(rowsCalc) {
         '<td style="font-size:11px;color:#9b9b98">' + (r.classe_ativo||'—') + '</td>' +
         '<td style="font-size:11px;color:#9b9b98">' + (r.setor||'—') + '</td>' +
         '<td class="tr ' + dc(r.resultEur) + '">' + (r.resultEur!=null?(r.resultEur>=0?'+':'')+eur(r.resultEur):'—') + '</td>' +
+        '<td class="tr ' + dc(r.deltaFechEur) + '">' + (r.deltaFechEur!=null?(r.deltaFechEur>=0?'+':'')+eur(r.deltaFechEur):'—') + '</td>' +
         '<td class="tr ' + dc(r.rentPctRow) + '" style="font-size:11px">' + (r.rentPctRow!=null?(r.rentPctRow>=0?'+':'')+r.rentPctRow.toFixed(1)+'%':'—') + '</td>' +
         '<td class="tr" style="font-weight:500">' + (r.mercadoEur!=null?eur(r.mercadoEur):'—') + '</td>' +
         '<td class="tr" style="font-size:11px;color:#6b6b68">' + (peso!=null?peso.toFixed(1)+'%':'—') + '</td>' +
@@ -937,7 +938,6 @@ function renderPosTable(rowsCalc) {
         '<td style="font-size:11px;color:#6b6b68">' + r.moeda + '</td>' +
         '<td class="tr" style="font-size:11px;color:#6b6b68">' + (r.precoFech!=null?num(r.precoFech,2):'—') + '</td>' +
         '<td class="tr" style="color:#6b6b68">' + (r.valorFechEur!=null?eur(r.valorFechEur):'—') + '</td>' +
-        '<td class="tr ' + dc(r.deltaFechEur) + '">' + (r.deltaFechEur!=null?(r.deltaFechEur>=0?'+':'')+eur(r.deltaFechEur):'—') + '</td>' +
         '</tr>';
     }).join('') + '</tbody>' +
     (() => {
@@ -948,12 +948,12 @@ function renderPosTable(rowsCalc) {
       return '<tfoot><tr style="background:#fafaf9;font-weight:600;border-top:2px solid #e5e5e3">' +
         '<td style="padding:8px">Total ('+sorted.length+')</td><td></td><td></td><td></td>' +
         '<td class="tr '+dc(tRes)+'">'+(tRes>=0?'+':'')+eur(tRes)+'</td>' +
+        '<td class="tr '+dc(tDelta)+'">'+(tDelta>=0?'+':'')+eur(tDelta)+'</td>' +
         '<td></td>' +
         '<td class="tr" style="font-weight:600">'+eur(tMerc)+'</td>' +
         '<td class="tr" style="font-size:11px;color:#6b6b68">100%</td>' +
         '<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>' +
         '<td class="tr" style="color:#6b6b68">'+eur(tValFech)+'</td>' +
-        '<td class="tr '+dc(tDelta)+'">'+(tDelta>=0?'+':'')+eur(tDelta)+'</td>' +
         '</tr></tfoot>';
     })() + '</table>';
 }
