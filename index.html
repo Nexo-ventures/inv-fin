@@ -196,7 +196,7 @@
 
   <div id="tab-historico" class="section">
     <div id="hist-kpis" style="margin-bottom:16px"></div>
-    <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:12px">Resultado mensal realizado (EUR)</div><div style="position:relative;height:220px"><canvas id="hist-chart"></canvas></div></div>
+    <div class="card" id="hist-mensal-card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:12px">Resultado mensal realizado (EUR)</div><div style="position:relative;height:220px"><canvas id="hist-chart"></canvas></div></div>
     <div id="hist-anual" style="margin-bottom:16px"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
       <div class="card">
@@ -264,7 +264,7 @@
 
   <div id="tab-custos" class="section">
     <div id="custos-kpis" style="margin-bottom:16px"></div>
-    <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:12px">Evolução mensal de custos (EUR)</div><div style="position:relative;height:220px"><canvas id="custos-chart"></canvas></div></div>
+    <div class="card" id="custos-evol-card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:12px">Evolução mensal de custos (EUR)</div><div style="position:relative;height:220px"><canvas id="custos-chart"></canvas></div></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
       <div id="custos-top5" class="card" style="padding:14px 18px"></div>
       <div id="custos-top5c" class="card" style="padding:14px 18px"></div>
@@ -996,7 +996,7 @@ function renderHist(rows) {
       '<div class="card" style="padding:14px 18px"><div class="card-label">Tempo médio posição</div><div style="font-size:20px;font-weight:700">'+(tempoMedio!=null?tempoMedio+' dias':'—')+'</div><div style="font-size:10px;color:#9b9b98;margin-top:4px;line-height:1.6">'+(tempoClasseStr||'—')+'</div></div>'+
       '</div>'+
       // Linha 2: por classe
-      '<div class="card" style="padding:14px 18px;margin-bottom:16px"><div class="card-label" style="margin-bottom:12px">Resultado por classe (EUR)</div><div style="display:flex;flex-wrap:wrap;gap:10px">'+
+      '<div class="card" id="hist-classe-card" style="padding:14px 18px;margin-bottom:16px"><div class="card-label" style="margin-bottom:12px">Resultado por classe (EUR)</div><div style="display:flex;flex-wrap:wrap;gap:10px">'+
       klassesSorted.map(([c,v])=>{const color=CLASS_COLORS[c]||'#9b9b98';return '<div style="display:flex;align-items:center;gap:8px;background:#f9f9f8;border-radius:8px;padding:8px 12px;min-width:160px"><div style="width:10px;height:10px;border-radius:50%;background:'+color+';flex-shrink:0"></div><div><div style="font-size:11px;color:#6b6b68">'+c+'</div><div style="font-size:13px;font-weight:600;color:'+(v>=0?'#1a7f4b':'#c0392b')+'">'+'€'+num(v,2)+'</div></div></div>';}).join('')+
       '</div></div>'+
       // Linha 3: top 5 ganhos e perdas
@@ -1008,6 +1008,7 @@ function renderHist(rows) {
       '<div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Rentabilidade acumulada mês a mês (%)</div><div style="position:relative;height:200px"><canvas id="hist-rent-chart"></canvas></div></div>'+
       // Linha 5: resultado por setor barras
       '<div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Resultado por setor (EUR)</div><div style="position:relative;height:240px"><canvas id="hist-setor-chart"></canvas></div></div>';
+    { const _cl=document.getElementById('hist-classe-card'), _me=document.getElementById('hist-mensal-card'); if(_cl&&_me) _cl.after(_me); }
 
     // Gráfico rentabilidade acumulada
     const byMonthRent = {};
@@ -1394,7 +1395,7 @@ function renderCustos(rows, patrimonioTotal) {
         }).join('')}
       </div>
     </div>
-    <div class="card" style="padding:0;margin-bottom:12px;overflow-x:auto">
+    <div class="card" id="custos-anual-card" style="padding:0;margin-bottom:12px;overflow-x:auto">
       <table style="width:100%;border-collapse:collapse;min-width:400px">
         <thead><tr style="background:#fafaf9">
           <th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;border-bottom:1px solid #f0f0ee">Ano</th>
@@ -1471,6 +1472,7 @@ function renderCustos(rows, patrimonioTotal) {
 
   if (custosChart) custosChart.destroy();
   const ctx = document.getElementById('custos-chart');
+  { const _ev=document.getElementById('custos-evol-card'), _an=document.getElementById('custos-anual-card'); if(_ev&&_an) _ev.after(_an); }
   if (ctx) {
     custosChart = new Chart(ctx, {
       type: 'bar',
