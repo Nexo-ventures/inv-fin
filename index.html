@@ -290,10 +290,9 @@
   <div id="tab-cambio" class="section">
     <!-- KPIs -->
     <div id="cambio-kpis" style="margin-bottom:16px"></div>
-    <!-- Gráficos mensais BRL/USD -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
-      <div class="card"><div class="card-label" style="margin-bottom:12px">EUR/BRL — Evolução mensal</div><div style="position:relative;height:180px"><canvas id="chart-brl"></canvas></div></div>
-      <div class="card"><div class="card-label" style="margin-bottom:12px">EUR/USD — Evolução mensal</div><div style="position:relative;height:180px"><canvas id="chart-usd"></canvas></div></div>
+    <!-- Gráfico mensal BRL+USD (2 eixos) -->
+    <div style="margin-bottom:16px">
+      <div class="card"><div class="card-label" style="margin-bottom:12px">Câmbio mensal — EUR/BRL e EUR/USD</div><div style="position:relative;height:200px"><canvas id="chart-mensal-cambio"></canvas></div></div>
     </div>
     <!-- Novo: câmbio realizado 2 linhas (primeiro gráfico) -->
     <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:12px">Câmbio realizado no tempo — EUR/BRL e EUR/USD</div><div style="position:relative;height:220px"><canvas id="chart-cambio-realizado"></canvas></div></div>
@@ -1610,9 +1609,9 @@ async function loadCambio() {
 
   document.getElementById('cambio-kpis').innerHTML = `
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:12px">
-      <div class="card"><div class="card-label">EUR/BRL Atual</div><div class="card-value">${num(curBRL,4)}</div><div class="card-sub">${latestBRL?.mes||''}</div></div>
+      <div class="card"><div class="card-label">EUR/BRL Atual</div><div class="card-value">${num(curBRL,4)}</div><div class="card-sub">${latestBRL?.criado_em ? latestBRL.criado_em.slice(0,10).split('-').reverse().join('/') : (latestBRL?.mes||'')}</div></div>
       <div class="card"><div class="card-label">% vs Máx BRL</div><div class="card-value ${pctBRL<0?'neg':'pos'}">${pctBRL}%</div><div class="card-sub">máx ${num(MAX_BRL,2)}</div></div>
-      <div class="card"><div class="card-label">EUR/USD Atual</div><div class="card-value">${num(curUSD,4)}</div><div class="card-sub">${latestUSD?.mes||''}</div></div>
+      <div class="card"><div class="card-label">EUR/USD Atual</div><div class="card-value">${num(curUSD,4)}</div><div class="card-sub">${latestUSD?.criado_em ? latestUSD.criado_em.slice(0,10).split('-').reverse().join('/') : (latestUSD?.mes||'')}</div></div>
       <div class="card"><div class="card-label">% vs Máx USD</div><div class="card-value ${pctUSD<0?'neg':'pos'}">${pctUSD}%</div><div class="card-sub">máx ${num(MAX_USD,2)}</div></div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px">
@@ -1623,41 +1622,24 @@ async function loadCambio() {
       <div class="card"><div class="card-label">Ganho/Perda vs atual</div><div class="card-value ${totalGanhoAtual>=0?'pos':'neg'}">${totalGanhoAtual>=0?'+':''}${eur(totalGanhoAtual)}</div><div class="card-sub">vs taxa atual</div></div>
     </div>`;
 
-  // --- Gráficos mensais ---
+  // --- Gráfico mensal EUR/BRL + EUR/USD (2 eixos) ---
   const labelsM = sorted.map(r => r.mes).reverse();
   const brlVals = sorted.map(r => r.eur_brl).reverse();
   const usdVals = sorted.map(r => r.eur_usd).reverse();
-
-  const chartCfg = (vals, maxVal, color) => ({
-    type: 'line',
-    data: {
-      labels: labelsM,
-      datasets: [
-        { label: 'Valor mensal', data: vals, borderColor: color, backgroundColor: color+'22', borderWidth:2, pointRadius:3, tension:0.3, fill:true },
-        { label: 'Máx histórico', data: labelsM.map(() => maxVal), borderColor:'#c0392b', borderWidth:1.5, borderDash:[5,4], pointRadius:0 }
-      ]
-    },
-    options: {
-      responsive:true, maintainAspectRatio:false,
-      plugins:{ legend:{ labels:{ font:{size:10}, boxWidth:10 } } },
-      scales:{
-        x:{ grid:{display:false}, ticks:{font:{size:9}, maxTicksLimit:8} },
-        y:{ grid:{color:'#f0f0ee'}, ticks:{ font:{size:9}, callback: v => v.toFixed(2) } }
-      }
-    }
-  });
-
   if (cambioChartBRL) cambioChartBRL.destroy();
   if (cambioChartUSD) cambioChartUSD.destroy();
-  cambioChartBRL = new Chart(document.getElementById('chart-brl'), chartCfg(brlVals, MAX_BRL, '#1a7f4b'));
-  cambioChartUSD = new Chart(document.getElementById('chart-usd'), chartCfg(usdVals, MAX_USD, '#1565c0'));
+  const mensalC = document.getElementById('chart-mensal-cambio');
+  if (mensalC) { cambioChartBRL = new Chart(mensalC, {type:'line', data:{labels:labelsM, datasets:[
+      { label:'EUR/BRL', data:brlVals, borderColor:'#1a7f4b', backgroundColor:'#1a7f4b15', borderWidth:2, pointRadius:2, tension:0.3, fill:true, yAxisID:'yBRL' },
+      { label:'EUR/USD', data:usdVals, borderColor:'#1565c0', backgroundColor:'transparent', borderWidth:2, pointRadius:2, tension:0.3, yAxisID:'yUSD' }
+    ]}, options:{responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false}, plugins:{legend:{labels:{font:{size:10},boxWidth:10}}, tooltip:{callbacks:{label:ctx=>' '+ctx.dataset.label+': '+num(ctx.raw,4)}}}, scales:{yBRL:{position:'left', grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>num(v,2)}, title:{display:true,text:'EUR/BRL',font:{size:9},color:'#1a7f4b'}}, yUSD:{position:'right', grid:{display:false}, ticks:{font:{size:9}, callback:v=>num(v,3)}, title:{display:true,text:'EUR/USD',font:{size:9},color:'#1565c0'}}, x:{grid:{display:false}, ticks:{font:{size:9}, maxTicksLimit:8}}}}}); }
 
-  // --- Gráfico % vs Máx histórico (spanGaps:true para conectar pontos) ---
-  const brlWise = [...wiseAll].filter(r => r.par === 'EUR_BRL' && r.pct_vs_max_hist).sort((a,b) => a.data.localeCompare(b.data));
-  const usdWise = [...wiseAll].filter(r => r.par === 'EUR_USD' && r.pct_vs_max_hist).sort((a,b) => a.data.localeCompare(b.data));
+  // --- Gráfico % vs Máx histórico (calcula de taxa p/ incluir todas as conversões, inclusive IBKR) ---
+  const brlWise = [...wiseAll].filter(r => r.par === 'EUR_BRL' && r.taxa && r.data).sort((a,b) => a.data.localeCompare(b.data));
+  const usdWise = [...wiseAll].filter(r => r.par === 'EUR_USD' && r.taxa && r.data).sort((a,b) => a.data.localeCompare(b.data));
   const allDates = [...new Set([...brlWise.map(r=>r.data), ...usdWise.map(r=>r.data)])].sort();
-  const brlPctMap = Object.fromEntries(brlWise.map(r => [r.data, r.pct_vs_max_hist * 100]));
-  const usdPctMap = Object.fromEntries(usdWise.map(r => [r.data, r.pct_vs_max_hist * 100]));
+  const brlPctMap = Object.fromEntries(brlWise.map(r => [r.data, (r.taxa - MAX_BRL) / MAX_BRL * 100]));
+  const usdPctMap = Object.fromEntries(usdWise.map(r => [r.data, (r.taxa - MAX_USD) / MAX_USD * 100]));
 
   if (cambioChartPct) cambioChartPct.destroy();
   cambioChartPct = new Chart(document.getElementById('chart-pct-max'), {
