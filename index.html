@@ -196,8 +196,6 @@
 
   <div id="tab-historico" class="section">
     <div id="hist-kpis" style="margin-bottom:16px"></div>
-    <div class="card" id="hist-mensal-card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:12px">Resultado mensal realizado (EUR)</div><div style="position:relative;height:220px"><canvas id="hist-chart"></canvas></div></div>
-    <div class="card" id="hist-cvr-card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:12px">Compras, vendas e resultado por mês (EUR)</div><div style="position:relative;height:220px"><canvas id="hist-cvr-chart"></canvas></div></div>
     <div id="hist-anual" style="margin-bottom:16px"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
       <div class="card">
@@ -963,6 +961,7 @@ function renderHist(rows) {
   const totalComprasEur = rows.reduce((s,r) => s + (toEur(r.custo_total, r.moeda, getMesKey(r.data_entrada)) || 0), 0);
   const totalVendasEur = rows.reduce((s,r) => s + (toEur(r.receita_total, r.moeda, getMesKey(r.data_saida)) || 0), 0);
   const efeitoCambialFech = totalEur - (totalVendasEur - totalComprasEur);
+  const resultadoMercadoFech = totalVendasEur - totalComprasEur;
 
   // Top 5 ganhos e perdas
   const sorted = [...comResult].sort((a,b)=>b.resultado_eur-a.resultado_eur);
@@ -993,30 +992,38 @@ function renderHist(rows) {
 
   if (document.getElementById('hist-kpis')) {
     document.getElementById('hist-kpis').innerHTML =
-      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px">'+
-      '<div class="card" style="padding:14px 18px"><div class="card-label">Total compras</div><div style="font-size:20px;font-weight:700;color:#6b6b68">€'+num(totalComprasEur,2)+'</div><div style="font-size:11px;color:#9b9b98">capital investido (saídas)</div></div>'+
+      // Linha 1: ciclo do resultado (mercado + câmbio = total)
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:12px">'+
+      '<div class="card" style="padding:14px 18px"><div class="card-label">Total compras</div><div style="font-size:20px;font-weight:700;color:#6b6b68">€'+num(totalComprasEur,2)+'</div><div style="font-size:11px;color:#9b9b98">capital investido</div></div>'+
       '<div class="card" style="padding:14px 18px"><div class="card-label">Total vendas</div><div style="font-size:20px;font-weight:700;color:#6b6b68">€'+num(totalVendasEur,2)+'</div><div style="font-size:11px;color:#9b9b98">capital resgatado</div></div>'+
-      '<div class="card" style="padding:14px 18px"><div class="card-label">Resultado total</div><div style="font-size:20px;font-weight:700;color:'+(totalEur>=0?'#1a7f4b':'#c0392b')+'">'+'€'+num(totalEur,2)+'</div></div>'+
-      '<div class="card" style="padding:14px 18px"><div class="card-label">Efeito cambial</div><div style="font-size:20px;font-weight:700;color:'+(efeitoCambialFech>=0?'#1a7f4b':'#c0392b')+'">'+(efeitoCambialFech>=0?'+':'')+'€'+num(efeitoCambialFech,2)+'</div><div style="font-size:11px;color:#9b9b98">vendas − compras + câmbio = result.</div></div>'+
+      '<div class="card" style="padding:14px 18px"><div class="card-label">Resultado de mercado</div><div style="font-size:20px;font-weight:700;color:'+(resultadoMercadoFech>=0?'#1a7f4b':'#c0392b')+'">'+(resultadoMercadoFech>=0?'+':'')+'€'+num(resultadoMercadoFech,2)+'</div><div style="font-size:11px;color:#9b9b98">vendas − compras</div></div>'+
+      '<div class="card" style="padding:14px 18px"><div class="card-label">Efeito cambial</div><div style="font-size:20px;font-weight:700;color:'+(efeitoCambialFech>=0?'#1a7f4b':'#c0392b')+'">'+(efeitoCambialFech>=0?'+':'')+'€'+num(efeitoCambialFech,2)+'</div><div style="font-size:11px;color:#9b9b98">ganho/perda de câmbio</div></div>'+
+      '<div class="card" style="padding:14px 18px"><div class="card-label">Resultado total</div><div style="font-size:20px;font-weight:700;color:'+(totalEur>=0?'#1a7f4b':'#c0392b')+'">€'+num(totalEur,2)+'</div><div style="font-size:11px;color:#9b9b98">mercado + câmbio</div></div>'+
+      '</div>'+
+      // Linha 2: métricas
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px">'+
       '<div class="card" style="padding:14px 18px"><div class="card-label">Rentabilidade total</div><div style="font-size:20px;font-weight:700;color:'+(rentTotal!=null?(rentTotal>=0?'#1a7f4b':'#c0392b'):'#9b9b98')+'">'+(rentTotal!=null?rentTotal.toFixed(2)+'%':'—')+'</div><div style="font-size:11px;color:#9b9b98">sobre capital investido</div></div>'+
       '<div class="card" style="padding:14px 18px"><div class="card-label">Taxa de acerto</div><div style="font-size:20px;font-weight:700;color:#1c1c1a">'+taxaAcerto+'%</div><div style="font-size:11px;color:#9b9b98">'+positivas.length+' de '+comResult.length+' operações</div></div>'+
       '<div class="card" style="padding:14px 18px"><div class="card-label">Resultado médio/op.</div><div style="font-size:20px;font-weight:700;color:'+(resultMedio!=null?(resultMedio>=0?'#1a7f4b':'#c0392b'):'#9b9b98')+'">'+(resultMedio!=null?(resultMedio>=0?'+':'')+'€'+num(resultMedio,2):'—')+'</div><div style="font-size:11px;color:#9b9b98">por operação fechada</div></div>'+
       '<div class="card" style="padding:14px 18px"><div class="card-label">Tempo médio posição</div><div style="font-size:20px;font-weight:700">'+(tempoMedio!=null?tempoMedio+' dias':'—')+'</div><div style="font-size:10px;color:#9b9b98;margin-top:4px;line-height:1.6">'+(tempoClasseStr||'—')+'</div></div>'+
       '</div>'+
-      // Linha 2: por classe
-      '<div class="card" id="hist-classe-card" style="padding:14px 18px;margin-bottom:16px"><div class="card-label" style="margin-bottom:12px">Resultado por classe (EUR)</div><div style="display:flex;flex-wrap:wrap;gap:10px">'+
+      // Resultado por classe
+      '<div class="card" style="padding:14px 18px;margin-bottom:16px"><div class="card-label" style="margin-bottom:12px">Resultado por classe (EUR)</div><div style="display:flex;flex-wrap:wrap;gap:10px">'+
       klassesSorted.map(([c,v])=>{const color=CLASS_COLORS[c]||'#9b9b98';return '<div style="display:flex;align-items:center;gap:8px;background:#f9f9f8;border-radius:8px;padding:8px 12px;min-width:160px"><div style="width:10px;height:10px;border-radius:50%;background:'+color+';flex-shrink:0"></div><div><div style="font-size:11px;color:#6b6b68">'+c+'</div><div style="font-size:13px;font-weight:600;color:'+(v>=0?'#1a7f4b':'#c0392b')+'">'+'€'+num(v,2)+'</div></div></div>';}).join('')+
       '</div></div>'+
-      // Linha 3: top 5 ganhos e perdas
+      // Resultado mensal realizado (gráfico embutido — não some no scroll)
+      '<div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:12px">Resultado mensal realizado (EUR)</div><div style="position:relative;height:220px"><canvas id="hist-chart"></canvas></div></div>'+
+      // Compras, vendas e resultado por mês
+      '<div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:12px">Compras, vendas e resultado por mês (EUR)</div><div style="position:relative;height:220px"><canvas id="hist-cvr-chart"></canvas></div></div>'+
+      // Top 5 ganhos e perdas
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">'+
       '<div class="card" style="padding:14px 18px"><div class="card-label" style="margin-bottom:10px">Top 5 Ganhos</div>'+top5g.map((r,i)=>'<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #f0f0ee"><div style="font-size:12px;font-weight:500">'+(i+1)+'. '+r.ticker+'<span style="font-size:10px;color:#9b9b98;margin-left:6px">'+dt(r.data_saida)+'</span></div><div style="font-size:12px;font-weight:600;color:#1a7f4b">'+'€'+num(r.resultado_eur,2)+'</div></div>').join('')+'</div>'+
       '<div class="card" style="padding:14px 18px"><div class="card-label" style="margin-bottom:10px">Top 5 Perdas</div>'+top5p.map((r,i)=>'<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #f0f0ee"><div style="font-size:12px;font-weight:500">'+(i+1)+'. '+r.ticker+'<span style="font-size:10px;color:#9b9b98;margin-left:6px">'+dt(r.data_saida)+'</span></div><div style="font-size:12px;font-weight:600;color:#c0392b">'+'€'+num(r.resultado_eur,2)+'</div></div>').join('')+'</div>'+
       '</div>'+
-      // Linha 4: rentabilidade acumulada
+      // Rentabilidade acumulada
       '<div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Rentabilidade acumulada mês a mês (%)</div><div style="position:relative;height:200px"><canvas id="hist-rent-chart"></canvas></div></div>'+
-      // Linha 5: resultado por setor barras
+      // Resultado por setor barras
       '<div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Resultado por setor (EUR)</div><div style="position:relative;height:240px"><canvas id="hist-setor-chart"></canvas></div></div>';
-    { const _cl=document.getElementById('hist-classe-card'), _me=document.getElementById('hist-mensal-card'); if(_cl&&_me) _cl.after(_me); const _cvr=document.getElementById('hist-cvr-card'); if(_me&&_cvr) _me.after(_cvr); }
 
     // Gráfico rentabilidade acumulada
     const byMonthRent = {};
