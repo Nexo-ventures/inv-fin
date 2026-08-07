@@ -895,7 +895,19 @@ function renderPosTable(rowsCalc) {
         '<td class="tr">' + (r.valorMercado!=null?num(r.valorMercado,0):'—') + '</td>' +
         '<td style="font-size:11px;color:#6b6b68">' + r.moeda + '</td>' +
         '</tr>';
-    }).join('') + '</tbody></table>';
+    }).join('') + '</tbody>' +
+    (() => {
+      const tRes = sorted.reduce((s,r)=>s+(r.resultEur||0),0);
+      const tMerc = sorted.reduce((s,r)=>s+(r.mercadoEur||0),0);
+      return '<tfoot><tr style="background:#fafaf9;font-weight:600;border-top:2px solid #e5e5e3">' +
+        '<td style="padding:8px">Total ('+sorted.length+')</td><td></td><td></td><td></td>' +
+        '<td class="tr '+dc(tRes)+'">'+(tRes>=0?'+':'')+eur(tRes)+'</td>' +
+        '<td></td>' +
+        '<td class="tr" style="font-weight:600">'+eur(tMerc)+'</td>' +
+        '<td class="tr" style="font-size:11px;color:#6b6b68">100%</td>' +
+        '<td></td><td></td><td></td><td></td><td></td><td></td><td></td>' +
+        '</tr></tfoot>';
+    })() + '</table>';
 }
 
 function sortPos(col) {
