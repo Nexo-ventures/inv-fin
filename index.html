@@ -551,6 +551,7 @@ async function loadGeral() {
   const MES_NUM_G={Jan:0,Fev:1,Feb:1,Mar:2,Abr:3,Apr:3,Mai:4,May:4,Jun:5,Jul:6,Ago:7,Aug:7,Set:8,Sep:8,Out:9,Oct:9,Nov:10,Dez:11,Dec:11};
   const mesToIdx = mn => (mn in MES_NUM_G) ? MES_NUM_G[mn] : MES_ORDER2.indexOf(mn);
   const fluxosSemCB = fluxos.filter(r=>r.corretora!=='CB'&&r.corretora!=='nan'&&r.tipo!=='TRANSFERENCIA_INTERNA'&&r.data);
+  let abertasLimpoG = 0; // não realizado atual limpo (custo na taxa da compra), p/ separar Abertas vs Resto na tabela
 
   // === KPI de fechamento — decomposição do resultado ===
   {
@@ -578,6 +579,7 @@ async function loadGeral() {
       const custoEntry = p.moeda==='EUR'?p.custo_total:(er&&er[mo]?p.custo_total/er[mo]:null);
       if(mercEur!=null&&custoEntry!=null) abertasTotal += mercEur-custoEntry;
     });
+    abertasLimpoG = abertasTotal;
     const capitalLiq=aportesTotal-retiradasTotal;
     const lucroTotal=patrimonioTotal-capitalLiq;
     const resto=lucroTotal-realizadoTotal-abertasTotal-rendaCustos;
@@ -728,7 +730,7 @@ async function loadGeral() {
     const td='padding:8px 8px;text-align:right;font-size:11.5px;border-bottom:1px solid #f5f5f4;white-space:nowrap';
     const col=v=>v>=0?'#1a7f4b':'#c0392b';
     let body='';
-    let totAp=0, totRet=0, totRd=0, totCt=0, totRealiz=0, totNaoReal=0;
+    let totAp=0, totRet=0, totRd=0, totCt=0, totRealiz=0, totNaoReal=0, totAbertas=0, totResto=0;
     for(let i=pat.length-1;i>=0;i--){
       const d=pat[i], k=keyOf(d.mes);
       const inicial = i>0? pat[i-1].total_eur : 0;
@@ -737,12 +739,17 @@ async function loadGeral() {
       const mercado = final - inicial - ap + ret;
       const realizado = realizMes[k]||0;
       const naoRealizado = mercado - realizado;
-      totAp+=ap; totRet+=ret; totRd+=rd; totCt+=ct; totRealiz+=realizado; totNaoReal+=naoRealizado;
+      const isLatest = (i === pat.length-1);
+      const abertasMes = isLatest ? abertasLimpoG : naoRealizado;
+      const restoMes = isLatest ? (naoRealizado - abertasLimpoG) : 0;
+      totAp+=ap; totRet+=ret; totRd+=rd; totCt+=ct; totRealiz+=realizado; totNaoReal+=naoRealizado; totAbertas+=abertasMes; totResto+=restoMes;
       const varPct = inicial>0 ? (final-inicial)/inicial*100 : null;
       const aporteLiq = ap - ret;
       const lucroAcum = final - (cumApLiqByKey[k]||0);
       const realizAcum = cumRealizByKey[k]||0;
       const naoRealAcum = cumNaoRealByKey[k]||0;
+      const abertasAcum = isLatest ? (naoRealAcum - restoMes) : naoRealAcum;
+      const restoAcum = isLatest ? restoMes : 0;
       const pctMerc = inicial>0 ? (mercado/inicial*100) : null;
       const brlRate = brlByKey[k];
       const finalBRL = brlRate ? final*brlRate : null;
@@ -756,8 +763,10 @@ async function loadGeral() {
         + '<td style="'+td+';color:'+(ct?'#c0392b':'#c9c9c6')+'">'+(ct?eur(ct):'—')+'</td>'
         + '<td style="'+td+';color:'+(realizado?col(realizado):'#c9c9c6')+'">'+(realizado?(realizado>=0?'+':'')+eur(realizado):'—')+'</td>'
         + '<td style="'+td+';color:'+col(realizAcum)+'">'+(realizAcum>=0?'+':'')+eur(realizAcum)+'</td>'
-        + '<td style="'+td+';color:'+col(naoRealizado)+'">'+(naoRealizado>=0?'+':'')+eur(naoRealizado)+'</td>'
-        + '<td style="'+td+';color:'+col(naoRealAcum)+'">'+(naoRealAcum>=0?'+':'')+eur(naoRealAcum)+'</td>'
+        + '<td style="'+td+';color:'+col(abertasMes)+'">'+(abertasMes>=0?'+':'')+eur(abertasMes)+'</td>'
+        + '<td style="'+td+';color:'+col(abertasAcum)+'">'+(abertasAcum>=0?'+':'')+eur(abertasAcum)+'</td>'
+        + '<td style="'+td+';color:'+(restoMes?col(restoMes):'#c9c9c6')+'">'+(restoMes?(restoMes>=0?'+':'')+eur(restoMes):'0')+'</td>'
+        + '<td style="'+td+';color:'+(restoAcum?col(restoAcum):'#c9c9c6')+'">'+(restoAcum?(restoAcum>=0?'+':'')+eur(restoAcum):'0')+'</td>'
         + '<td style="'+td+';font-weight:600;color:'+col(lucroAcum)+'">'+(lucroAcum>=0?'+':'')+eur(lucroAcum)+'</td>'
         + '<td style="'+td+';font-weight:600">'+eur(final)+'</td>'
         + '<td style="'+td+';color:#6b6b68">'+(finalBRL!=null?'R$'+num(finalBRL,0):'—')+'</td>'
@@ -767,7 +776,7 @@ async function loadGeral() {
     }
     const head='<tr style="background:#fafaf9">'
       +'<th style="'+thL+'">Mês</th><th style="'+th+'">Valor<br>inicial</th><th style="'+th+'">Aportes</th><th style="'+th+'">Retiradas</th><th style="'+th+'">Aporte<br>líq.</th>'
-      +'<th style="'+th+'">Renda</th><th style="'+th+'">Custos</th><th style="'+th+'">Reali-<br>zado</th><th style="'+th+'">Realiz.<br>acum.</th><th style="'+th+'">Não<br>realiz.</th><th style="'+th+'">Ñ realiz.<br>acum.</th><th style="'+th+'">Lucro<br>acum.</th><th style="'+th+'">Valor<br>final</th><th style="'+th+'">Final<br>BRL</th><th style="'+th+'">%<br>merc.</th><th style="'+th+'">Var<br>%</th></tr>';
+      +'<th style="'+th+'">Renda</th><th style="'+th+'">Custos</th><th style="'+th+'">Reali-<br>zado</th><th style="'+th+'">Realiz.<br>acum.</th><th style="'+th+'">Aber-<br>tas</th><th style="'+th+'">Abertas<br>acum.</th><th style="'+th+'">Resto</th><th style="'+th+'">Resto<br>acum.</th><th style="'+th+'">Lucro<br>acum.</th><th style="'+th+'">Valor<br>final</th><th style="'+th+'">Final<br>BRL</th><th style="'+th+'">%<br>merc.</th><th style="'+th+'">Var<br>%</th></tr>';
     const el=document.getElementById('geral-tabela-mensal');
     const valFinalAtual = pat.length ? pat[pat.length-1].total_eur : 0;
     const cumApLiqAtual = pat.length ? (cumApLiqByKey[keyOf(pat[pat.length-1].mes)]||0) : 0;
@@ -783,8 +792,10 @@ async function loadGeral() {
       + '<td style="'+td+';color:#c0392b">'+eur(totCt)+'</td>'
       + '<td style="'+td+';color:'+col(totRealiz)+'">'+(totRealiz>=0?'+':'')+eur(totRealiz)+'</td>'
       + '<td style="'+td+';color:'+col(totRealiz)+'">'+(totRealiz>=0?'+':'')+eur(totRealiz)+'</td>'
-      + '<td style="'+td+';color:'+col(totNaoReal)+'">'+(totNaoReal>=0?'+':'')+eur(totNaoReal)+'</td>'
-      + '<td style="'+td+';color:'+col(totNaoReal)+'">'+(totNaoReal>=0?'+':'')+eur(totNaoReal)+'</td>'
+      + '<td style="'+td+';color:'+col(totAbertas)+'">'+(totAbertas>=0?'+':'')+eur(totAbertas)+'</td>'
+      + '<td style="'+td+';color:'+col(totAbertas)+'">'+(totAbertas>=0?'+':'')+eur(totAbertas)+'</td>'
+      + '<td style="'+td+';color:'+col(totResto)+'">'+(totResto>=0?'+':'')+eur(totResto)+'</td>'
+      + '<td style="'+td+';color:'+col(totResto)+'">'+(totResto>=0?'+':'')+eur(totResto)+'</td>'
       + '<td style="'+td+';color:'+col(lucroAcumAtual)+'">'+(lucroAcumAtual>=0?'+':'')+eur(lucroAcumAtual)+'</td>'
       + '<td style="'+td+'">'+eur(valFinalAtual)+'</td>'
       + '<td style="'+td+';color:#6b6b68">'+(brlAtual?'R$'+num(valFinalAtual*brlAtual,0):'—')+'</td>'
