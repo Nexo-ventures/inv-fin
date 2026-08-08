@@ -1203,8 +1203,19 @@ function renderHist(rows) {
   // Total compras/vendas em EUR (item: conferência vendas − compras ≈ resultado)
   const totalComprasEur = rows.reduce((s,r) => s + (toEur(r.custo_total, r.moeda, getMesKey(r.data_entrada)) || 0), 0);
   const totalVendasEur = rows.reduce((s,r) => s + (toEur(r.receita_total, r.moeda, getMesKey(r.data_saida)) || 0), 0);
-  const efeitoCambialFech = totalEur - (totalVendasEur - totalComprasEur);
-  const resultadoMercadoFech = totalVendasEur - totalComprasEur;
+  // Efeito cambial MEDIDO: resultado na moeda convertido à taxa atual vs resultado em EUR gravado
+  const _MOH=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  let _bestK=null, _bestV=-1;
+  Object.keys(cambioRates).forEach(k=>{ const [mn,yr]=k.split('/'); const v=(+yr)*12+_MOH.indexOf(mn); if(v>_bestV){_bestV=v;_bestK=k;} });
+  const taxaAtual = (_bestK && cambioRates[_bestK]) || posCambio || {};
+  const resultadoMercadoFech = rows.reduce((s,r) => {
+    const rm = r.resultado_moeda;
+    if (rm == null) return s;
+    if (r.moeda === 'EUR') return s + rm;
+    const rate = r.moeda === 'BRL' ? taxaAtual.brl : r.moeda === 'USD' ? taxaAtual.usd : null;
+    return rate ? s + rm/rate : s;
+  }, 0);
+  const efeitoCambialFech = totalEur - resultadoMercadoFech;
 
   // Top 5 ganhos e perdas
   const sorted = [...comResult].sort((a,b)=>b.resultado_eur-a.resultado_eur);
@@ -1239,7 +1250,7 @@ function renderHist(rows) {
       '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:12px">'+
       '<div class="card" style="padding:14px 18px"><div class="card-label">Total compras</div><div style="font-size:20px;font-weight:700;color:#6b6b68">€'+num(totalComprasEur,2)+'</div><div style="font-size:11px;color:#9b9b98">capital investido</div></div>'+
       '<div class="card" style="padding:14px 18px"><div class="card-label">Total vendas</div><div style="font-size:20px;font-weight:700;color:#6b6b68">€'+num(totalVendasEur,2)+'</div><div style="font-size:11px;color:#9b9b98">capital resgatado</div></div>'+
-      '<div class="card" style="padding:14px 18px"><div class="card-label">Resultado de mercado</div><div style="font-size:20px;font-weight:700;color:'+(resultadoMercadoFech>=0?'#1a7f4b':'#c0392b')+'">'+(resultadoMercadoFech>=0?'+':'')+'€'+num(resultadoMercadoFech,2)+'</div><div style="font-size:11px;color:#9b9b98">vendas − compras</div></div>'+
+      '<div class="card" style="padding:14px 18px"><div class="card-label">Resultado de mercado</div><div style="font-size:20px;font-weight:700;color:'+(resultadoMercadoFech>=0?'#1a7f4b':'#c0392b')+'">'+(resultadoMercadoFech>=0?'+':'')+'€'+num(resultadoMercadoFech,2)+'</div><div style="font-size:11px;color:#9b9b98">na moeda, à taxa atual</div></div>'+
       '<div class="card" style="padding:14px 18px"><div class="card-label">Efeito cambial</div><div style="font-size:20px;font-weight:700;color:'+(efeitoCambialFech>=0?'#1a7f4b':'#c0392b')+'">'+(efeitoCambialFech>=0?'+':'')+'€'+num(efeitoCambialFech,2)+'</div><div style="font-size:11px;color:#9b9b98">ganho/perda de câmbio</div></div>'+
       '<div class="card" style="padding:14px 18px"><div class="card-label">Resultado total</div><div style="font-size:20px;font-weight:700;color:'+(totalEur>=0?'#1a7f4b':'#c0392b')+'">€'+num(totalEur,2)+'</div><div style="font-size:11px;color:#9b9b98">mercado + câmbio</div></div>'+
       '</div>'+
