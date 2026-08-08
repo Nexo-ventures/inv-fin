@@ -105,12 +105,6 @@
     <!-- KPI de fechamento — decomposição do resultado -->
     <div id="geral-fechamento" style="margin-bottom:20px"></div>
     <div id="geral-por-corretora" style="margin-bottom:20px"></div>
-    <!-- Rentabilidade -->
-    <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:#9b9b98;margin-bottom:8px">Rentabilidade</div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-bottom:16px">
-      <div class="card"><div class="card-label">Rentabilidade total %</div><div class="card-value" id="k-rent-total">—</div><div class="card-sub">resultado / capital líquido</div></div>
-      <div class="card"><div class="card-label">Yield anualizado</div><div class="card-value" id="k-yield">—</div><div class="card-sub" id="k-yield-sub">renda anual / patrimônio</div></div>
-    </div>
     <!-- Tabela mensal consolidada -->
     <div class="card" style="padding:0;margin-bottom:16px;overflow-x:auto">
       <div class="card-label" style="padding:14px 18px 8px">Resumo mensal consolidado (EUR)</div>
@@ -121,12 +115,10 @@
     <!-- Gráfico P&L acumulado -->
     <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">P&L acumulado mês a mês — total e por corretora (EUR)</div><div style="position:relative;height:200px"><canvas id="geral-pnl-acum-chart"></canvas></div></div>
     <!-- Gráfico variação mensal com/sem câmbio -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
-      <div class="card"><div class="card-label" style="margin-bottom:8px">Variação total do patrimônio (EUR)</div><div style="position:relative;height:200px"><canvas id="geral-var-total-chart"></canvas></div></div>
-      <div class="card"><div class="card-label" style="margin-bottom:8px">Resultado — excl. aportes (EUR)</div><div style="position:relative;height:200px"><canvas id="geral-vs-cambio-chart"></canvas></div></div>
-    </div>
+    <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Variação mensal — total e excl. aportes (EUR)</div><div style="position:relative;height:210px"><canvas id="geral-vs-cambio-chart"></canvas></div></div>
     <!-- Gráfico câmbio + patrimônio -->
-    <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Patrimônio em EUR e BRL</div><div style="position:relative;height:200px"><canvas id="geral-cambio-pat-chart"></canvas></div></div>
+    <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Patrimônio em EUR e BRL · variação mensal</div><div style="position:relative;height:220px"><canvas id="geral-cambio-pat-chart"></canvas></div></div>
+    <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Aporte líquido mensal (EUR)</div><div style="position:relative;height:190px"><canvas id="geral-aporte-liq-chart"></canvas></div></div>
     <!-- Gráfico alocação histórica -->
     <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Contribuição por corretora — patrimônio mensal (EUR)</div><div style="position:relative;height:220px"><canvas id="geral-corr-hist-chart"></canvas></div></div>
     <!-- Distribuição por moeda — evolução (após contribuição) -->
@@ -461,9 +453,6 @@ async function loadGeral() {
   const dc2 = v => v==null?'':v>=0?'pos':'neg';
 
 
-  document.getElementById('k-rent-total').innerHTML = '<span style="font-size:22px;font-weight:700;color:'+(rentTotal!=null?(rentTotal>=0?'#1a7f4b':'#c0392b'):'#9b9b98')+'">'+(rentTotal!=null?(rentTotal>=0?'+':'')+rentTotal.toFixed(2)+'%':'—')+'</span>';
-  document.getElementById('k-yield').innerHTML = '<span style="font-size:22px;font-weight:700;color:#1a7f4b">'+(yieldAnual!=null?yieldAnual.toFixed(2)+'%':'—')+'</span>';
-  document.getElementById('k-yield-sub').textContent = 'renda anual / patrimônio';
 
   // Cards por corretora — fonte: fechamento auditado (patrimonio_consolidado + patrimonio_mensal)
   const CORR_LABELS = {XP:'XP Investimentos', AV:'Avenue', IBKR:'Interactive Brokers', R4:'Renta 4'};
@@ -477,14 +466,35 @@ async function loadGeral() {
 
   // Gráfico moeda donut
   const moedaLabels = pat.map(d=>d.mes.split('/')[0]+'/'+d.mes.split('/')[1].slice(2));
-  const eurSerie = pat.map(d=>(d.ibkr_eur||0)+(d.r4_eur||0));
-  const usdSerie = pat.map(d=>d.av_eur||0);
+  // IBKR tem ações em USD: separa a parte em dólar (via snapshots) do caixa em euro
+  const ibkrUsdPorMes = {};
+  {
+    const MK={Jan:1,Fev:2,Feb:2,Mar:3,Abr:4,Apr:4,Mai:5,May:5,Jun:6,Jul:7,Ago:8,Aug:8,Set:9,Sep:9,Out:10,Oct:10,Nov:11,Dez:12,Dec:12};
+    const kMes=m=>{const [mn,yr]=m.split('/');return yr+'-'+String(MK[mn]||0).padStart(2,'0');};
+    const kData=d=>{const dt=new Date(d);return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0');};
+    const rt={}; (cambioHist||[]).forEach(c=>{ rt[kMes(c.mes)]=c.eur_usd; });
+    (snapsHist||[]).forEach(s=>{
+      if(s.corretora!=='IBKR'||s.moeda!=='USD') return;
+      const k=kData(s.data), r=rt[k];
+      if(r) ibkrUsdPorMes[k]=(ibkrUsdPorMes[k]||0)+(s.custo_total||0)/r;
+    });
+    // mês corrente: usa posições ao vivo se não houver snapshot
+    const kAtual = last? kMes(last.mes) : null;
+    if(kAtual && !ibkrUsdPorMes[kAtual]){
+      const rA=rt[kAtual]; let v=0;
+      (posData_g||[]).forEach(p=>{ if(p.corretora==='IBKR'&&p.moeda==='USD'&&p.preco_atual&&p.quantidade) v+=p.preco_atual*p.quantidade; });
+      if(rA&&v) ibkrUsdPorMes[kAtual]=v/rA;
+    }
+  }
+  const _kmes=m=>{const MK={Jan:1,Fev:2,Feb:2,Mar:3,Abr:4,Apr:4,Mai:5,May:5,Jun:6,Jul:7,Ago:8,Aug:8,Set:9,Sep:9,Out:10,Oct:10,Nov:11,Dez:12,Dec:12};const [mn,yr]=m.split('/');return yr+'-'+String(MK[mn]||0).padStart(2,'0');};
+  const eurSerie = pat.map(d=>{ const usdIb=ibkrUsdPorMes[_kmes(d.mes)]||0; return Math.max(0,(d.ibkr_eur||0)-usdIb)+(d.r4_eur||0); });
+  const usdSerie = pat.map(d=>(d.av_eur||0)+(ibkrUsdPorMes[_kmes(d.mes)]||0));
   const brlSerie = pat.map(d=>d.xp_eur||0);
   const mc = document.getElementById('geral-moeda-chart');
   if (mc) { if(geralMoedaChart) geralMoedaChart.destroy(); geralMoedaChart = new Chart(mc, {type:'line', data:{labels:moedaLabels, datasets:[
-    {label:'EUR (IBKR+R4)', data:eurSerie, borderColor:'#1a7f4b', backgroundColor:'#1a7f4b55', borderWidth:1.5, pointRadius:0, tension:0.3, fill:true},
-    {label:'USD (Avenue)', data:usdSerie, borderColor:'#1565c0', backgroundColor:'#1565c055', borderWidth:1.5, pointRadius:0, tension:0.3, fill:true},
-    {label:'BRL (XP)', data:brlSerie, borderColor:'#e65100', backgroundColor:'#e6510055', borderWidth:1.5, pointRadius:0, tension:0.3, fill:true}
+    {label:'EUR (caixa IBKR + R4)', data:eurSerie, borderColor:'#1a7f4b', backgroundColor:'#1a7f4b55', borderWidth:1.5, pointRadius:2.5, pointBackgroundColor:'#1a7f4b', tension:0.3, fill:true},
+    {label:'USD (Avenue + ações IBKR)', data:usdSerie, borderColor:'#1565c0', backgroundColor:'#1565c055', borderWidth:1.5, pointRadius:2.5, pointBackgroundColor:'#1565c0', tension:0.3, fill:true},
+    {label:'BRL (XP)', data:brlSerie, borderColor:'#e65100', backgroundColor:'#e6510055', borderWidth:1.5, pointRadius:2.5, pointBackgroundColor:'#e65100', tension:0.3, fill:true}
   ]}, options:{responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false}, plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12}}, tooltip:{callbacks:{label:ctx=>{const t=ctx.chart.data.datasets.reduce((s,ds)=>s+(ds.data[ctx.dataIndex]||0),0); const pct=t>0?(ctx.raw/t*100).toFixed(1):'0'; return ' '+ctx.dataset.label+': '+eur(ctx.raw)+' ('+pct+'%)';}, footer:items=>{const t=items.reduce((s,it)=>s+(it.raw||0),0);return 'Total: '+eur(t);}}, footerFont:{weight:'bold'}, footerColor:'#fff'}}, scales:{x:{grid:{display:false},ticks:{font:{size:9},maxTicksLimit:8}}, y:{stacked:true, grid:{color:'#f0f0ee'}, ticks:{font:{size:9},callback:v=>'€'+Math.round(v/1000)+'k'}}}}}); }
 
   // Gráfico variação % mensal — removido (item 4)
@@ -528,6 +538,8 @@ async function loadGeral() {
     const lucroTotal=patrimonioTotal-capitalLiq;
     const resto=lucroTotal-realizadoTotal-abertasTotal-rendaCustos;
     const semCambio=realizadoTotal+abertasTotal+rendaCustos;
+    const rentGeral = capitalLiq>0 ? (lucroTotal/capitalLiq*100) : 0;
+    const yieldG = (typeof yieldAnual!=='undefined' && yieldAnual!=null) ? yieldAnual : null;
     const cor=v=>v>=0?'#1a7f4b':'#c0392b';
     const sg=v=>(v>=0?'+':'−')+eur(Math.abs(v));
     const item=(lbl,val,sub)=>'<div style="flex:1;min-width:110px;padding:10px 14px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;margin-bottom:3px">'+lbl+'</div><div style="font-size:17px;font-weight:700;color:'+cor(val)+'">'+sg(val)+'</div>'+(sub?'<div style="font-size:10px;color:#c9c9c6;margin-top:1px">'+sub+'</div>':'')+'</div>';
@@ -551,8 +563,10 @@ async function loadGeral() {
       +'</div>'
       +'<div style="display:flex;gap:12px;margin-top:12px;align-items:center">'
       +'<div style="padding:10px 16px;background:'+(semCambio>=0?'#eafaf1':'#fdf3f1')+';border-radius:8px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;margin-bottom:3px">Resultado atribuído <span style="color:#c9c9c6">(o que você controla)</span></div><div style="font-size:19px;font-weight:700;color:'+cor(semCambio)+'">'+sg(semCambio)+'</div></div>'
-      +'<div style="font-size:11px;color:#9b9b98;line-height:1.5">Realizado + Abertas + (Renda − Custos). O "não atribuído" é a diferença residual entre o patrimônio e a soma das partes.</div>'
+      +'<div style="padding:10px 16px;background:#fafaf9;border-radius:8px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;margin-bottom:3px">Rentabilidade</div><div style="font-size:19px;font-weight:700;color:'+cor(rentGeral)+'">'+(rentGeral>=0?'+':'')+rentGeral.toFixed(2)+'%</div><div style="font-size:10px;color:#c9c9c6;margin-top:1px">resultado / capital líquido</div></div>'
+      +'<div style="padding:10px 16px;background:#fafaf9;border-radius:8px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;margin-bottom:3px">Yield anualizado</div><div style="font-size:19px;font-weight:700;color:#1a7f4b">'+(yieldG!=null?yieldG.toFixed(2)+'%':'—')+'</div><div style="font-size:10px;color:#c9c9c6;margin-top:1px">só renda / patrimônio</div></div>'
       +'</div>'
+      +'<div style="font-size:11px;color:#9b9b98;line-height:1.5;margin-top:10px">Realizado + Abertas + (Renda − Custos). O "não atribuído" é a diferença residual entre o patrimônio e a soma das partes.</div>'
       +'</div>';
   }
 
@@ -681,10 +695,10 @@ async function loadGeral() {
     return d.total_eur - pat[i].total_eur - aportesDoMes;
   });
   const vsCambioC = document.getElementById('geral-vs-cambio-chart');
-  const barOpts = {responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>' '+(ctx.raw>=0?'+':'')+eur(ctx.raw)}}}, scales:{x:{grid:{display:false}, ticks:{font:{size:9}}}, y:{grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>eur(v)}}}};
-  const varTotC = document.getElementById('geral-var-total-chart');
-  if (varTotC) { if(window._geralVarTotChart) window._geralVarTotChart.destroy(); window._geralVarTotChart = new Chart(varTotC, {type:'bar', data:{labels:vsCambioLabels, datasets:[{data:varAbsVals, backgroundColor:varAbsVals.map(v=>v>=0?'#1a7f4bcc':'#c0392bcc'), borderRadius:4}]}, options:barOpts}); }
-  if (vsCambioC) { if(window._geralVsCambioChart) window._geralVsCambioChart.destroy(); window._geralVsCambioChart = new Chart(vsCambioC, {type:'bar', data:{labels:vsCambioLabels, datasets:[{data:varSemAportes, backgroundColor:varSemAportes.map(v=>v>=0?'#1565c0cc':'#c0392bcc'), borderRadius:4}]}, options:barOpts}); }
+  if (vsCambioC) { if(window._geralVsCambioChart) window._geralVsCambioChart.destroy(); window._geralVsCambioChart = new Chart(vsCambioC, {type:'bar', data:{labels:vsCambioLabels, datasets:[
+    {label:'Variação total', data:varAbsVals, backgroundColor:'#c9c9c6aa', borderRadius:3, barPercentage:0.9, categoryPercentage:0.85},
+    {label:'Excl. aportes (resultado)', data:varSemAportes, backgroundColor:varSemAportes.map(v=>v>=0?'#1a7f4bdd':'#c0392bdd'), borderRadius:3, barPercentage:0.5, categoryPercentage:0.85}
+  ]}, options:{responsive:true, maintainAspectRatio:false, grouped:false, interaction:{mode:'index',intersect:false}, plugins:{legend:{labels:{font:{size:10},boxWidth:10}}, tooltip:{callbacks:{label:ctx=>' '+ctx.dataset.label+': '+(ctx.raw>=0?'+':'')+eur(ctx.raw)}}}, scales:{x:{grid:{display:false}, ticks:{font:{size:9}}}, y:{grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>eur(v)}}}}}); }
 
   // Gráfico Patrimônio em EUR e BRL
   const _MNC={Jan:1,Fev:2,Feb:2,Mar:3,Abr:4,Apr:4,Mai:5,May:5,Jun:6,Jul:7,Ago:8,Aug:8,Set:9,Sep:9,Out:10,Oct:10,Nov:11,Dez:12,Dec:12};
@@ -694,7 +708,25 @@ async function loadGeral() {
   const cambioPatlabels = pat.map(d=>d.mes.split('/')[0]+'/'+d.mes.split('/')[1].slice(2));
   const patBRL = pat.map(d=>{ const rate=cambioMap[_ymk(d.mes)]; return rate? d.total_eur*rate : null; });
   const cambioPatC = document.getElementById('geral-cambio-pat-chart');
-  if (cambioPatC) { if(window._geralCambioPatChart) window._geralCambioPatChart.destroy(); window._geralCambioPatChart = new Chart(cambioPatC, {type:'line', data:{labels:cambioPatlabels, datasets:[{label:'Patrimônio EUR', data:pat.map(d=>d.total_eur), borderColor:'#1a7f4b', backgroundColor:'transparent', borderWidth:2, pointRadius:3, tension:0.3, yAxisID:'yPat'},{label:'Patrimônio BRL', data:patBRL, borderColor:'#e65100', backgroundColor:'transparent', borderWidth:2, pointRadius:3, tension:0.3, yAxisID:'yBRL'}]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{labels:{font:{size:10},boxWidth:10}}, tooltip:{callbacks:{label:ctx=>ctx.datasetIndex===0?' €'+Math.round(ctx.raw).toLocaleString('de-DE'):' R$'+Math.round(ctx.raw).toLocaleString('de-DE')}}}, scales:{yPat:{position:'left', grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>'€'+Math.round(v/1000)+'k'}}, yBRL:{position:'right', grid:{display:false}, ticks:{font:{size:9}, callback:v=>'R$'+Math.round(v/1000)+'k'}}, x:{grid:{display:false}, ticks:{font:{size:9}}}}}}); }
+  // variação mensal (barras) dentro do gráfico de patrimônio
+  const varMensalPat = pat.map((d,i)=> i===0 ? null : d.total_eur - pat[i-1].total_eur);
+  if (cambioPatC) { if(window._geralCambioPatChart) window._geralCambioPatChart.destroy(); window._geralCambioPatChart = new Chart(cambioPatC, {data:{labels:cambioPatlabels, datasets:[
+    {type:'bar', label:'Variação do mês', data:varMensalPat, backgroundColor:varMensalPat.map(v=>v==null?'#eee':(v>=0?'#1a7f4b40':'#c0392b40')), borderRadius:3, yAxisID:'yVar', order:3},
+    {type:'line', label:'Patrimônio EUR', data:pat.map(d=>d.total_eur), borderColor:'#1a7f4b', backgroundColor:'transparent', borderWidth:2, pointRadius:3, tension:0.3, yAxisID:'yPat', order:1},
+    {type:'line', label:'Patrimônio BRL', data:patBRL, borderColor:'#e65100', backgroundColor:'transparent', borderWidth:2, pointRadius:3, tension:0.3, yAxisID:'yBRL', order:2}
+  ]}, options:{responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false}, plugins:{legend:{labels:{font:{size:10},boxWidth:10}}, tooltip:{callbacks:{label:ctx=>{const l=ctx.dataset.label; if(l==='Patrimônio BRL') return ' '+l+': R$'+Math.round(ctx.raw).toLocaleString('de-DE'); return ' '+l+': '+(ctx.raw>=0?'':'')+eur(ctx.raw);}}}}, scales:{yPat:{position:'left', grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>'€'+Math.round(v/1000)+'k'}}, yBRL:{position:'right', grid:{display:false}, ticks:{font:{size:9}, callback:v=>'R$'+Math.round(v/1000)+'k'}}, yVar:{display:false, position:'right'}, x:{grid:{display:false}, ticks:{font:{size:9}}}}}}); }
+
+  // Gráfico aporte líquido mensal (item 4)
+  {
+    const apLiqMes = pat.map(d=>{
+      const [mn,yr]=d.mes.split('/'); const mi=mesToIdx(mn); const yy=parseInt(yr)<100?2000+parseInt(yr):parseInt(yr);
+      return fluxosSemCB.reduce((s,r)=>{ const rd=new Date(r.data); if(isNaN(rd)) return s;
+        if(rd.getFullYear()===yy && rd.getMonth()===mi) return s + (r.tipo==='APORTE'? r.valor_eur : -Math.abs(r.valor_eur));
+        return s; },0);
+    });
+    const alC=document.getElementById('geral-aporte-liq-chart');
+    if(alC){ if(window._geralApLiqChart) window._geralApLiqChart.destroy(); window._geralApLiqChart=new Chart(alC,{type:'bar',data:{labels:cambioPatlabels,datasets:[{data:apLiqMes,backgroundColor:apLiqMes.map(v=>v>=0?'#1a7f4bcc':'#c0392bcc'),borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>' '+(ctx.raw>=0?'+':'−')+eur(Math.abs(ctx.raw))}}},scales:{x:{grid:{display:false},ticks:{font:{size:9}}},y:{grid:{color:'#f0f0ee'},ticks:{font:{size:9},callback:v=>eur(v)}}}}}); }
+  }
 
   // Gráfico contribuição por corretora (área empilhada)
   const CORR_COLORS_G = {XP:'#e65100cc',AV:'#1565c0cc',IBKR:'#1a7f4bcc',R4:'#6a1b9acc'};
