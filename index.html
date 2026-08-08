@@ -105,34 +105,16 @@
     <!-- KPI de fechamento — decomposição do resultado -->
     <div id="geral-fechamento" style="margin-bottom:20px"></div>
     <div id="geral-por-corretora" style="margin-bottom:20px"></div>
-    <!-- Linha 1: Capital -->
-    <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:#9b9b98;margin-bottom:8px">Capital</div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px">
-      <div class="card"><div class="card-label">Aportes líquidos</div><div class="card-value" id="k-aportes">—</div><div class="card-sub" id="k-aportes-sub">total aportado - retirado</div></div>
-      <div class="card"><div class="card-label">Patrimônio total</div><div class="card-value" id="k-total">—</div><div class="card-sub" id="k-mes">—</div></div>
-      <div class="card"><div class="card-label">Variação mensal</div><div class="card-value" id="k-var">—</div><div class="card-sub" id="k-var2">—</div></div>
-      <div class="card"><div class="card-label">Múltiplo do capital</div><div class="card-value" id="k-multiplo">—</div><div class="card-sub" id="k-multiplo-sub">patrimônio / aportes</div></div>
-    </div>
-    <!-- Linha 2: Resultado -->
-    <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:#9b9b98;margin-bottom:8px">Resultado</div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-bottom:16px">
-      <div class="card"><div class="card-label">P&L líquido total</div><div class="card-value" id="k-pnl">—</div><div class="card-sub" id="k-pnl-sub">—</div></div>
-      <div class="card"><div class="card-label">Resultado realizado</div><div class="card-value" id="k-realizado">—</div><div class="card-sub">posições fechadas</div></div>
-      <div class="card"><div class="card-label">Resultado não realizado</div><div class="card-value" id="k-result-nr">—</div><div class="card-sub" id="k-result-nr-sub">—</div></div>
-      <div class="card"><div class="card-label">Renda total</div><div class="card-value" id="k-renda-tot">—</div><div class="card-sub">dividendos + juros + FII</div></div>
-      <div class="card"><div class="card-label">Custos totais</div><div class="card-value" id="k-custos-tot">—</div><div class="card-sub">corretagens + impostos</div></div>
-      <div class="card"><div class="card-label">Tarifas câmbio (Wise)</div><div class="card-value" id="k-tarifas-wise">—</div><div class="card-sub">custo total remessas</div></div>
-    </div>
-    <!-- Linha 3: Rentabilidade -->
+    <!-- Rentabilidade -->
     <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:#9b9b98;margin-bottom:8px">Rentabilidade</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-bottom:16px">
       <div class="card"><div class="card-label">Rentabilidade total %</div><div class="card-value" id="k-rent-total">—</div><div class="card-sub">P&L / aportes líquidos</div></div>
+      <div class="card"><div class="card-label">Múltiplo do capital</div><div class="card-value" id="k-multiplo">—</div><div class="card-sub" id="k-multiplo-sub">patrimônio / aportes</div></div>
       <div class="card"><div class="card-label">Yield anualizado</div><div class="card-value" id="k-yield">—</div><div class="card-sub" id="k-yield-sub">renda anual / patrimônio</div></div>
       <div class="card"><div class="card-label">Taxa de acerto</div><div class="card-value" id="k-acerto">—</div><div class="card-sub" id="k-acerto-sub">posições fechadas</div></div>
       <div class="card"><div class="card-label">Tempo médio posição</div><div class="card-value" id="k-tempo">—</div><div class="card-sub">entre entrada e saída</div></div>
       <div class="card"><div class="card-label">Melhor mês</div><div class="card-value" id="k-best-mes">—</div><div class="card-sub" id="k-best-mes-sub">—</div></div>
       <div class="card"><div class="card-label">Pior mês</div><div class="card-value" id="k-worst-mes">—</div><div class="card-sub" id="k-worst-mes-sub">—</div></div>
-      <div class="card"><div class="card-label">Efeito cambial est.</div><div class="card-value" id="k-cambial">—</div><div class="card-sub" id="k-cambial-sub">estimativa</div></div>
     </div>
     <!-- Tabela mensal consolidada -->
     <div class="card" style="padding:0;margin-bottom:16px;overflow-x:auto">
@@ -142,7 +124,7 @@
     <!-- Gráfico evolução Investido vs Caixa (após a tabela) -->
     <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Investido vs Caixa — evolução (EUR)</div><div style="position:relative;height:200px"><canvas id="geral-inv-caixa-chart"></canvas></div></div>
     <!-- Gráfico P&L acumulado -->
-    <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">P&L acumulado mês a mês (EUR)</div><div style="position:relative;height:200px"><canvas id="geral-pnl-acum-chart"></canvas></div></div>
+    <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">P&L acumulado mês a mês — total e por corretora (EUR)</div><div style="position:relative;height:200px"><canvas id="geral-pnl-acum-chart"></canvas></div></div>
     <!-- Gráfico variação mensal com/sem câmbio -->
     <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Ganho/Perda mensal — com e sem aporte (EUR)</div><div style="position:relative;height:200px"><canvas id="geral-vs-cambio-chart"></canvas></div></div>
     <!-- Gráfico câmbio + patrimônio -->
@@ -480,37 +462,9 @@ async function loadGeral() {
   // --- Populate KPIs ---
   const dc2 = v => v==null?'':v>=0?'pos':'neg';
 
-  document.getElementById('k-aportes').innerHTML = '<span style="font-size:22px;font-weight:700">'+eur(aportesLiquidos)+'</span>';
-  document.getElementById('k-aportes-sub').textContent = 'capital próprio líquido';
-
-  document.getElementById('k-total').innerHTML =
-    '<span style="font-size:22px;font-weight:700">'+eur(patrimonioTotal)+'</span>'+
-    '<div style="font-size:10px;color:#9b9b98;margin-top:3px">fechamento auditado '+last.mes+'</div>';
-  document.getElementById('k-mes').textContent = last.mes+(last.tem_provisorio?' *provisório':'');
-
-  if (prev) {
-    const d = last.total_eur-prev.total_eur, p = d/prev.total_eur*100;
-    document.getElementById('k-var').innerHTML = '<span class="'+dc2(d)+'" style="font-size:22px;font-weight:700">'+(d>=0?'+':'')+eur(d)+'</span>';
-    document.getElementById('k-var2').innerHTML = '<span class="'+dc2(d)+'">'+(p>=0?'+':'')+p.toFixed(1)+'% vs '+prev.mes+'</span>';
-  }
-
   document.getElementById('k-multiplo').innerHTML = '<span style="font-size:22px;font-weight:700">'+(multiplo!=null?multiplo.toFixed(3)+'x':'—')+'</span>';
   document.getElementById('k-multiplo-sub').textContent = multiplo!=null?(multiplo>=1?'crescimento de capital':'capital reduzido'):'—';
 
-  document.getElementById('k-pnl').innerHTML = '<span style="font-size:22px;font-weight:700;color:'+(pnlLiquido>=0?'#1a7f4b':'#c0392b')+'">'+(pnlLiquido>=0?'+':'')+eur(pnlLiquido)+'</span>';
-  document.getElementById('k-pnl-sub').innerHTML = '<span style="font-size:10px;color:#9b9b98">Real '+(totalRealizado>=0?'+':'')+eur(totalRealizado)+' · NR '+(resultNR!=null?(resultNR>=0?'+':'')+eur(resultNR):'n/d')+'<br>+Renda '+eur(totalRenda)+' · -Custos '+eur(totalCustos)+' · -Wise '+eur(totalTarifasWise)+'</span>';
-
-  document.getElementById('k-realizado').innerHTML = '<span style="font-size:22px;font-weight:700;color:'+(totalRealizado>=0?'#1a7f4b':'#c0392b')+'">'+(totalRealizado>=0?'+':'')+eur(totalRealizado)+'</span>';
-  document.getElementById('k-result-nr').innerHTML = resultNR!=null ? '<span style="font-size:22px;font-weight:700;color:'+(resultNR>=0?'#1a7f4b':'#c0392b')+'">'+(resultNR>=0?'+':'')+eur(resultNR)+'</span>' : '<span style="font-size:22px;font-weight:700;color:#9b9b98">—</span>';
-  document.getElementById('k-result-nr-sub').innerHTML = '<span style="color:'+(rentNR!=null?(rentNR>=0?'#1a7f4b':'#c0392b'):'#9b9b98')+'">'+(rentNR!=null?(rentNR>=0?'+':'')+rentNR.toFixed(1)+'% sobre custo':'—')+'</span>';
-  document.getElementById('k-renda-tot').innerHTML = '<span style="font-size:22px;font-weight:700;color:#1a7f4b">+'+eur(totalRenda)+'</span>';
-  document.getElementById('k-custos-tot').innerHTML = '<span style="font-size:22px;font-weight:700;color:#c0392b">-'+eur(totalCustos)+'</span>';
-  document.getElementById('k-tarifas-wise').innerHTML = '<span style="font-size:22px;font-weight:700;color:#c0392b">-'+eur(totalTarifasWise)+'</span>';
-
-  // Efeito cambial estimado
-  const efeitoCambial = patrimonioTotal - aportesLiquidos - pnlLiquido;
-  document.getElementById('k-cambial').innerHTML = '<span style="font-size:22px;font-weight:700;color:' + (efeitoCambial>=0?'#1a7f4b':'#c0392b') + '">' + (efeitoCambial>=0?'+':'') + eur(efeitoCambial) + '</span>';
-  document.getElementById('k-cambial-sub').textContent = 'aportes - patrimônio - P&L';
   document.getElementById('k-rent-total').innerHTML = '<span style="font-size:22px;font-weight:700;color:'+(rentTotal!=null?(rentTotal>=0?'#1a7f4b':'#c0392b'):'#9b9b98')+'">'+(rentTotal!=null?(rentTotal>=0?'+':'')+rentTotal.toFixed(2)+'%':'—')+'</span>';
   document.getElementById('k-yield').innerHTML = '<span style="font-size:22px;font-weight:700;color:#1a7f4b">'+(yieldAnual!=null?yieldAnual.toFixed(2)+'%':'—')+'</span>';
   document.getElementById('k-yield-sub').textContent = 'renda anual / patrimônio';
@@ -597,11 +551,12 @@ async function loadGeral() {
       +'<div style="flex:1;min-width:120px;padding:10px 14px;background:#fafaf9;border-radius:8px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;margin-bottom:3px">Aportes</div><div style="font-size:17px;font-weight:700;color:#1a7f4b">+'+eur(aportesTotal)+'</div></div>'
       +'<div style="flex:1;min-width:120px;padding:10px 14px;background:#fafaf9;border-radius:8px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;margin-bottom:3px">Retiradas</div><div style="font-size:17px;font-weight:700;color:#c0392b">−'+eur(retiradasTotal)+'</div></div>'
       +'<div style="flex:1;min-width:120px;padding:10px 14px;background:#f4f6fb;border-radius:8px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;margin-bottom:3px">Capital líquido</div><div style="font-size:17px;font-weight:700;color:#1c1c1a">'+eur(capitalLiq)+'</div></div>'
+      +'<div style="flex:1;min-width:120px;padding:10px 14px;background:#f4f6fb;border-radius:8px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;margin-bottom:3px">Patrimônio atual</div><div style="font-size:17px;font-weight:700;color:#1c1c1a">'+eur(patrimonioTotal)+'</div><div style="font-size:10px;color:#c9c9c6;margin-top:1px">'+(last?last.mes:'')+'</div></div>'
       +'</div>'
       +'<div style="display:flex;flex-wrap:wrap;align-items:stretch;gap:2px;border:1px solid #f0f0ee;border-radius:8px;overflow:hidden">'
       +item('Realizado',realizadoTotal,'trades fechados')+op+'+</div>'
       +item('Abertas',abertasTotal,'não realizado')+op+'+</div>'
-      +item('Renda − Custos',rendaCustos,'')+op+'+</div>'
+      +item('Renda − Custos',rendaCustos,'renda '+eur(rendaTotalV)+' · custos '+eur(custosTotalV))+op+'+</div>'
       +item('Não atribuído',resto,'a investigar')+op+'=</div>'
       +'<div style="flex:1.2;min-width:130px;padding:10px 14px;background:'+(lucroTotal>=0?'#eafaf1':'#fdf3f1')+'"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;margin-bottom:3px">Resultado total</div><div style="font-size:19px;font-weight:700;color:'+cor(lucroTotal)+'">'+sg(lucroTotal)+'</div></div>'
       +'</div>'
@@ -655,7 +610,6 @@ async function loadGeral() {
         +'<td style="'+td+';font-weight:600">'+eur(entrou)+(entrouO?sub(fo(entrouO,mo)+' '+mo):'')+'</td>'
         +'<td style="'+td+';font-weight:600">'+eur(saldo)+(saldoO!=null?sub(fo(saldoO,mo)+' '+mo):'')+'</td>'
         +'<td style="'+td+';font-weight:700;color:'+cl(res)+'">'+(res>=0?'+':'−')+eur(Math.abs(res))+(resO!=null?sub('<span style="color:'+cl(resO)+'">'+(resO>=0?'+':'−')+fo(resO,mo)+'</span>'):'')+'</td>'
-        +'<td style="'+td+';font-weight:600;color:'+(pctO==null?'#9b9b98':cl(pctO))+'">'+(pctO==null?'—':(pctO>=0?'+':'')+pctO.toFixed(1)+'%')+sub('na moeda')+'</td>'
         +'</tr>';
     });
     const tEntrou=tAp-tRet+tIntra, tRes=tSaldo-tEntrou, tPct=tEntrou>0?(tRes/tEntrou*100):null;
@@ -667,9 +621,8 @@ async function loadGeral() {
       +'<td style="'+td+'">'+eur(tEntrou)+'</td>'
       +'<td style="'+td+'">'+eur(tSaldo)+'</td>'
       +'<td style="'+td+';color:'+cl(tRes)+'">'+(tRes>=0?'+':'−')+eur(Math.abs(tRes))+'</td>'
-      +'<td style="'+td+';color:'+(tPct==null?'#9b9b98':cl(tPct))+'">'+(tPct==null?'—':(tPct>=0?'+':'')+tPct.toFixed(1)+'%')+'</td>'
       +'</tr>';
-    const head='<tr style="background:#fafaf9"><th style="'+thL+'">Corretora</th><th style="'+th+'">Aportes</th><th style="'+th+'">Retiradas</th><th style="'+th+'">Transf.<br>internas</th><th style="'+th+'">Capital<br>na conta</th><th style="'+th+'">Saldo<br>atual</th><th style="'+th+'">Resultado</th><th style="'+th+'">Rentabi-<br>lidade</th></tr>';
+    const head='<tr style="background:#fafaf9"><th style="'+thL+'">Corretora</th><th style="'+th+'">Aportes</th><th style="'+th+'">Retiradas</th><th style="'+th+'">Transf.<br>internas</th><th style="'+th+'">Capital<br>na conta</th><th style="'+th+'">Saldo<br>atual</th><th style="'+th+'">Resultado</th></tr>';
     const gc=document.getElementById('geral-por-corretora');
     if(gc) gc.innerHTML='<div class="card" style="padding:0;overflow-x:auto">'
       +'<div class="card-label" style="padding:14px 18px 8px">Resultado por corretora (EUR) <span style="text-transform:none;letter-spacing:0;color:#c9c9c6">· transferências internas incluídas para refletir o capital real de cada conta</span></div>'
@@ -693,7 +646,31 @@ async function loadGeral() {
     return d.total_eur - aportesAte;
   });
   const pnlAcumC = document.getElementById('geral-pnl-acum-chart');
-  if (pnlAcumC) { if(window._geralPnlAcumChart) window._geralPnlAcumChart.destroy(); window._geralPnlAcumChart = new Chart(pnlAcumC, {type:'line', data:{labels:pnlAcumLabels, datasets:[{label:'P&L acumulado', data:pnlAcumVals, borderColor:'#1565c0', backgroundColor:'#1565c015', borderWidth:2, pointRadius:3, tension:0.3, fill:true}]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>' '+(ctx.raw>=0?'+':'')+eur(ctx.raw)}}}, scales:{x:{grid:{display:false}, ticks:{font:{size:9}}}, y:{grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>(v>=0?'+':'')+eur(v)}}}}}); }
+  // séries por corretora (inclui transferências internas p/ não distorcer R4/IBKR)
+  const CORRP=['XP','AV','IBKR','R4'], CORRCOL={XP:'#e65100',AV:'#1565c0',IBKR:'#1a7f4b',R4:'#6a1b9a'};
+  const pnlPorCorr = {};
+  CORRP.forEach(c=>{
+    pnlPorCorr[c] = pat.map(d=>{
+      const [mn,yr]=d.mes.split('/');
+      const mesIdx=mesToIdx(mn); const patYr=parseInt(yr)<100?2000+parseInt(yr):parseInt(yr);
+      const entrouAte=(fluxos||[]).reduce((s,r)=>{
+        if(r.corretora!==c) return s;
+        const rd=new Date(r.data); if(isNaN(rd)) return s;
+        if(rd.getFullYear()>patYr || (rd.getFullYear()===patYr && rd.getMonth()>mesIdx)) return s;
+        const v=r.valor_eur||0;
+        if(r.tipo==='APORTE') return s+v;
+        if(r.tipo==='RETIRADA') return s-Math.abs(v);
+        if(r.tipo==='TRANSFERENCIA_INTERNA') return s+v;
+        return s;
+      },0);
+      const saldo = c==='XP'?(d.xp_eur||0):c==='AV'?(d.av_eur||0):c==='IBKR'?(d.ibkr_eur||0):(d.r4_eur||0);
+      return (saldo===0 && entrouAte===0) ? null : saldo-entrouAte;
+    });
+  });
+  if (pnlAcumC) { if(window._geralPnlAcumChart) window._geralPnlAcumChart.destroy(); window._geralPnlAcumChart = new Chart(pnlAcumC, {type:'line', data:{labels:pnlAcumLabels, datasets:[
+      {label:'Total', data:pnlAcumVals, borderColor:'#1c1c1a', backgroundColor:'#1c1c1a10', borderWidth:2.5, pointRadius:3, tension:0.3, fill:true, order:0},
+      ...CORRP.map(c=>({label:c, data:pnlPorCorr[c], borderColor:CORRCOL[c], backgroundColor:'transparent', borderWidth:1.5, pointRadius:0, tension:0.3, spanGaps:true, order:1}))
+    ]}, options:{responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false}, plugins:{legend:{labels:{font:{size:10},boxWidth:10}}, tooltip:{callbacks:{label:ctx=>' '+ctx.dataset.label+': '+(ctx.raw>=0?'+':'')+eur(ctx.raw)}}}, scales:{x:{grid:{display:false}, ticks:{font:{size:9}}}, y:{grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>(v>=0?'+':'')+eur(v)}}}}}); }
 
   // Gráfico ganho/perda mensal com e sem efeito cambial
   const vsCambioLabels = pat.slice(1).map(d=>d.mes.split('/')[0]+'/'+d.mes.split('/')[1].slice(2));
@@ -711,7 +688,7 @@ async function loadGeral() {
     return d.total_eur - pat[i].total_eur - aportesDoMes;
   });
   const vsCambioC = document.getElementById('geral-vs-cambio-chart');
-  if (vsCambioC) { if(window._geralVsCambioChart) window._geralVsCambioChart.destroy(); window._geralVsCambioChart = new Chart(vsCambioC, {type:'bar', data:{labels:vsCambioLabels, datasets:[{label:'Variação total', data:varAbsVals, backgroundColor:varAbsVals.map(v=>v>=0?'#1a7f4b55':'#c0392b55'), borderRadius:4},{label:'Excl. aportes', data:varSemAportes, backgroundColor:varSemAportes.map(v=>v>=0?'#1a7f4bcc':'#c0392bcc'), borderRadius:4}]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{labels:{font:{size:10},boxWidth:10}}, tooltip:{callbacks:{label:ctx=>' '+(ctx.raw>=0?'+':'')+eur(ctx.raw)}}}, scales:{x:{grid:{display:false}, ticks:{font:{size:9}}}, y:{grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>eur(v)}}}}}); }
+  if (vsCambioC) { if(window._geralVsCambioChart) window._geralVsCambioChart.destroy(); window._geralVsCambioChart = new Chart(vsCambioC, {type:'line', data:{labels:vsCambioLabels, datasets:[{label:'Variação total', data:varAbsVals, borderColor:'#9b9b98', backgroundColor:'transparent', borderWidth:2, pointRadius:2.5, tension:0.3, borderDash:[5,4]},{label:'Excl. aportes (resultado)', data:varSemAportes, borderColor:'#1565c0', backgroundColor:'#1565c012', borderWidth:2, pointRadius:3, tension:0.3, fill:true}]}, options:{responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false}, plugins:{legend:{labels:{font:{size:10},boxWidth:10}}, tooltip:{callbacks:{label:ctx=>' '+ctx.dataset.label+': '+(ctx.raw>=0?'+':'')+eur(ctx.raw)}}}, scales:{x:{grid:{display:false}, ticks:{font:{size:9}}}, y:{grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>eur(v)}}}}}); }
 
   // Gráfico Patrimônio em EUR e BRL
   const _MNC={Jan:1,Fev:2,Feb:2,Mar:3,Abr:4,Apr:4,Mai:5,May:5,Jun:6,Jul:7,Ago:8,Aug:8,Set:9,Sep:9,Out:10,Oct:10,Nov:11,Dez:12,Dec:12};
