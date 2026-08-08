@@ -108,13 +108,8 @@
     <!-- Rentabilidade -->
     <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:#9b9b98;margin-bottom:8px">Rentabilidade</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-bottom:16px">
-      <div class="card"><div class="card-label">Rentabilidade total %</div><div class="card-value" id="k-rent-total">—</div><div class="card-sub">P&L / aportes líquidos</div></div>
-      <div class="card"><div class="card-label">Múltiplo do capital</div><div class="card-value" id="k-multiplo">—</div><div class="card-sub" id="k-multiplo-sub">patrimônio / aportes</div></div>
+      <div class="card"><div class="card-label">Rentabilidade total %</div><div class="card-value" id="k-rent-total">—</div><div class="card-sub">resultado / capital líquido</div></div>
       <div class="card"><div class="card-label">Yield anualizado</div><div class="card-value" id="k-yield">—</div><div class="card-sub" id="k-yield-sub">renda anual / patrimônio</div></div>
-      <div class="card"><div class="card-label">Taxa de acerto</div><div class="card-value" id="k-acerto">—</div><div class="card-sub" id="k-acerto-sub">posições fechadas</div></div>
-      <div class="card"><div class="card-label">Tempo médio posição</div><div class="card-value" id="k-tempo">—</div><div class="card-sub">entre entrada e saída</div></div>
-      <div class="card"><div class="card-label">Melhor mês</div><div class="card-value" id="k-best-mes">—</div><div class="card-sub" id="k-best-mes-sub">—</div></div>
-      <div class="card"><div class="card-label">Pior mês</div><div class="card-value" id="k-worst-mes">—</div><div class="card-sub" id="k-worst-mes-sub">—</div></div>
     </div>
     <!-- Tabela mensal consolidada -->
     <div class="card" style="padding:0;margin-bottom:16px;overflow-x:auto">
@@ -126,7 +121,10 @@
     <!-- Gráfico P&L acumulado -->
     <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">P&L acumulado mês a mês — total e por corretora (EUR)</div><div style="position:relative;height:200px"><canvas id="geral-pnl-acum-chart"></canvas></div></div>
     <!-- Gráfico variação mensal com/sem câmbio -->
-    <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Ganho/Perda mensal — com e sem aporte (EUR)</div><div style="position:relative;height:200px"><canvas id="geral-vs-cambio-chart"></canvas></div></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+      <div class="card"><div class="card-label" style="margin-bottom:8px">Variação total do patrimônio (EUR)</div><div style="position:relative;height:200px"><canvas id="geral-var-total-chart"></canvas></div></div>
+      <div class="card"><div class="card-label" style="margin-bottom:8px">Resultado — excl. aportes (EUR)</div><div style="position:relative;height:200px"><canvas id="geral-vs-cambio-chart"></canvas></div></div>
+    </div>
     <!-- Gráfico câmbio + patrimônio -->
     <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Patrimônio em EUR e BRL</div><div style="position:relative;height:200px"><canvas id="geral-cambio-pat-chart"></canvas></div></div>
     <!-- Gráfico alocação histórica -->
@@ -426,7 +424,7 @@ async function loadGeral() {
   // Aportes líquidos (excluindo CB — mesma lógica da aba Fluxos)
   const aportesLiquidos = fluxos.filter(r=>r.corretora!=='CB' && r.corretora!=='nan').reduce((s,r)=>s+(r.tipo==='APORTE'?r.valor_eur:-r.valor_eur),0);
   const multiplo = aportesLiquidos > 0 ? (patrimonioTotal / aportesLiquidos) : null;
-  const rentTotal = aportesLiquidos > 0 ? (pnlLiquido / aportesLiquidos * 100) : null;
+  const rentTotal = aportesLiquidos > 0 ? ((patrimonioTotal - aportesLiquidos) / aportesLiquidos * 100) : null;
 
   // Alocação %
   const pctInvestido = patrimonioTotal > 0 ? (totalInvestido/patrimonioTotal*100).toFixed(1) : 0;
@@ -462,19 +460,10 @@ async function loadGeral() {
   // --- Populate KPIs ---
   const dc2 = v => v==null?'':v>=0?'pos':'neg';
 
-  document.getElementById('k-multiplo').innerHTML = '<span style="font-size:22px;font-weight:700">'+(multiplo!=null?multiplo.toFixed(3)+'x':'—')+'</span>';
-  document.getElementById('k-multiplo-sub').textContent = multiplo!=null?(multiplo>=1?'crescimento de capital':'capital reduzido'):'—';
 
   document.getElementById('k-rent-total').innerHTML = '<span style="font-size:22px;font-weight:700;color:'+(rentTotal!=null?(rentTotal>=0?'#1a7f4b':'#c0392b'):'#9b9b98')+'">'+(rentTotal!=null?(rentTotal>=0?'+':'')+rentTotal.toFixed(2)+'%':'—')+'</span>';
   document.getElementById('k-yield').innerHTML = '<span style="font-size:22px;font-weight:700;color:#1a7f4b">'+(yieldAnual!=null?yieldAnual.toFixed(2)+'%':'—')+'</span>';
   document.getElementById('k-yield-sub').textContent = 'renda anual / patrimônio';
-  document.getElementById('k-acerto').innerHTML = '<span style="font-size:22px;font-weight:700">'+(taxaAcerto!=null?taxaAcerto+'%':'—')+'</span>';
-  document.getElementById('k-acerto-sub').textContent = taxaAcerto!=null?(positivas.length+' de '+comResult.length+' operações'):'—';
-  document.getElementById('k-tempo').innerHTML = '<span style="font-size:22px;font-weight:700">'+(tempoMedio!=null?tempoMedio+' dias':'—')+'</span>';
-  document.getElementById('k-best-mes').innerHTML = bestMes?'<span style="font-size:20px;font-weight:700;color:#1a7f4b">+'+bestMes.var.toFixed(1)+'%</span>':'—';
-  document.getElementById('k-best-mes-sub').textContent = bestMes?bestMes.mes+' (+'+eur(bestMes.abs)+')':'—';
-  document.getElementById('k-worst-mes').innerHTML = worstMes?'<span style="font-size:20px;font-weight:700;color:#c0392b">'+worstMes.var.toFixed(1)+'%</span>':'—';
-  document.getElementById('k-worst-mes-sub').textContent = worstMes?worstMes.mes+' ('+eur(worstMes.abs)+')':'—';
 
   // Cards por corretora — fonte: fechamento auditado (patrimonio_consolidado + patrimonio_mensal)
   const CORR_LABELS = {XP:'XP Investimentos', AV:'Avenue', IBKR:'Interactive Brokers', R4:'Renta 4'};
@@ -606,10 +595,12 @@ async function loadGeral() {
         +'<td style="'+td+';text-align:left"><span class="pill p-'+c+'">'+c+'</span> <span style="font-size:11px;color:#6b6b68">'+CLBL[c]+'</span></td>'
         +'<td style="'+td+';color:'+(d.ap?'#1a7f4b':'#c9c9c6')+'">'+(d.ap?'+'+eur(d.ap):'—')+'</td>'
         +'<td style="'+td+';color:'+(d.ret?'#c0392b':'#c9c9c6')+'">'+(d.ret?'−'+eur(d.ret):'—')+'</td>'
+        +'<td style="'+td+';font-weight:600;color:'+cl(d.ap-d.ret)+'">'+((d.ap-d.ret)>=0?'+':'−')+eur(Math.abs(d.ap-d.ret))+'</td>'
         +'<td style="'+td+';color:'+(d.intra?cl(d.intra):'#c9c9c6')+'">'+(d.intra?(d.intra>=0?'+':'−')+eur(Math.abs(d.intra)):'—')+'</td>'
         +'<td style="'+td+';font-weight:600">'+eur(entrou)+(entrouO?sub(fo(entrouO,mo)+' '+mo):'')+'</td>'
         +'<td style="'+td+';font-weight:600">'+eur(saldo)+(saldoO!=null?sub(fo(saldoO,mo)+' '+mo):'')+'</td>'
         +'<td style="'+td+';font-weight:700;color:'+cl(res)+'">'+(res>=0?'+':'−')+eur(Math.abs(res))+(resO!=null?sub('<span style="color:'+cl(resO)+'">'+(resO>=0?'+':'−')+fo(resO,mo)+'</span>'):'')+'</td>'
+        +'<td style="'+td+';font-weight:600;color:'+(entrou>0?cl(res/entrou):'#9b9b98')+'">'+(entrou>0?((res/entrou*100)>=0?'+':'')+(res/entrou*100).toFixed(1)+'%':'—')+'</td>'
         +'</tr>';
     });
     const tEntrou=tAp-tRet+tIntra, tRes=tSaldo-tEntrou, tPct=tEntrou>0?(tRes/tEntrou*100):null;
@@ -617,12 +608,14 @@ async function loadGeral() {
       +'<td style="'+td+';text-align:left">Total</td>'
       +'<td style="'+td+';color:#1a7f4b">+'+eur(tAp)+'</td>'
       +'<td style="'+td+';color:#c0392b">−'+eur(tRet)+'</td>'
+      +'<td style="'+td+';font-weight:600;color:'+cl(tAp-tRet)+'">+'+eur(tAp-tRet)+'</td>'
       +'<td style="'+td+';color:#9b9b98">'+(Math.abs(tIntra)<1?'0':eur(tIntra))+'</td>'
       +'<td style="'+td+'">'+eur(tEntrou)+'</td>'
       +'<td style="'+td+'">'+eur(tSaldo)+'</td>'
       +'<td style="'+td+';color:'+cl(tRes)+'">'+(tRes>=0?'+':'−')+eur(Math.abs(tRes))+'</td>'
+      +'<td style="'+td+';color:'+(tEntrou>0?cl(tRes/tEntrou):'#9b9b98')+'">'+(tEntrou>0?((tRes/tEntrou*100)>=0?'+':'')+(tRes/tEntrou*100).toFixed(1)+'%':'—')+'</td>'
       +'</tr>';
-    const head='<tr style="background:#fafaf9"><th style="'+thL+'">Corretora</th><th style="'+th+'">Aportes</th><th style="'+th+'">Retiradas</th><th style="'+th+'">Transf.<br>internas</th><th style="'+th+'">Capital<br>na conta</th><th style="'+th+'">Saldo<br>atual</th><th style="'+th+'">Resultado</th></tr>';
+    const head='<tr style="background:#fafaf9"><th style="'+thL+'">Corretora</th><th style="'+th+'">Aportes</th><th style="'+th+'">Retiradas</th><th style="'+th+'">Aporte<br>líq.</th><th style="'+th+'">Transf.<br>internas</th><th style="'+th+'">Capital<br>na conta</th><th style="'+th+'">Saldo<br>atual</th><th style="'+th+'">Resultado</th><th style="'+th+'">Rentabi-<br>lidade</th></tr>';
     const gc=document.getElementById('geral-por-corretora');
     if(gc) gc.innerHTML='<div class="card" style="padding:0;overflow-x:auto">'
       +'<div class="card-label" style="padding:14px 18px 8px">Resultado por corretora (EUR) <span style="text-transform:none;letter-spacing:0;color:#c9c9c6">· transferências internas incluídas para refletir o capital real de cada conta</span></div>'
@@ -669,7 +662,7 @@ async function loadGeral() {
   });
   if (pnlAcumC) { if(window._geralPnlAcumChart) window._geralPnlAcumChart.destroy(); window._geralPnlAcumChart = new Chart(pnlAcumC, {type:'line', data:{labels:pnlAcumLabels, datasets:[
       {label:'Total', data:pnlAcumVals, borderColor:'#1c1c1a', backgroundColor:'#1c1c1a10', borderWidth:2.5, pointRadius:3, tension:0.3, fill:true, order:0},
-      ...CORRP.map(c=>({label:c, data:pnlPorCorr[c], borderColor:CORRCOL[c], backgroundColor:'transparent', borderWidth:1.5, pointRadius:0, tension:0.3, spanGaps:true, order:1}))
+      ...CORRP.map(c=>({label:c, data:pnlPorCorr[c], borderColor:CORRCOL[c], backgroundColor:'transparent', borderWidth:1.5, pointRadius:2.5, pointBackgroundColor:CORRCOL[c], tension:0.3, spanGaps:true, order:1}))
     ]}, options:{responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false}, plugins:{legend:{labels:{font:{size:10},boxWidth:10}}, tooltip:{callbacks:{label:ctx=>' '+ctx.dataset.label+': '+(ctx.raw>=0?'+':'')+eur(ctx.raw)}}}, scales:{x:{grid:{display:false}, ticks:{font:{size:9}}}, y:{grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>(v>=0?'+':'')+eur(v)}}}}}); }
 
   // Gráfico ganho/perda mensal com e sem efeito cambial
@@ -688,7 +681,10 @@ async function loadGeral() {
     return d.total_eur - pat[i].total_eur - aportesDoMes;
   });
   const vsCambioC = document.getElementById('geral-vs-cambio-chart');
-  if (vsCambioC) { if(window._geralVsCambioChart) window._geralVsCambioChart.destroy(); window._geralVsCambioChart = new Chart(vsCambioC, {type:'line', data:{labels:vsCambioLabels, datasets:[{label:'Variação total', data:varAbsVals, borderColor:'#9b9b98', backgroundColor:'transparent', borderWidth:2, pointRadius:2.5, tension:0.3, borderDash:[5,4]},{label:'Excl. aportes (resultado)', data:varSemAportes, borderColor:'#1565c0', backgroundColor:'#1565c012', borderWidth:2, pointRadius:3, tension:0.3, fill:true}]}, options:{responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false}, plugins:{legend:{labels:{font:{size:10},boxWidth:10}}, tooltip:{callbacks:{label:ctx=>' '+ctx.dataset.label+': '+(ctx.raw>=0?'+':'')+eur(ctx.raw)}}}, scales:{x:{grid:{display:false}, ticks:{font:{size:9}}}, y:{grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>eur(v)}}}}}); }
+  const barOpts = {responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>' '+(ctx.raw>=0?'+':'')+eur(ctx.raw)}}}, scales:{x:{grid:{display:false}, ticks:{font:{size:9}}}, y:{grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>eur(v)}}}};
+  const varTotC = document.getElementById('geral-var-total-chart');
+  if (varTotC) { if(window._geralVarTotChart) window._geralVarTotChart.destroy(); window._geralVarTotChart = new Chart(varTotC, {type:'bar', data:{labels:vsCambioLabels, datasets:[{data:varAbsVals, backgroundColor:varAbsVals.map(v=>v>=0?'#1a7f4bcc':'#c0392bcc'), borderRadius:4}]}, options:barOpts}); }
+  if (vsCambioC) { if(window._geralVsCambioChart) window._geralVsCambioChart.destroy(); window._geralVsCambioChart = new Chart(vsCambioC, {type:'bar', data:{labels:vsCambioLabels, datasets:[{data:varSemAportes, backgroundColor:varSemAportes.map(v=>v>=0?'#1565c0cc':'#c0392bcc'), borderRadius:4}]}, options:barOpts}); }
 
   // Gráfico Patrimônio em EUR e BRL
   const _MNC={Jan:1,Fev:2,Feb:2,Mar:3,Abr:4,Apr:4,Mai:5,May:5,Jun:6,Jul:7,Ago:8,Aug:8,Set:9,Sep:9,Out:10,Oct:10,Nov:11,Dez:12,Dec:12};
@@ -810,6 +806,7 @@ async function loadGeral() {
         + '<td style="'+td+';color:'+(restoMes?col(restoMes):'#c9c9c6')+'">'+(restoMes?(restoMes>=0?'+':'')+eur(restoMes):'0')+'</td>'
         + '<td style="'+td+';color:'+(restoAcum?col(restoAcum):'#c9c9c6')+'">'+(restoAcum?(restoAcum>=0?'+':'')+eur(restoAcum):'0')+'</td>'
         + '<td style="'+td+';font-weight:600;color:'+col(lucroAcum)+'">'+(lucroAcum>=0?'+':'')+eur(lucroAcum)+'</td>'
+        + '<td style="'+td+';font-weight:600;color:'+col(mercado)+'">'+(mercado>=0?'+':'')+eur(mercado)+'</td>'
         + '<td style="'+td+';font-weight:600">'+eur(final)+'</td>'
         + '<td style="'+td+';color:#6b6b68">'+(finalBRL!=null?'R$'+num(finalBRL,0):'—')+'</td>'
         + '<td style="'+td+';color:'+(pctMerc==null?'#9b9b98':col(pctMerc))+'">'+(pctMerc==null?'—':(pctMerc>=0?'+':'')+pctMerc.toFixed(1)+'%')+'</td>'
@@ -818,7 +815,7 @@ async function loadGeral() {
     }
     const head='<tr style="background:#fafaf9">'
       +'<th style="'+thL+'">Mês</th><th style="'+th+'">Valor<br>inicial</th><th style="'+th+'">Aportes</th><th style="'+th+'">Retiradas</th><th style="'+th+'">Aporte<br>líq.</th>'
-      +'<th style="'+th+'">Renda</th><th style="'+th+'">Custos</th><th style="'+th+'">Reali-<br>zado</th><th style="'+th+'">Realiz.<br>acum.</th><th style="'+th+'">Aber-<br>tas</th><th style="'+th+'">Abertas<br>acum.</th><th style="'+th+'">Resto</th><th style="'+th+'">Resto<br>acum.</th><th style="'+th+'">Lucro<br>acum.</th><th style="'+th+'">Valor<br>final</th><th style="'+th+'">Final<br>BRL</th><th style="'+th+'">%<br>merc.</th><th style="'+th+'">Var<br>%</th></tr>';
+      +'<th style="'+th+'">Renda</th><th style="'+th+'">Custos</th><th style="'+th+'">Reali-<br>zado</th><th style="'+th+'">Realiz.<br>acum.</th><th style="'+th+'">Aber-<br>tas</th><th style="'+th+'">Abertas<br>acum.</th><th style="'+th+'">Resto</th><th style="'+th+'">Resto<br>acum.</th><th style="'+th+'">Lucro<br>acum.</th><th style="'+th+'">Lucro<br>do mês</th><th style="'+th+'">Valor<br>final</th><th style="'+th+'">Final<br>BRL</th><th style="'+th+'">%<br>merc.</th><th style="'+th+'">Var<br>%</th></tr>';
     const el=document.getElementById('geral-tabela-mensal');
     const valFinalAtual = pat.length ? pat[pat.length-1].total_eur : 0;
     const cumApLiqAtual = pat.length ? (cumApLiqByKey[keyOf(pat[pat.length-1].mes)]||0) : 0;
@@ -839,9 +836,10 @@ async function loadGeral() {
       + '<td style="'+td+';color:'+col(totResto)+'">'+(totResto>=0?'+':'')+eur(totResto)+'</td>'
       + '<td style="'+td+';color:'+col(totResto)+'">'+(totResto>=0?'+':'')+eur(totResto)+'</td>'
       + '<td style="'+td+';color:'+col(lucroAcumAtual)+'">'+(lucroAcumAtual>=0?'+':'')+eur(lucroAcumAtual)+'</td>'
+      + '<td style="'+td+';color:'+col(lucroAcumAtual)+'">'+(lucroAcumAtual>=0?'+':'')+eur(lucroAcumAtual)+'</td>'
       + '<td style="'+td+'">'+eur(valFinalAtual)+'</td>'
       + '<td style="'+td+';color:#6b6b68">'+(brlAtual?'R$'+num(valFinalAtual*brlAtual,0):'—')+'</td>'
-      + '<td style="'+td+'"></td>'
+      + '<td style="'+td+';color:'+col(lucroAcumAtual)+'">'+(cumApLiqAtual>0?((lucroAcumAtual/cumApLiqAtual*100)>=0?'+':'')+(lucroAcumAtual/cumApLiqAtual*100).toFixed(1)+'%':'—')+'</td>'
       + '<td style="'+td+'"></td>'
       + '</tr>';
     if(el) el.innerHTML='<table style="width:100%;border-collapse:collapse;min-width:960px"><thead>'+head+'</thead><tbody>'+body+'</tbody><tfoot>'+foot+'</tfoot></table>';
