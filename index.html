@@ -539,7 +539,7 @@ async function loadGeral() {
     {label:'EUR (IBKR+R4)', data:eurSerie, borderColor:'#1a7f4b', backgroundColor:'#1a7f4b55', borderWidth:1.5, pointRadius:0, tension:0.3, fill:true},
     {label:'USD (Avenue)', data:usdSerie, borderColor:'#1565c0', backgroundColor:'#1565c055', borderWidth:1.5, pointRadius:0, tension:0.3, fill:true},
     {label:'BRL (XP)', data:brlSerie, borderColor:'#e65100', backgroundColor:'#e6510055', borderWidth:1.5, pointRadius:0, tension:0.3, fill:true}
-  ]}, options:{responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false}, plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12}}, tooltip:{callbacks:{label:ctx=>{const t=ctx.chart.data.datasets.reduce((s,ds)=>s+(ds.data[ctx.dataIndex]||0),0); const pct=t>0?(ctx.raw/t*100).toFixed(1):'0'; return ' '+ctx.dataset.label+': '+eur(ctx.raw)+' ('+pct+'%)';}, footer:items=>{const t=items.reduce((s,it)=>s+(it.raw||0),0);return 'Total: '+eur(t);}}, footerFont:{weight:'bold'}, footerColor:'#1c1c1a'}}, scales:{x:{grid:{display:false},ticks:{font:{size:9},maxTicksLimit:8}}, y:{stacked:true, grid:{color:'#f0f0ee'}, ticks:{font:{size:9},callback:v=>'€'+Math.round(v/1000)+'k'}}}}}); }
+  ]}, options:{responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false}, plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12}}, tooltip:{callbacks:{label:ctx=>{const t=ctx.chart.data.datasets.reduce((s,ds)=>s+(ds.data[ctx.dataIndex]||0),0); const pct=t>0?(ctx.raw/t*100).toFixed(1):'0'; return ' '+ctx.dataset.label+': '+eur(ctx.raw)+' ('+pct+'%)';}, footer:items=>{const t=items.reduce((s,it)=>s+(it.raw||0),0);return 'Total: '+eur(t);}}, footerFont:{weight:'bold'}, footerColor:'#fff'}}, scales:{x:{grid:{display:false},ticks:{font:{size:9},maxTicksLimit:8}}, y:{stacked:true, grid:{color:'#f0f0ee'}, ticks:{font:{size:9},callback:v=>'€'+Math.round(v/1000)+'k'}}}}}); }
 
   // Gráfico variação % mensal — removido (item 4)
 
@@ -587,10 +587,12 @@ async function loadGeral() {
   if (vsCambioC) { if(window._geralVsCambioChart) window._geralVsCambioChart.destroy(); window._geralVsCambioChart = new Chart(vsCambioC, {type:'bar', data:{labels:vsCambioLabels, datasets:[{label:'Variação total', data:varAbsVals, backgroundColor:varAbsVals.map(v=>v>=0?'#1a7f4b55':'#c0392b55'), borderRadius:4},{label:'Excl. aportes', data:varSemAportes, backgroundColor:varSemAportes.map(v=>v>=0?'#1a7f4bcc':'#c0392bcc'), borderRadius:4}]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{labels:{font:{size:10},boxWidth:10}}, tooltip:{callbacks:{label:ctx=>' '+(ctx.raw>=0?'+':'')+eur(ctx.raw)}}}, scales:{x:{grid:{display:false}, ticks:{font:{size:9}}}, y:{grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>eur(v)}}}}}); }
 
   // Gráfico Patrimônio em EUR e BRL
+  const _MNC={Jan:1,Fev:2,Feb:2,Mar:3,Abr:4,Apr:4,Mai:5,May:5,Jun:6,Jul:7,Ago:8,Aug:8,Set:9,Sep:9,Out:10,Oct:10,Nov:11,Dez:12,Dec:12};
+  const _ymk = mes => { const [mn,yr]=mes.split('/'); return yr+'-'+String(_MNC[mn]||0).padStart(2,'0'); };
   const cambioMap = {};
-  (cambioHist||[]).forEach(r=>{ cambioMap[r.mes]=r.eur_brl; });
+  (cambioHist||[]).forEach(r=>{ cambioMap[_ymk(r.mes)]=r.eur_brl; });
   const cambioPatlabels = pat.map(d=>d.mes.split('/')[0]+'/'+d.mes.split('/')[1].slice(2));
-  const patBRL = pat.map(d=>{ const rate=cambioMap[d.mes]; return rate? d.total_eur*rate : null; });
+  const patBRL = pat.map(d=>{ const rate=cambioMap[_ymk(d.mes)]; return rate? d.total_eur*rate : null; });
   const cambioPatC = document.getElementById('geral-cambio-pat-chart');
   if (cambioPatC) { if(window._geralCambioPatChart) window._geralCambioPatChart.destroy(); window._geralCambioPatChart = new Chart(cambioPatC, {type:'line', data:{labels:cambioPatlabels, datasets:[{label:'Patrimônio EUR', data:pat.map(d=>d.total_eur), borderColor:'#1a7f4b', backgroundColor:'transparent', borderWidth:2, pointRadius:3, tension:0.3, yAxisID:'yPat'},{label:'Patrimônio BRL', data:patBRL, borderColor:'#e65100', backgroundColor:'transparent', borderWidth:2, pointRadius:3, tension:0.3, yAxisID:'yBRL'}]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{labels:{font:{size:10},boxWidth:10}}, tooltip:{callbacks:{label:ctx=>ctx.datasetIndex===0?' €'+Math.round(ctx.raw).toLocaleString('de-DE'):' R$'+Math.round(ctx.raw).toLocaleString('de-DE')}}}, scales:{yPat:{position:'left', grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>'€'+Math.round(v/1000)+'k'}}, yBRL:{position:'right', grid:{display:false}, ticks:{font:{size:9}, callback:v=>'R$'+Math.round(v/1000)+'k'}}, x:{grid:{display:false}, ticks:{font:{size:9}}}}}}); }
 
@@ -621,7 +623,7 @@ async function loadGeral() {
     if(icC){ if(window._geralInvCaixaChart) window._geralInvCaixaChart.destroy(); window._geralInvCaixaChart=new Chart(icC,{type:'line',data:{labels:icLabels,datasets:[
       {label:'Investido',data:icInvest,borderColor:'#1565c0',backgroundColor:'#1565c015',borderWidth:2,pointRadius:3,tension:0.3,fill:true},
       {label:'Caixa',data:icCaixa,borderColor:'#8a8a86',backgroundColor:'transparent',borderWidth:2,pointRadius:3,tension:0.3}
-    ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{font:{size:10},boxWidth:10}},tooltip:{callbacks:{label:ctx=>{const t=(ctx.chart.data.datasets[0].data[ctx.dataIndex]||0)+(ctx.chart.data.datasets[1].data[ctx.dataIndex]||0); const pct=t>0?(ctx.raw/t*100).toFixed(1):'0'; return ' '+ctx.dataset.label+': '+eur(ctx.raw)+' ('+pct+'%)';},footer:items=>{const t=items.reduce((s,it)=>s+(it.raw||0),0);return 'Total: '+eur(t);}},footerFont:{weight:'bold'},footerColor:'#1c1c1a'}},scales:{x:{grid:{display:false},ticks:{font:{size:9}}},y:{grid:{color:'#f0f0ee'},ticks:{font:{size:9},callback:v=>'€'+Math.round(v/1000)+'k'}}}}}); }
+    ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{font:{size:10},boxWidth:10}},tooltip:{callbacks:{label:ctx=>{const t=(ctx.chart.data.datasets[0].data[ctx.dataIndex]||0)+(ctx.chart.data.datasets[1].data[ctx.dataIndex]||0); const pct=t>0?(ctx.raw/t*100).toFixed(1):'0'; return ' '+ctx.dataset.label+': '+eur(ctx.raw)+' ('+pct+'%)';},footer:items=>{const t=items.reduce((s,it)=>s+(it.raw||0),0);return 'Total: '+eur(t);}},footerFont:{weight:'bold'},footerColor:'#fff'}},scales:{x:{grid:{display:false},ticks:{font:{size:9}}},y:{grid:{color:'#f0f0ee'},ticks:{font:{size:9},callback:v=>'€'+Math.round(v/1000)+'k'}}}}}); }
   }
 
   const origByMonthCorr = {};
@@ -640,7 +642,7 @@ async function loadGeral() {
       const o = mes && origByMonthCorr[mes] ? origByMonthCorr[mes][corr] : null;
       const origStr = o ? ' ('+fmtOrig(o.val, SYM[o.moeda]||'')+' '+o.moeda+')' : '';
       return ' '+corr+': '+eur(ctx.raw)+origStr+' · '+pct+'%';
-    }, footer:items=>{const t=items.reduce((s,it)=>s+(it.raw||0),0); return 'Total: '+eur(t);}}, footerFont:{weight:'bold'}, footerColor:'#1c1c1a'}}, scales:{x:{stacked:true, grid:{display:false}, ticks:{font:{size:9}}}, y:{stacked:true, grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>'€'+Math.round(v/1000)+'k'}}}}}); }
+    }, footer:items=>{const t=items.reduce((s,it)=>s+(it.raw||0),0); return 'Total: '+eur(t);}}, footerFont:{weight:'bold'}, footerColor:'#fff'}}, scales:{x:{stacked:true, grid:{display:false}, ticks:{font:{size:9}}}, y:{stacked:true, grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>'€'+Math.round(v/1000)+'k'}}}}}); }
 
   // === Tabela mensal consolidada ===
   {
@@ -658,9 +660,12 @@ async function loadGeral() {
     // aporte líquido acumulado por mês (cronológico) p/ lucro acumulado
     const cumApLiqByKey={}; let _runAp=0;
     for(let j=0;j<pat.length;j++){ const kk=keyOf(pat[j].mes); _runAp += (apMes[kk]||0)-(retMes[kk]||0); cumApLiqByKey[kk]=_runAp; }
-    const th='padding:9px 12px;text-align:right;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.3px;color:#9b9b98;border-bottom:1px solid #f0f0ee;white-space:nowrap';
+    // realizado e não-realizado acumulados (cronológico)
+    const cumRealizByKey={}, cumNaoRealByKey={}; let _runRz=0, _runNr=0;
+    for(let j=0;j<pat.length;j++){ const kk=keyOf(pat[j].mes); const ini=j>0?pat[j-1].total_eur:0; const fin=pat[j].total_eur; const merc=fin-ini-(apMes[kk]||0)+(retMes[kk]||0); const rz=realizMes[kk]||0; _runRz+=rz; _runNr+=(merc-rz); cumRealizByKey[kk]=_runRz; cumNaoRealByKey[kk]=_runNr; }
+    const th='padding:8px 8px;text-align:right;font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.2px;color:#9b9b98;border-bottom:1px solid #f0f0ee;line-height:1.25';
     const thL=th.replace('text-align:right','text-align:left');
-    const td='padding:9px 12px;text-align:right;font-size:12px;border-bottom:1px solid #f5f5f4;white-space:nowrap';
+    const td='padding:8px 8px;text-align:right;font-size:11.5px;border-bottom:1px solid #f5f5f4;white-space:nowrap';
     const col=v=>v>=0?'#1a7f4b':'#c0392b';
     let body='';
     let totAp=0, totRet=0, totRd=0, totCt=0, totRealiz=0, totNaoReal=0;
@@ -676,6 +681,9 @@ async function loadGeral() {
       const varPct = inicial>0 ? (final-inicial)/inicial*100 : null;
       const aporteLiq = ap - ret;
       const lucroAcum = final - (cumApLiqByKey[k]||0);
+      const realizAcum = cumRealizByKey[k]||0;
+      const naoRealAcum = cumNaoRealByKey[k]||0;
+      const pctMerc = inicial>0 ? (mercado/inicial*100) : null;
       const brlRate = brlByKey[k];
       const finalBRL = brlRate ? final*brlRate : null;
       body += '<tr>'
@@ -687,16 +695,19 @@ async function loadGeral() {
         + '<td style="'+td+';color:'+(rd?'#1a7f4b':'#c9c9c6')+'">'+(rd?eur(rd):'—')+'</td>'
         + '<td style="'+td+';color:'+(ct?'#c0392b':'#c9c9c6')+'">'+(ct?eur(ct):'—')+'</td>'
         + '<td style="'+td+';color:'+(realizado?col(realizado):'#c9c9c6')+'">'+(realizado?(realizado>=0?'+':'')+eur(realizado):'—')+'</td>'
-        + '<td style="'+td+';font-weight:600;color:'+col(naoRealizado)+'">'+(naoRealizado>=0?'+':'')+eur(naoRealizado)+'</td>'
+        + '<td style="'+td+';color:'+col(naoRealizado)+'">'+(naoRealizado>=0?'+':'')+eur(naoRealizado)+'</td>'
+        + '<td style="'+td+';color:'+col(realizAcum)+'">'+(realizAcum>=0?'+':'')+eur(realizAcum)+'</td>'
+        + '<td style="'+td+';color:'+col(naoRealAcum)+'">'+(naoRealAcum>=0?'+':'')+eur(naoRealAcum)+'</td>'
         + '<td style="'+td+';font-weight:600;color:'+col(lucroAcum)+'">'+(lucroAcum>=0?'+':'')+eur(lucroAcum)+'</td>'
         + '<td style="'+td+';font-weight:600">'+eur(final)+'</td>'
         + '<td style="'+td+';color:#6b6b68">'+(finalBRL!=null?'R$'+num(finalBRL,0):'—')+'</td>'
+        + '<td style="'+td+';color:'+(pctMerc==null?'#9b9b98':col(pctMerc))+'">'+(pctMerc==null?'—':(pctMerc>=0?'+':'')+pctMerc.toFixed(1)+'%')+'</td>'
         + '<td style="'+td+';color:'+(varPct==null?'#9b9b98':col(varPct))+'">'+(varPct==null?'—':(varPct>=0?'+':'')+varPct.toFixed(1)+'%')+'</td>'
         + '</tr>';
     }
     const head='<tr style="background:#fafaf9">'
-      +'<th style="'+thL+'">Mês</th><th style="'+th+'">Valor inicial</th><th style="'+th+'">Aportes</th><th style="'+th+'">Retiradas</th><th style="'+th+'">Aporte líq.</th>'
-      +'<th style="'+th+'">Renda</th><th style="'+th+'">Custos</th><th style="'+th+'">Realizado</th><th style="'+th+'">Não realizado</th><th style="'+th+'">Lucro acum.</th><th style="'+th+'">Valor final</th><th style="'+th+'">Final BRL</th><th style="'+th+'">Var %</th></tr>';
+      +'<th style="'+thL+'">Mês</th><th style="'+th+'">Valor<br>inicial</th><th style="'+th+'">Aportes</th><th style="'+th+'">Retiradas</th><th style="'+th+'">Aporte<br>líq.</th>'
+      +'<th style="'+th+'">Renda</th><th style="'+th+'">Custos</th><th style="'+th+'">Reali-<br>zado</th><th style="'+th+'">Não<br>realiz.</th><th style="'+th+'">Realiz.<br>acum.</th><th style="'+th+'">Ñ realiz.<br>acum.</th><th style="'+th+'">Lucro<br>acum.</th><th style="'+th+'">Valor<br>final</th><th style="'+th+'">Final<br>BRL</th><th style="'+th+'">%<br>merc.</th><th style="'+th+'">Var<br>%</th></tr>';
     const el=document.getElementById('geral-tabela-mensal');
     const valFinalAtual = pat.length ? pat[pat.length-1].total_eur : 0;
     const cumApLiqAtual = pat.length ? (cumApLiqByKey[keyOf(pat[pat.length-1].mes)]||0) : 0;
@@ -712,9 +723,12 @@ async function loadGeral() {
       + '<td style="'+td+';color:#c0392b">'+eur(totCt)+'</td>'
       + '<td style="'+td+';color:'+col(totRealiz)+'">'+(totRealiz>=0?'+':'')+eur(totRealiz)+'</td>'
       + '<td style="'+td+';color:'+col(totNaoReal)+'">'+(totNaoReal>=0?'+':'')+eur(totNaoReal)+'</td>'
+      + '<td style="'+td+';color:'+col(totRealiz)+'">'+(totRealiz>=0?'+':'')+eur(totRealiz)+'</td>'
+      + '<td style="'+td+';color:'+col(totNaoReal)+'">'+(totNaoReal>=0?'+':'')+eur(totNaoReal)+'</td>'
       + '<td style="'+td+';color:'+col(lucroAcumAtual)+'">'+(lucroAcumAtual>=0?'+':'')+eur(lucroAcumAtual)+'</td>'
       + '<td style="'+td+'">'+eur(valFinalAtual)+'</td>'
       + '<td style="'+td+';color:#6b6b68">'+(brlAtual?'R$'+num(valFinalAtual*brlAtual,0):'—')+'</td>'
+      + '<td style="'+td+'"></td>'
       + '<td style="'+td+'"></td>'
       + '</tr>';
     if(el) el.innerHTML='<table style="width:100%;border-collapse:collapse;min-width:960px"><thead>'+head+'</thead><tbody>'+body+'</tbody><tfoot>'+foot+'</tfoot></table>';
