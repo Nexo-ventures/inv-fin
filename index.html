@@ -115,7 +115,6 @@
     <!-- Gráfico P&L acumulado -->
     <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">P&L acumulado mês a mês — total e por corretora (EUR)</div><div style="position:relative;height:200px"><canvas id="geral-pnl-acum-chart"></canvas></div></div>
     <!-- Gráfico variação mensal com/sem câmbio -->
-    <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Variação mensal — total e excl. aportes (EUR)</div><div style="position:relative;height:210px"><canvas id="geral-vs-cambio-chart"></canvas></div></div>
     <!-- Gráfico câmbio + patrimônio -->
     <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Patrimônio em EUR e BRL · variação mensal</div><div style="position:relative;height:220px"><canvas id="geral-cambio-pat-chart"></canvas></div></div>
     <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Aporte líquido mensal (EUR)</div><div style="position:relative;height:190px"><canvas id="geral-aporte-liq-chart"></canvas></div></div>
@@ -539,6 +538,18 @@ async function loadGeral() {
     const resto=lucroTotal-realizadoTotal-abertasTotal-rendaCustos;
     const semCambio=realizadoTotal+abertasTotal+rendaCustos;
     const rentGeral = capitalLiq>0 ? (lucroTotal/capitalLiq*100) : 0;
+    // TWR — retorno encadeado mês a mês (imune a aportes/retiradas)
+    let twrFactor=1, twrOk=false;
+    for(let j=1;j<pat.length;j++){
+      const ini=pat[j-1].total_eur, fim=pat[j].total_eur;
+      if(!ini||ini<=0) continue;
+      const kk=rk(pat[j].mes);
+      let fluxoMes=0;
+      fluxosSemCB.forEach(r=>{ if(rkd(r.data)===kk) fluxoMes += (r.tipo==='APORTE'? r.valor_eur : -Math.abs(r.valor_eur)); });
+      const retMes=(fim-ini-fluxoMes)/ini;
+      if(isFinite(retMes)){ twrFactor*=(1+retMes); twrOk=true; }
+    }
+    const twr = twrOk ? (twrFactor-1)*100 : null;
     const yieldG = (typeof yieldAnual!=='undefined' && yieldAnual!=null) ? yieldAnual : null;
     const cor=v=>v>=0?'#1a7f4b':'#c0392b';
     const sg=v=>(v>=0?'+':'−')+eur(Math.abs(v));
@@ -564,6 +575,7 @@ async function loadGeral() {
       +'<div style="display:flex;gap:12px;margin-top:12px;align-items:center">'
       +'<div style="padding:10px 16px;background:'+(semCambio>=0?'#eafaf1':'#fdf3f1')+';border-radius:8px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;margin-bottom:3px">Resultado atribuído <span style="color:#c9c9c6">(o que você controla)</span></div><div style="font-size:19px;font-weight:700;color:'+cor(semCambio)+'">'+sg(semCambio)+'</div></div>'
       +'<div style="padding:10px 16px;background:#fafaf9;border-radius:8px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;margin-bottom:3px">Rentabilidade</div><div style="font-size:19px;font-weight:700;color:'+cor(rentGeral)+'">'+(rentGeral>=0?'+':'')+rentGeral.toFixed(2)+'%</div><div style="font-size:10px;color:#c9c9c6;margin-top:1px">resultado / capital líquido</div></div>'
+      +'<div style="padding:10px 16px;background:#f4f6fb;border-radius:8px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;margin-bottom:3px">Rentabilidade TWR</div><div style="font-size:19px;font-weight:700;color:'+(twr==null?'#9b9b98':cor(twr))+'">'+(twr==null?'—':(twr>=0?'+':'')+twr.toFixed(2)+'%')+'</div><div style="font-size:10px;color:#c9c9c6;margin-top:1px">sem efeito de aportes/retiradas</div></div>'
       +'<div style="padding:10px 16px;background:#fafaf9;border-radius:8px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;margin-bottom:3px">Yield anualizado</div><div style="font-size:19px;font-weight:700;color:#1a7f4b">'+(yieldG!=null?yieldG.toFixed(2)+'%':'—')+'</div><div style="font-size:10px;color:#c9c9c6;margin-top:1px">só renda / patrimônio</div></div>'
       +'</div>'
       +'<div style="font-size:11px;color:#9b9b98;line-height:1.5;margin-top:10px">Realizado + Abertas + (Renda − Custos). O "não atribuído" é a diferença residual entre o patrimônio e a soma das partes.</div>'
@@ -694,11 +706,6 @@ async function loadGeral() {
     }, 0);
     return d.total_eur - pat[i].total_eur - aportesDoMes;
   });
-  const vsCambioC = document.getElementById('geral-vs-cambio-chart');
-  if (vsCambioC) { if(window._geralVsCambioChart) window._geralVsCambioChart.destroy(); window._geralVsCambioChart = new Chart(vsCambioC, {type:'bar', data:{labels:vsCambioLabels, datasets:[
-    {label:'Variação total', data:varAbsVals, backgroundColor:'#c9c9c6aa', borderRadius:3, barPercentage:0.9, categoryPercentage:0.85},
-    {label:'Excl. aportes (resultado)', data:varSemAportes, backgroundColor:varSemAportes.map(v=>v>=0?'#1a7f4bdd':'#c0392bdd'), borderRadius:3, barPercentage:0.5, categoryPercentage:0.85}
-  ]}, options:{responsive:true, maintainAspectRatio:false, grouped:false, interaction:{mode:'index',intersect:false}, plugins:{legend:{labels:{font:{size:10},boxWidth:10}}, tooltip:{callbacks:{label:ctx=>' '+ctx.dataset.label+': '+(ctx.raw>=0?'+':'')+eur(ctx.raw)}}}, scales:{x:{grid:{display:false}, ticks:{font:{size:9}}}, y:{grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>eur(v)}}}}}); }
 
   // Gráfico Patrimônio em EUR e BRL
   const _MNC={Jan:1,Fev:2,Feb:2,Mar:3,Abr:4,Apr:4,Mai:5,May:5,Jun:6,Jul:7,Ago:8,Aug:8,Set:9,Sep:9,Out:10,Oct:10,Nov:11,Dez:12,Dec:12};
@@ -711,10 +718,11 @@ async function loadGeral() {
   // variação mensal (barras) dentro do gráfico de patrimônio
   const varMensalPat = pat.map((d,i)=> i===0 ? null : d.total_eur - pat[i-1].total_eur);
   if (cambioPatC) { if(window._geralCambioPatChart) window._geralCambioPatChart.destroy(); window._geralCambioPatChart = new Chart(cambioPatC, {data:{labels:cambioPatlabels, datasets:[
-    {type:'bar', label:'Variação do mês', data:varMensalPat, backgroundColor:varMensalPat.map(v=>v==null?'#eee':(v>=0?'#1a7f4b40':'#c0392b40')), borderRadius:3, yAxisID:'yVar', order:3},
+    {type:'bar', label:'Variação do mês', data:varMensalPat, backgroundColor:varMensalPat.map(v=>v==null?'#eee':(v>=0?'#1a7f4b35':'#c0392b35')), borderRadius:3, yAxisID:'yVar', order:4, barPercentage:0.9, categoryPercentage:0.8},
+    {type:'bar', label:'Excl. aportes (resultado)', data:[null,...varSemAportes], backgroundColor:[null,...varSemAportes].map(v=>v==null?'#eee':(v>=0?'#1a7f4bcc':'#c0392bcc')), borderRadius:3, yAxisID:'yVar', order:3, barPercentage:0.45, categoryPercentage:0.8},
     {type:'line', label:'Patrimônio EUR', data:pat.map(d=>d.total_eur), borderColor:'#1a7f4b', backgroundColor:'transparent', borderWidth:2, pointRadius:3, tension:0.3, yAxisID:'yPat', order:1},
     {type:'line', label:'Patrimônio BRL', data:patBRL, borderColor:'#e65100', backgroundColor:'transparent', borderWidth:2, pointRadius:3, tension:0.3, yAxisID:'yBRL', order:2}
-  ]}, options:{responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false}, plugins:{legend:{labels:{font:{size:10},boxWidth:10}}, tooltip:{callbacks:{label:ctx=>{const l=ctx.dataset.label; if(l==='Patrimônio BRL') return ' '+l+': R$'+Math.round(ctx.raw).toLocaleString('de-DE'); return ' '+l+': '+(ctx.raw>=0?'':'')+eur(ctx.raw);}}}}, scales:{yPat:{position:'left', grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>'€'+Math.round(v/1000)+'k'}}, yBRL:{position:'right', grid:{display:false}, ticks:{font:{size:9}, callback:v=>'R$'+Math.round(v/1000)+'k'}}, yVar:{display:false, position:'right'}, x:{grid:{display:false}, ticks:{font:{size:9}}}}}}); }
+  ]}, options:{responsive:true, maintainAspectRatio:false, grouped:false, interaction:{mode:'index',intersect:false}, plugins:{legend:{labels:{font:{size:10},boxWidth:10}}, tooltip:{callbacks:{label:ctx=>{const l=ctx.dataset.label; if(l==='Patrimônio BRL') return ' '+l+': R$'+Math.round(ctx.raw).toLocaleString('de-DE'); return ' '+l+': '+(ctx.raw>=0?'':'')+eur(ctx.raw);}}}}, scales:{yPat:{position:'left', grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>'€'+Math.round(v/1000)+'k'}}, yBRL:{position:'right', grid:{display:false}, ticks:{font:{size:9}, callback:v=>'R$'+Math.round(v/1000)+'k'}}, yVar:{display:false, position:'right'}, x:{grid:{display:false}, ticks:{font:{size:9}}}}}}); }
 
   // Gráfico aporte líquido mensal (item 4)
   {
