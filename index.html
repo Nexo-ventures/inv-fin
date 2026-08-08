@@ -131,17 +131,13 @@
       <div class="card"><div class="card-label">Pior mês</div><div class="card-value" id="k-worst-mes">—</div><div class="card-sub" id="k-worst-mes-sub">—</div></div>
       <div class="card"><div class="card-label">Efeito cambial est.</div><div class="card-value" id="k-cambial">—</div><div class="card-sub" id="k-cambial-sub">estimativa</div></div>
     </div>
-    <!-- Gráfico evolução Investido vs Caixa -->
-    <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Investido vs Caixa — evolução (EUR)</div><div style="position:relative;height:200px"><canvas id="geral-inv-caixa-chart"></canvas></div></div>
     <!-- Tabela mensal consolidada -->
     <div class="card" style="padding:0;margin-bottom:16px;overflow-x:auto">
       <div class="card-label" style="padding:14px 18px 8px">Resumo mensal consolidado (EUR)</div>
       <div id="geral-tabela-mensal"></div>
     </div>
-    <!-- Gráficos linha 1 -->
-    <div style="margin-bottom:16px">
-      <div class="card"><div class="card-label" style="margin-bottom:8px">Distribuição por moeda</div><div style="position:relative;height:220px"><canvas id="geral-moeda-chart"></canvas></div></div>
-    </div>
+    <!-- Gráfico evolução Investido vs Caixa (após a tabela) -->
+    <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Investido vs Caixa — evolução (EUR)</div><div style="position:relative;height:200px"><canvas id="geral-inv-caixa-chart"></canvas></div></div>
     <!-- Gráfico P&L acumulado -->
     <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">P&L acumulado mês a mês (EUR)</div><div style="position:relative;height:200px"><canvas id="geral-pnl-acum-chart"></canvas></div></div>
     <!-- Gráfico variação mensal com/sem câmbio -->
@@ -150,8 +146,8 @@
     <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Patrimônio em EUR e BRL</div><div style="position:relative;height:200px"><canvas id="geral-cambio-pat-chart"></canvas></div></div>
     <!-- Gráfico alocação histórica -->
     <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Contribuição por corretora — patrimônio mensal (EUR)</div><div style="position:relative;height:220px"><canvas id="geral-corr-hist-chart"></canvas></div></div>
-    <!-- Gráfico variação % mensal -->
-    <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Variação % mensal do patrimônio</div><div style="position:relative;height:180px"><canvas id="geral-var-chart"></canvas></div></div>
+    <!-- Distribuição por moeda — evolução (após contribuição) -->
+    <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Distribuição por moeda — evolução (EUR)</div><div style="position:relative;height:220px"><canvas id="geral-moeda-chart"></canvas></div></div>
   </div>
 
   <div id="tab-posicoes" class="section">
@@ -534,16 +530,18 @@ async function loadGeral() {
   const vals = pat.map(d=>d.total_eur);
 
   // Gráfico moeda donut
-  const moedaData = [{l:'EUR (IBKR+R4)', v:(invCorrSnap.IBKR||0)+(invCorrSnap.R4||0), c:'#1a7f4b'},{l:'USD (Avenue)', v:invCorrSnap.AV||0, c:'#1565c0'},{l:'BRL (XP)', v:invCorrSnap.XP||0, c:'#e65100'}].filter(d=>d.v>0);
-  const totalMoeda = moedaData.reduce((s,d)=>s+d.v,0);
+  const moedaLabels = pat.map(d=>d.mes.split('/')[0]+'/'+d.mes.split('/')[1].slice(2));
+  const eurSerie = pat.map(d=>(d.ibkr_eur||0)+(d.r4_eur||0));
+  const usdSerie = pat.map(d=>d.av_eur||0);
+  const brlSerie = pat.map(d=>d.xp_eur||0);
   const mc = document.getElementById('geral-moeda-chart');
-  if (mc) { if(geralMoedaChart) geralMoedaChart.destroy(); geralMoedaChart = new Chart(mc, {type:'doughnut', data:{labels:moedaData.map(d=>d.l+' '+(totalMoeda?(d.v/totalMoeda*100).toFixed(1):'0')+'%'), datasets:[{data:moedaData.map(d=>d.v), backgroundColor:moedaData.map(d=>d.c), borderWidth:2, borderColor:'#fff'}]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{font:{size:10}, boxWidth:12}}, tooltip:{callbacks:{label:ctx=>' '+eur(ctx.raw)}}}}}); }
+  if (mc) { if(geralMoedaChart) geralMoedaChart.destroy(); geralMoedaChart = new Chart(mc, {type:'line', data:{labels:moedaLabels, datasets:[
+    {label:'EUR (IBKR+R4)', data:eurSerie, borderColor:'#1a7f4b', backgroundColor:'#1a7f4b55', borderWidth:1.5, pointRadius:0, tension:0.3, fill:true},
+    {label:'USD (Avenue)', data:usdSerie, borderColor:'#1565c0', backgroundColor:'#1565c055', borderWidth:1.5, pointRadius:0, tension:0.3, fill:true},
+    {label:'BRL (XP)', data:brlSerie, borderColor:'#e65100', backgroundColor:'#e6510055', borderWidth:1.5, pointRadius:0, tension:0.3, fill:true}
+  ]}, options:{responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false}, plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12}}, tooltip:{callbacks:{label:ctx=>{const t=ctx.chart.data.datasets.reduce((s,ds)=>s+(ds.data[ctx.dataIndex]||0),0); const pct=t>0?(ctx.raw/t*100).toFixed(1):'0'; return ' '+ctx.dataset.label+': '+eur(ctx.raw)+' ('+pct+'%)';}, footer:items=>{const t=items.reduce((s,it)=>s+(it.raw||0),0);return 'Total: '+eur(t);}}, footerFont:{weight:'bold'}, footerColor:'#1c1c1a'}}, scales:{x:{grid:{display:false},ticks:{font:{size:9},maxTicksLimit:8}}, y:{stacked:true, grid:{color:'#f0f0ee'}, ticks:{font:{size:9},callback:v=>'€'+Math.round(v/1000)+'k'}}}}}); }
 
-  // Gráfico variação % mensal
-  const varLabels = pat.slice(1).map(d=>d.mes.split('/')[0]+'/'+d.mes.split('/')[1].slice(2));
-  const varVals = pat.slice(1).map((d,i)=>pat[i].total_eur>0?((d.total_eur-pat[i].total_eur)/pat[i].total_eur*100):0);
-  const vc = document.getElementById('geral-var-chart');
-  if (vc) { if(geralVarChart) geralVarChart.destroy(); geralVarChart = new Chart(vc, {type:'bar', data:{labels:varLabels, datasets:[{data:varVals, backgroundColor:varVals.map(v=>v>=0?'#1a7f4b99':'#c0392b99'), borderRadius:4}]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>' '+(ctx.raw>=0?'+':'')+ctx.raw.toFixed(1)+'%'}}}, scales:{x:{grid:{display:false}, ticks:{font:{size:9}}}, y:{grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>v.toFixed(1)+'%'}}}}}); }
+  // Gráfico variação % mensal — removido (item 4)
 
   // Gráfico P&L acumulado mês a mês
   // Calcula aportes acumulados até cada mês usando fluxos com data
@@ -620,10 +618,10 @@ async function loadGeral() {
     });
     icLabels.push('Atual'); icInvest.push(totalInvestido); icCaixa.push(totalCaixa);
     const icC=document.getElementById('geral-inv-caixa-chart');
-    if(icC){ if(window._geralInvCaixaChart) window._geralInvCaixaChart.destroy(); window._geralInvCaixaChart=new Chart(icC,{type:'bar',data:{labels:icLabels,datasets:[
-      {label:'Investido',data:icInvest,backgroundColor:'#1565c0cc',stack:'ic'},
-      {label:'Caixa',data:icCaixa,backgroundColor:'#b8b8b4cc',stack:'ic'}
-    ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{font:{size:10},boxWidth:10}},tooltip:{callbacks:{label:ctx=>{const t=(ctx.chart.data.datasets[0].data[ctx.dataIndex]||0)+(ctx.chart.data.datasets[1].data[ctx.dataIndex]||0); const pct=t>0?(ctx.raw/t*100).toFixed(1):'0'; return ' '+ctx.dataset.label+': '+eur(ctx.raw)+' ('+pct+'%)';},footer:items=>{const t=items.reduce((s,it)=>s+(it.raw||0),0);return 'Total: '+eur(t);}},footerFont:{weight:'bold'},footerColor:'#1c1c1a'}},scales:{x:{stacked:true,grid:{display:false},ticks:{font:{size:9}}},y:{stacked:true,grid:{color:'#f0f0ee'},ticks:{font:{size:9},callback:v=>'€'+Math.round(v/1000)+'k'}}}}}); }
+    if(icC){ if(window._geralInvCaixaChart) window._geralInvCaixaChart.destroy(); window._geralInvCaixaChart=new Chart(icC,{type:'line',data:{labels:icLabels,datasets:[
+      {label:'Investido',data:icInvest,borderColor:'#1565c0',backgroundColor:'#1565c015',borderWidth:2,pointRadius:3,tension:0.3,fill:true},
+      {label:'Caixa',data:icCaixa,borderColor:'#8a8a86',backgroundColor:'transparent',borderWidth:2,pointRadius:3,tension:0.3}
+    ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{font:{size:10},boxWidth:10}},tooltip:{callbacks:{label:ctx=>{const t=(ctx.chart.data.datasets[0].data[ctx.dataIndex]||0)+(ctx.chart.data.datasets[1].data[ctx.dataIndex]||0); const pct=t>0?(ctx.raw/t*100).toFixed(1):'0'; return ' '+ctx.dataset.label+': '+eur(ctx.raw)+' ('+pct+'%)';},footer:items=>{const t=items.reduce((s,it)=>s+(it.raw||0),0);return 'Total: '+eur(t);}},footerFont:{weight:'bold'},footerColor:'#1c1c1a'}},scales:{x:{grid:{display:false},ticks:{font:{size:9}}},y:{grid:{color:'#f0f0ee'},ticks:{font:{size:9},callback:v=>'€'+Math.round(v/1000)+'k'}}}}}); }
   }
 
   const origByMonthCorr = {};
@@ -655,6 +653,11 @@ async function loadGeral() {
     (rendaTot||[]).forEach(r=>{ if(!r.data)return; const k=dateKey(r.data); rendaMes[k]=(rendaMes[k]||0)+(r.valor_eur||0); });
     (custosTot||[]).forEach(r=>{ if(!r.data)return; const k=dateKey(r.data); custoMes[k]=(custoMes[k]||0)+(r.valor_eur||0); });
     (resultFech||[]).forEach(r=>{ if(!r.data_saida)return; const k=dateKey(r.data_saida); realizMes[k]=(realizMes[k]||0)+(r.resultado_eur||0); });
+    // taxa EUR/BRL por mês (p/ valor final em BRL)
+    const brlByKey={}; (cambioHist||[]).forEach(c=>{ const [mn,yr]=c.mes.split('/'); const m=MES_NUM[mn]||(MES3.indexOf(mn)+1); brlByKey[yr+'-'+String(m).padStart(2,'0')]=c.eur_brl; });
+    // aporte líquido acumulado por mês (cronológico) p/ lucro acumulado
+    const cumApLiqByKey={}; let _runAp=0;
+    for(let j=0;j<pat.length;j++){ const kk=keyOf(pat[j].mes); _runAp += (apMes[kk]||0)-(retMes[kk]||0); cumApLiqByKey[kk]=_runAp; }
     const th='padding:9px 12px;text-align:right;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.3px;color:#9b9b98;border-bottom:1px solid #f0f0ee;white-space:nowrap';
     const thL=th.replace('text-align:right','text-align:left');
     const td='padding:9px 12px;text-align:right;font-size:12px;border-bottom:1px solid #f5f5f4;white-space:nowrap';
@@ -671,37 +674,50 @@ async function loadGeral() {
       const naoRealizado = mercado - realizado;
       totAp+=ap; totRet+=ret; totRd+=rd; totCt+=ct; totRealiz+=realizado; totNaoReal+=naoRealizado;
       const varPct = inicial>0 ? (final-inicial)/inicial*100 : null;
+      const aporteLiq = ap - ret;
+      const lucroAcum = final - (cumApLiqByKey[k]||0);
+      const brlRate = brlByKey[k];
+      const finalBRL = brlRate ? final*brlRate : null;
       body += '<tr>'
         + '<td style="'+td+';text-align:left;font-weight:500">'+d.mes+'</td>'
         + '<td style="'+td+';color:#6b6b68">'+(inicial?eur(inicial):'—')+'</td>'
         + '<td style="'+td+';color:'+(ap?'#1a7f4b':'#c9c9c6')+'">'+(ap?'+'+eur(ap):'—')+'</td>'
         + '<td style="'+td+';color:'+(ret?'#c0392b':'#c9c9c6')+'">'+(ret?'−'+eur(ret):'—')+'</td>'
+        + '<td style="'+td+';color:'+(aporteLiq?col(aporteLiq):'#c9c9c6')+'">'+(aporteLiq?(aporteLiq>=0?'+':'−')+eur(Math.abs(aporteLiq)):'—')+'</td>'
         + '<td style="'+td+';color:'+(rd?'#1a7f4b':'#c9c9c6')+'">'+(rd?eur(rd):'—')+'</td>'
         + '<td style="'+td+';color:'+(ct?'#c0392b':'#c9c9c6')+'">'+(ct?eur(ct):'—')+'</td>'
         + '<td style="'+td+';color:'+(realizado?col(realizado):'#c9c9c6')+'">'+(realizado?(realizado>=0?'+':'')+eur(realizado):'—')+'</td>'
         + '<td style="'+td+';font-weight:600;color:'+col(naoRealizado)+'">'+(naoRealizado>=0?'+':'')+eur(naoRealizado)+'</td>'
+        + '<td style="'+td+';font-weight:600;color:'+col(lucroAcum)+'">'+(lucroAcum>=0?'+':'')+eur(lucroAcum)+'</td>'
         + '<td style="'+td+';font-weight:600">'+eur(final)+'</td>'
+        + '<td style="'+td+';color:#6b6b68">'+(finalBRL!=null?'R$'+num(finalBRL,0):'—')+'</td>'
         + '<td style="'+td+';color:'+(varPct==null?'#9b9b98':col(varPct))+'">'+(varPct==null?'—':(varPct>=0?'+':'')+varPct.toFixed(1)+'%')+'</td>'
         + '</tr>';
     }
     const head='<tr style="background:#fafaf9">'
-      +'<th style="'+thL+'">Mês</th><th style="'+th+'">Valor inicial</th><th style="'+th+'">Aportes</th><th style="'+th+'">Retiradas</th>'
-      +'<th style="'+th+'">Renda</th><th style="'+th+'">Custos</th><th style="'+th+'">Realizado</th><th style="'+th+'">Não realizado</th><th style="'+th+'">Valor final</th><th style="'+th+'">Var %</th></tr>';
+      +'<th style="'+thL+'">Mês</th><th style="'+th+'">Valor inicial</th><th style="'+th+'">Aportes</th><th style="'+th+'">Retiradas</th><th style="'+th+'">Aporte líq.</th>'
+      +'<th style="'+th+'">Renda</th><th style="'+th+'">Custos</th><th style="'+th+'">Realizado</th><th style="'+th+'">Não realizado</th><th style="'+th+'">Lucro acum.</th><th style="'+th+'">Valor final</th><th style="'+th+'">Final BRL</th><th style="'+th+'">Var %</th></tr>';
     const el=document.getElementById('geral-tabela-mensal');
     const valFinalAtual = pat.length ? pat[pat.length-1].total_eur : 0;
+    const cumApLiqAtual = pat.length ? (cumApLiqByKey[keyOf(pat[pat.length-1].mes)]||0) : 0;
+    const lucroAcumAtual = valFinalAtual - cumApLiqAtual;
+    const brlAtual = pat.length ? brlByKey[keyOf(pat[pat.length-1].mes)] : null;
     const foot='<tr style="background:#fafaf9;font-weight:600;border-top:2px solid #e5e5e3">'
       + '<td style="'+td+';text-align:left">Total</td>'
       + '<td style="'+td+'"></td>'
       + '<td style="'+td+';color:#1a7f4b">+'+eur(totAp)+'</td>'
       + '<td style="'+td+';color:#c0392b">−'+eur(totRet)+'</td>'
+      + '<td style="'+td+';color:'+col(totAp-totRet)+'">'+((totAp-totRet)>=0?'+':'−')+eur(Math.abs(totAp-totRet))+'</td>'
       + '<td style="'+td+';color:#1a7f4b">'+eur(totRd)+'</td>'
       + '<td style="'+td+';color:#c0392b">'+eur(totCt)+'</td>'
       + '<td style="'+td+';color:'+col(totRealiz)+'">'+(totRealiz>=0?'+':'')+eur(totRealiz)+'</td>'
       + '<td style="'+td+';color:'+col(totNaoReal)+'">'+(totNaoReal>=0?'+':'')+eur(totNaoReal)+'</td>'
+      + '<td style="'+td+';color:'+col(lucroAcumAtual)+'">'+(lucroAcumAtual>=0?'+':'')+eur(lucroAcumAtual)+'</td>'
       + '<td style="'+td+'">'+eur(valFinalAtual)+'</td>'
+      + '<td style="'+td+';color:#6b6b68">'+(brlAtual?'R$'+num(valFinalAtual*brlAtual,0):'—')+'</td>'
       + '<td style="'+td+'"></td>'
       + '</tr>';
-    if(el) el.innerHTML='<table style="width:100%;border-collapse:collapse;min-width:820px"><thead>'+head+'</thead><tbody>'+body+'</tbody><tfoot>'+foot+'</tfoot></table>';
+    if(el) el.innerHTML='<table style="width:100%;border-collapse:collapse;min-width:960px"><thead>'+head+'</thead><tbody>'+body+'</tbody><tfoot>'+foot+'</tfoot></table>';
   }
 }
 
