@@ -601,12 +601,12 @@ async function loadGeral() {
       +item('Realizado',realizadoTotal,'trades fechados')+op+'+</div>'
       +item('Abertas',abertasTotal,'não realizado')+op+'+</div>'
       +item('Renda − Custos',rendaCustos,'')+op+'+</div>'
-      +item('Resto (câmbio)',resto,'não controlável')+op+'=</div>'
+      +item('Não atribuído',resto,'a investigar')+op+'=</div>'
       +'<div style="flex:1.2;min-width:130px;padding:10px 14px;background:'+(lucroTotal>=0?'#eafaf1':'#fdf3f1')+'"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;margin-bottom:3px">Resultado total</div><div style="font-size:19px;font-weight:700;color:'+cor(lucroTotal)+'">'+sg(lucroTotal)+'</div></div>'
       +'</div>'
       +'<div style="display:flex;gap:12px;margin-top:12px;align-items:center">'
-      +'<div style="padding:10px 16px;background:'+(semCambio>=0?'#eafaf1':'#fdf3f1')+';border-radius:8px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;margin-bottom:3px">Resultado sem câmbio <span style="color:#c9c9c6">(o que você controla)</span></div><div style="font-size:19px;font-weight:700;color:'+cor(semCambio)+'">'+sg(semCambio)+'</div></div>'
-      +'<div style="font-size:11px;color:#9b9b98;line-height:1.5">Realizado + Abertas + (Renda − Custos), sem o efeito cambial que depende do mercado de moedas.</div>'
+      +'<div style="padding:10px 16px;background:'+(semCambio>=0?'#eafaf1':'#fdf3f1')+';border-radius:8px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;margin-bottom:3px">Resultado atribuído <span style="color:#c9c9c6">(o que você controla)</span></div><div style="font-size:19px;font-weight:700;color:'+cor(semCambio)+'">'+sg(semCambio)+'</div></div>'
+      +'<div style="font-size:11px;color:#9b9b98;line-height:1.5">Realizado + Abertas + (Renda − Custos). O "não atribuído" é a diferença residual entre o patrimônio e a soma das partes.</div>'
       +'</div>'
       +'</div>';
   }
