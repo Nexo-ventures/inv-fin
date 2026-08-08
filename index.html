@@ -102,6 +102,8 @@
 <div class="content">
 
   <div id="tab-geral" class="section active">
+    <!-- KPI de fechamento — decomposição do resultado -->
+    <div id="geral-fechamento" style="margin-bottom:20px"></div>
     <!-- Linha 1: Capital -->
     <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:#9b9b98;margin-bottom:8px">Capital</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px">
@@ -378,7 +380,7 @@ let geralEvolucaoChart = null, geralMoedaChart = null, geralVarChart = null, ger
 async function loadGeral() {
   const [pat, posData_g, cash, rendaTot, custosTot, resultFech, fluxos, wiseData_g, cambioG, cambioHist, patMensal, snapsHist] = await Promise.all([
     get('/patrimonio_consolidado?select=mes,ordem,total_eur,xp_eur,av_eur,r4_eur,ibkr_eur,tem_provisorio&order=ordem.asc'),
-    get('/posicoes_abertas?select=corretora,moeda,preco_atual,quantidade,custo_total'),
+    get('/posicoes_abertas?select=corretora,moeda,preco_atual,quantidade,custo_total,data_entrada'),
     get('/operacoes?select=corretora,ticker,custo_total,preco_atual&status=eq.IGNORAR'),
     get('/renda?select=valor_eur,data'),
     get('/custos?select=valor_eur,data&corretora=neq.nan'),
@@ -549,6 +551,64 @@ async function loadGeral() {
   const MES_NUM_G={Jan:0,Fev:1,Feb:1,Mar:2,Abr:3,Apr:3,Mai:4,May:4,Jun:5,Jul:6,Ago:7,Aug:7,Set:8,Sep:8,Out:9,Oct:9,Nov:10,Dez:11,Dec:11};
   const mesToIdx = mn => (mn in MES_NUM_G) ? MES_NUM_G[mn] : MES_ORDER2.indexOf(mn);
   const fluxosSemCB = fluxos.filter(r=>r.corretora!=='CB'&&r.corretora!=='nan'&&r.tipo!=='TRANSFERENCIA_INTERNA'&&r.data);
+
+  // === KPI de fechamento — decomposição do resultado ===
+  {
+    const MNK={Jan:1,Fev:2,Feb:2,Mar:3,Abr:4,Apr:4,Mai:5,May:5,Jun:6,Jul:7,Ago:8,Aug:8,Set:9,Sep:9,Out:10,Oct:10,Nov:11,Dez:12,Dec:12};
+    const rk=mes=>{ const [mn,yr]=mes.split('/'); return yr+'-'+String(MNK[mn]||0).padStart(2,'0'); };
+    const rkd=d=>{ const dt=new Date(d); return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0'); };
+    const rateByKey={}; (cambioHist||[]).forEach(c=>{ rateByKey[rk(c.mes)]={brl:c.eur_brl,usd:c.eur_usd}; });
+    let _lk=null; Object.keys(rateByKey).sort().forEach(k=>_lk=k); const curR=rateByKey[_lk]||{brl:6,usd:1.15};
+    // aportes / retiradas
+    let aportesTotal=0, retiradasTotal=0;
+    fluxosSemCB.forEach(r=>{ if(r.tipo==='APORTE') aportesTotal+=r.valor_eur; else if(r.tipo==='RETIRADA') retiradasTotal+=r.valor_eur; });
+    // realizado, renda, custos
+    const realizadoTotal=(resultFech||[]).reduce((s,r)=>s+(r.resultado_eur||0),0);
+    const rendaTotalV=(rendaTot||[]).reduce((s,r)=>s+(r.valor_eur||0),0);
+    const custosTotalV=(custosTot||[]).reduce((s,r)=>s+(r.valor_eur||0),0);
+    const rendaCustos=rendaTotalV-custosTotalV;
+    // abertas (não realizado atual, custo na taxa da compra)
+    let abertasTotal=0;
+    (posData_g||[]).forEach(p=>{
+      if(!p.preco_atual||!p.quantidade) return;
+      const mo=(p.moeda||'').toLowerCase();
+      const vm=p.preco_atual*p.quantidade;
+      const mercEur = p.moeda==='EUR'?vm:(curR[mo]?vm/curR[mo]:null);
+      const er=rateByKey[rkd(p.data_entrada)];
+      const custoEntry = p.moeda==='EUR'?p.custo_total:(er&&er[mo]?p.custo_total/er[mo]:null);
+      if(mercEur!=null&&custoEntry!=null) abertasTotal += mercEur-custoEntry;
+    });
+    const capitalLiq=aportesTotal-retiradasTotal;
+    const lucroTotal=patrimonioTotal-capitalLiq;
+    const resto=lucroTotal-realizadoTotal-abertasTotal-rendaCustos;
+    const semCambio=realizadoTotal+abertasTotal+rendaCustos;
+    const cor=v=>v>=0?'#1a7f4b':'#c0392b';
+    const sg=v=>(v>=0?'+':'−')+eur(Math.abs(v));
+    const item=(lbl,val,sub)=>'<div style="flex:1;min-width:110px;padding:10px 14px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;margin-bottom:3px">'+lbl+'</div><div style="font-size:17px;font-weight:700;color:'+cor(val)+'">'+sg(val)+'</div>'+(sub?'<div style="font-size:10px;color:#c9c9c6;margin-top:1px">'+sub+'</div>':'')+'</div>';
+    const op='<div style="display:flex;align-items:center;font-size:18px;color:#c9c9c6;font-weight:300">';
+    const gf=document.getElementById('geral-fechamento');
+    if(gf) gf.innerHTML =
+      '<div class="card" style="padding:16px 18px">'
+      +'<div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:#9b9b98;margin-bottom:12px">Fechamento — decomposição do resultado</div>'
+      +'<div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:14px">'
+      +'<div style="flex:1;min-width:120px;padding:10px 14px;background:#fafaf9;border-radius:8px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;margin-bottom:3px">Aportes</div><div style="font-size:17px;font-weight:700;color:#1a7f4b">+'+eur(aportesTotal)+'</div></div>'
+      +'<div style="flex:1;min-width:120px;padding:10px 14px;background:#fafaf9;border-radius:8px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;margin-bottom:3px">Retiradas</div><div style="font-size:17px;font-weight:700;color:#c0392b">−'+eur(retiradasTotal)+'</div></div>'
+      +'<div style="flex:1;min-width:120px;padding:10px 14px;background:#f4f6fb;border-radius:8px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;margin-bottom:3px">Capital líquido</div><div style="font-size:17px;font-weight:700;color:#1c1c1a">'+eur(capitalLiq)+'</div></div>'
+      +'</div>'
+      +'<div style="display:flex;flex-wrap:wrap;align-items:stretch;gap:2px;border:1px solid #f0f0ee;border-radius:8px;overflow:hidden">'
+      +item('Realizado',realizadoTotal,'trades fechados')+op+'+</div>'
+      +item('Abertas',abertasTotal,'não realizado')+op+'+</div>'
+      +item('Renda − Custos',rendaCustos,'')+op+'+</div>'
+      +item('Resto (câmbio)',resto,'não controlável')+op+'=</div>'
+      +'<div style="flex:1.2;min-width:130px;padding:10px 14px;background:'+(lucroTotal>=0?'#eafaf1':'#fdf3f1')+'"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;margin-bottom:3px">Resultado total</div><div style="font-size:19px;font-weight:700;color:'+cor(lucroTotal)+'">'+sg(lucroTotal)+'</div></div>'
+      +'</div>'
+      +'<div style="display:flex;gap:12px;margin-top:12px;align-items:center">'
+      +'<div style="padding:10px 16px;background:'+(semCambio>=0?'#eafaf1':'#fdf3f1')+';border-radius:8px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;margin-bottom:3px">Resultado sem câmbio <span style="color:#c9c9c6">(o que você controla)</span></div><div style="font-size:19px;font-weight:700;color:'+cor(semCambio)+'">'+sg(semCambio)+'</div></div>'
+      +'<div style="font-size:11px;color:#9b9b98;line-height:1.5">Realizado + Abertas + (Renda − Custos), sem o efeito cambial que depende do mercado de moedas.</div>'
+      +'</div>'
+      +'</div>';
+  }
+
   const pnlAcumLabels = pat.map(d=>d.mes.split('/')[0]+'/'+d.mes.split('/')[1].slice(2));
   const pnlAcumVals = pat.map(d => {
     const [mn, yr] = d.mes.split('/');
