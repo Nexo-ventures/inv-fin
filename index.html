@@ -104,6 +104,7 @@
   <div id="tab-geral" class="section active">
     <!-- KPI de fechamento — decomposição do resultado -->
     <div id="geral-fechamento" style="margin-bottom:20px"></div>
+    <div id="geral-por-corretora" style="margin-bottom:20px"></div>
     <!-- Linha 1: Capital -->
     <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:#9b9b98;margin-bottom:8px">Capital</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px">
@@ -609,6 +610,59 @@ async function loadGeral() {
       +'<div style="font-size:11px;color:#9b9b98;line-height:1.5">Realizado + Abertas + (Renda − Custos). O "não atribuído" é a diferença residual entre o patrimônio e a soma das partes.</div>'
       +'</div>'
       +'</div>';
+  }
+
+  // === Tabela: resultado por corretora (inclui transferências internas p/ linhas verdadeiras) ===
+  {
+    const CORR=['XP','AV','IBKR','R4'];
+    const CLBL={XP:'XP Investimentos',AV:'Avenue',IBKR:'Interactive Brokers',R4:'Renta 4'};
+    const ag={}; CORR.forEach(c=>ag[c]={ap:0,ret:0,intra:0});
+    (fluxos||[]).forEach(r=>{
+      const c=r.corretora; if(!ag[c]) return;
+      const v=r.valor_eur||0;
+      if(r.tipo==='APORTE') ag[c].ap+=v;
+      else if(r.tipo==='RETIRADA') ag[c].ret+=Math.abs(v);
+      else if(r.tipo==='TRANSFERENCIA_INTERNA') ag[c].intra+=v; // sinal já indica entrada/saída
+    });
+    const patByCorr={}; if(last){ patByCorr.XP=last.xp_eur||0; patByCorr.AV=last.av_eur||0; patByCorr.IBKR=last.ibkr_eur||0; patByCorr.R4=last.r4_eur||0; }
+    const th='padding:9px 12px;text-align:right;font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.3px;color:#9b9b98;border-bottom:1px solid #f0f0ee;white-space:nowrap';
+    const thL=th.replace('text-align:right','text-align:left');
+    const td='padding:9px 12px;text-align:right;font-size:12px;border-bottom:1px solid #f5f5f4;white-space:nowrap';
+    const cl=v=>v>=0?'#1a7f4b':'#c0392b';
+    let tAp=0,tRet=0,tIntra=0,tSaldo=0,body='';
+    CORR.forEach(c=>{
+      const d=ag[c], saldo=patByCorr[c]||0;
+      const entrou=d.ap-d.ret+d.intra;      // capital que entrou nessa corretora (inclui internas)
+      const res=saldo-entrou;                // resultado real da corretora
+      const pct=entrou>0?(res/entrou*100):null;
+      tAp+=d.ap; tRet+=d.ret; tIntra+=d.intra; tSaldo+=saldo;
+      body+='<tr>'
+        +'<td style="'+td+';text-align:left"><span class="pill p-'+c+'">'+c+'</span> <span style="font-size:11px;color:#6b6b68">'+CLBL[c]+'</span></td>'
+        +'<td style="'+td+';color:'+(d.ap?'#1a7f4b':'#c9c9c6')+'">'+(d.ap?'+'+eur(d.ap):'—')+'</td>'
+        +'<td style="'+td+';color:'+(d.ret?'#c0392b':'#c9c9c6')+'">'+(d.ret?'−'+eur(d.ret):'—')+'</td>'
+        +'<td style="'+td+';color:'+(d.intra?cl(d.intra):'#c9c9c6')+'">'+(d.intra?(d.intra>=0?'+':'−')+eur(Math.abs(d.intra)):'—')+'</td>'
+        +'<td style="'+td+';font-weight:600">'+eur(entrou)+'</td>'
+        +'<td style="'+td+';font-weight:600">'+eur(saldo)+'</td>'
+        +'<td style="'+td+';font-weight:700;color:'+cl(res)+'">'+(res>=0?'+':'−')+eur(Math.abs(res))+'</td>'
+        +'<td style="'+td+';color:'+(pct==null?'#9b9b98':cl(pct))+'">'+(pct==null?'—':(pct>=0?'+':'')+pct.toFixed(1)+'%')+'</td>'
+        +'</tr>';
+    });
+    const tEntrou=tAp-tRet+tIntra, tRes=tSaldo-tEntrou, tPct=tEntrou>0?(tRes/tEntrou*100):null;
+    const foot='<tr style="background:#fafaf9;font-weight:700;border-top:2px solid #e5e5e3">'
+      +'<td style="'+td+';text-align:left">Total</td>'
+      +'<td style="'+td+';color:#1a7f4b">+'+eur(tAp)+'</td>'
+      +'<td style="'+td+';color:#c0392b">−'+eur(tRet)+'</td>'
+      +'<td style="'+td+';color:#9b9b98">'+(Math.abs(tIntra)<1?'0':eur(tIntra))+'</td>'
+      +'<td style="'+td+'">'+eur(tEntrou)+'</td>'
+      +'<td style="'+td+'">'+eur(tSaldo)+'</td>'
+      +'<td style="'+td+';color:'+cl(tRes)+'">'+(tRes>=0?'+':'−')+eur(Math.abs(tRes))+'</td>'
+      +'<td style="'+td+';color:'+(tPct==null?'#9b9b98':cl(tPct))+'">'+(tPct==null?'—':(tPct>=0?'+':'')+tPct.toFixed(1)+'%')+'</td>'
+      +'</tr>';
+    const head='<tr style="background:#fafaf9"><th style="'+thL+'">Corretora</th><th style="'+th+'">Aportes</th><th style="'+th+'">Retiradas</th><th style="'+th+'">Transf.<br>internas</th><th style="'+th+'">Capital<br>na conta</th><th style="'+th+'">Saldo<br>atual</th><th style="'+th+'">Resultado</th><th style="'+th+'">%</th></tr>';
+    const gc=document.getElementById('geral-por-corretora');
+    if(gc) gc.innerHTML='<div class="card" style="padding:0;overflow-x:auto">'
+      +'<div class="card-label" style="padding:14px 18px 8px">Resultado por corretora (EUR) <span style="text-transform:none;letter-spacing:0;color:#c9c9c6">· transferências internas incluídas para refletir o capital real de cada conta</span></div>'
+      +'<table style="width:100%;border-collapse:collapse;min-width:800px"><thead>'+head+'</thead><tbody>'+body+'</tbody><tfoot>'+foot+'</tfoot></table></div>';
   }
 
   const pnlAcumLabels = pat.map(d=>d.mes.split('/')[0]+'/'+d.mes.split('/')[1].slice(2));
