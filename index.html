@@ -386,7 +386,7 @@ async function loadGeral() {
     get('/renda?select=valor_eur,data'),
     get('/custos?select=valor_eur,data&corretora=neq.nan'),
     get('/resultado_fechado?select=resultado_eur,data_saida,dias_posicao'),
-    get('/fluxos_capital?select=tipo,valor_eur,corretora,data'),
+    get('/fluxos_capital?select=tipo,valor_eur,valor,moeda,corretora,data'),
     get('/cambio_wise?select=custo_pct,valor_eur'),
     get('/cambio?select=mes,eur_brl,eur_usd&order=mes.desc&limit=1'),
     get('/cambio?select=mes,eur_brl,eur_usd&order=mes.asc'),
@@ -616,35 +616,46 @@ async function loadGeral() {
   {
     const CORR=['XP','AV','IBKR','R4'];
     const CLBL={XP:'XP Investimentos',AV:'Avenue',IBKR:'Interactive Brokers',R4:'Renta 4'};
-    const ag={}; CORR.forEach(c=>ag[c]={ap:0,ret:0,intra:0});
+    const CMOEDA={XP:'BRL',AV:'USD',IBKR:'EUR',R4:'EUR'};
+    const SYMB={BRL:'R$',USD:'$',EUR:'€'};
+    const ag={}; CORR.forEach(c=>ag[c]={ap:0,ret:0,intra:0,apO:0,retO:0,intraO:0});
     (fluxos||[]).forEach(r=>{
       const c=r.corretora; if(!ag[c]) return;
-      const v=r.valor_eur||0;
-      if(r.tipo==='APORTE') ag[c].ap+=v;
-      else if(r.tipo==='RETIRADA') ag[c].ret+=Math.abs(v);
-      else if(r.tipo==='TRANSFERENCIA_INTERNA') ag[c].intra+=v; // sinal já indica entrada/saída
+      const v=r.valor_eur||0, vo=r.valor||0;
+      const mesma = (r.moeda||CMOEDA[c])===CMOEDA[c];
+      if(r.tipo==='APORTE'){ ag[c].ap+=v; if(mesma) ag[c].apO+=Math.abs(vo); }
+      else if(r.tipo==='RETIRADA'){ ag[c].ret+=Math.abs(v); if(mesma) ag[c].retO+=Math.abs(vo); }
+      else if(r.tipo==='TRANSFERENCIA_INTERNA'){ ag[c].intra+=v; if(mesma) ag[c].intraO+=vo; }
     });
-    const patByCorr={}; if(last){ patByCorr.XP=last.xp_eur||0; patByCorr.AV=last.av_eur||0; patByCorr.IBKR=last.ibkr_eur||0; patByCorr.R4=last.r4_eur||0; }
+    const patByCorr={}, patOrig={};
+    if(last){ patByCorr.XP=last.xp_eur||0; patByCorr.AV=last.av_eur||0; patByCorr.IBKR=last.ibkr_eur||0; patByCorr.R4=last.r4_eur||0; }
+    (patMensal||[]).forEach(r=>{ if(r.mes===last.mes) patOrig[r.corretora]={val:r.valor_orig, moeda:r.moeda}; });
     const th='padding:9px 12px;text-align:right;font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.3px;color:#9b9b98;border-bottom:1px solid #f0f0ee;white-space:nowrap';
     const thL=th.replace('text-align:right','text-align:left');
     const td='padding:9px 12px;text-align:right;font-size:12px;border-bottom:1px solid #f5f5f4;white-space:nowrap';
     const cl=v=>v>=0?'#1a7f4b':'#c0392b';
+    const sub=(txt)=>'<div style="font-size:10px;color:#9b9b98;margin-top:1px">'+txt+'</div>';
+    const fo=(v,m)=>SYMB[m]+num(Math.abs(v),0);
     let tAp=0,tRet=0,tIntra=0,tSaldo=0,body='';
     CORR.forEach(c=>{
-      const d=ag[c], saldo=patByCorr[c]||0;
-      const entrou=d.ap-d.ret+d.intra;      // capital que entrou nessa corretora (inclui internas)
-      const res=saldo-entrou;                // resultado real da corretora
-      const pct=entrou>0?(res/entrou*100):null;
+      const d=ag[c], saldo=patByCorr[c]||0, mo=CMOEDA[c];
+      const entrou=d.ap-d.ret+d.intra;
+      const res=saldo-entrou;
       tAp+=d.ap; tRet+=d.ret; tIntra+=d.intra; tSaldo+=saldo;
+      // moeda original
+      const entrouO=d.apO-d.retO+d.intraO;
+      const saldoO=patOrig[c]?patOrig[c].val:null;
+      const resO=(saldoO!=null&&entrouO)?saldoO-entrouO:null;
+      const pctO=(resO!=null&&entrouO>0)?(resO/entrouO*100):null; // rentabilidade na moeda (sem ruído de câmbio)
       body+='<tr>'
         +'<td style="'+td+';text-align:left"><span class="pill p-'+c+'">'+c+'</span> <span style="font-size:11px;color:#6b6b68">'+CLBL[c]+'</span></td>'
         +'<td style="'+td+';color:'+(d.ap?'#1a7f4b':'#c9c9c6')+'">'+(d.ap?'+'+eur(d.ap):'—')+'</td>'
         +'<td style="'+td+';color:'+(d.ret?'#c0392b':'#c9c9c6')+'">'+(d.ret?'−'+eur(d.ret):'—')+'</td>'
         +'<td style="'+td+';color:'+(d.intra?cl(d.intra):'#c9c9c6')+'">'+(d.intra?(d.intra>=0?'+':'−')+eur(Math.abs(d.intra)):'—')+'</td>'
-        +'<td style="'+td+';font-weight:600">'+eur(entrou)+'</td>'
-        +'<td style="'+td+';font-weight:600">'+eur(saldo)+'</td>'
-        +'<td style="'+td+';font-weight:700;color:'+cl(res)+'">'+(res>=0?'+':'−')+eur(Math.abs(res))+'</td>'
-        +'<td style="'+td+';color:'+(pct==null?'#9b9b98':cl(pct))+'">'+(pct==null?'—':(pct>=0?'+':'')+pct.toFixed(1)+'%')+'</td>'
+        +'<td style="'+td+';font-weight:600">'+eur(entrou)+(entrouO?sub(fo(entrouO,mo)+' '+mo):'')+'</td>'
+        +'<td style="'+td+';font-weight:600">'+eur(saldo)+(saldoO!=null?sub(fo(saldoO,mo)+' '+mo):'')+'</td>'
+        +'<td style="'+td+';font-weight:700;color:'+cl(res)+'">'+(res>=0?'+':'−')+eur(Math.abs(res))+(resO!=null?sub('<span style="color:'+cl(resO)+'">'+(resO>=0?'+':'−')+fo(resO,mo)+'</span>'):'')+'</td>'
+        +'<td style="'+td+';font-weight:600;color:'+(pctO==null?'#9b9b98':cl(pctO))+'">'+(pctO==null?'—':(pctO>=0?'+':'')+pctO.toFixed(1)+'%')+sub('na moeda')+'</td>'
         +'</tr>';
     });
     const tEntrou=tAp-tRet+tIntra, tRes=tSaldo-tEntrou, tPct=tEntrou>0?(tRes/tEntrou*100):null;
@@ -658,7 +669,7 @@ async function loadGeral() {
       +'<td style="'+td+';color:'+cl(tRes)+'">'+(tRes>=0?'+':'−')+eur(Math.abs(tRes))+'</td>'
       +'<td style="'+td+';color:'+(tPct==null?'#9b9b98':cl(tPct))+'">'+(tPct==null?'—':(tPct>=0?'+':'')+tPct.toFixed(1)+'%')+'</td>'
       +'</tr>';
-    const head='<tr style="background:#fafaf9"><th style="'+thL+'">Corretora</th><th style="'+th+'">Aportes</th><th style="'+th+'">Retiradas</th><th style="'+th+'">Transf.<br>internas</th><th style="'+th+'">Capital<br>na conta</th><th style="'+th+'">Saldo<br>atual</th><th style="'+th+'">Resultado</th><th style="'+th+'">%</th></tr>';
+    const head='<tr style="background:#fafaf9"><th style="'+thL+'">Corretora</th><th style="'+th+'">Aportes</th><th style="'+th+'">Retiradas</th><th style="'+th+'">Transf.<br>internas</th><th style="'+th+'">Capital<br>na conta</th><th style="'+th+'">Saldo<br>atual</th><th style="'+th+'">Resultado</th><th style="'+th+'">Rentabi-<br>lidade</th></tr>';
     const gc=document.getElementById('geral-por-corretora');
     if(gc) gc.innerHTML='<div class="card" style="padding:0;overflow-x:auto">'
       +'<div class="card-label" style="padding:14px 18px 8px">Resultado por corretora (EUR) <span style="text-transform:none;letter-spacing:0;color:#c9c9c6">· transferências internas incluídas para refletir o capital real de cada conta</span></div>'
