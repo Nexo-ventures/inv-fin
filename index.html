@@ -2362,9 +2362,11 @@ async function loadFluxos() {
   fluxosData = flux;
   // último mês do patrimônio, convertido para chave YYYY-MM
   const MES3 = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const MES_PT_EN = {Jan:1,Fev:2,Feb:2,Mar:3,Abr:4,Apr:4,Mai:5,May:5,Jun:6,Jul:7,Ago:8,Aug:8,Set:9,Sep:9,Out:10,Oct:10,Nov:11,Dez:12,Dec:12};
   const patKeys = (patM || []).map(p => {
-    const [mn, yr] = (p.mes||'').split('/'); const i = MES3.indexOf(mn);
-    return i < 0 ? null : `${yr}-${String(i+1).padStart(2,'0')}`;
+    const [mn, yr] = (p.mes||'').split('/');
+    const m = MES_PT_EN[mn] || (MES3.indexOf(mn)+1);
+    return m > 0 ? `${yr}-${String(m).padStart(2,'0')}` : null;
   }).filter(Boolean).sort();
   fluxosPatrimMax = patKeys.length ? patKeys[patKeys.length-1] : null;
   renderFluxos(fluxosData);
