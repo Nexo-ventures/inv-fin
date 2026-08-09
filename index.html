@@ -643,7 +643,12 @@ async function loadGeral() {
       }
       twrCorr[c]= ok ? (f-1)*100 : null;
     });
-    let tAp=0,tRet=0,tIntra=0,tSaldo=0,body='';
+    const TXA={BRL:(posCambio&&posCambio.brl)||null, USD:(posCambio&&posCambio.usd)||null, EUR:1};
+    { // fallback: taxa do mês mais recente do cambio
+      let bk=null,bv=-1; (cambioHist||[]).forEach(x=>{const k=kM(x.mes);if(k>bk||bk===null){if(k>bk){bk=k;bv=1;TXA.BRL=TXA.BRL||x.eur_brl;TXA.USD=TXA.USD||x.eur_usd;}}});
+      if(!TXA.BRL||!TXA.USD){ let best=null; (cambioHist||[]).forEach(x=>{const k=kM(x.mes); if(!best||k>best.k) best={k,x};}); if(best){TXA.BRL=TXA.BRL||best.x.eur_brl;TXA.USD=TXA.USD||best.x.eur_usd;} }
+    }
+    let tAp=0,tRet=0,tIntra=0,tSaldo=0,tReal=0,tFx=0,body='';
     CORR.forEach(c=>{
       const d=ag[c], saldo=patByCorr[c]||0, mo=CMOEDA[c];
       const entrou=d.ap-d.ret+d.intra;
@@ -653,6 +658,10 @@ async function loadGeral() {
       const entrouO=d.apO-d.retO+d.intraO;
       const saldoO=patOrig[c]?patOrig[c].val:null;
       const resO=(saldoO!=null&&entrouO)?saldoO-entrouO:null;
+      const txm=TXA[mo]||1;
+      const resReal = (resO!=null) ? (mo==='EUR'?resO:resO/txm) : res;
+      const resFx = res - resReal;
+      tReal+=resReal; tFx+=resFx;
       const pctO=(resO!=null&&entrouO>0)?(resO/entrouO*100):null; // rentabilidade na moeda (sem ruído de câmbio)
       body+='<tr>'
         +'<td style="'+td+';text-align:left"><span class="pill p-'+c+'">'+c+'</span> <span style="font-size:11px;color:#6b6b68">'+CLBL[c]+'</span></td>'
@@ -662,7 +671,9 @@ async function loadGeral() {
         +'<td style="'+td+';color:'+(d.intra?cl(d.intra):'#c9c9c6')+'">'+(d.intra?(d.intra>=0?'+':'−')+eur(Math.abs(d.intra)):'—')+'</td>'
         +'<td style="'+td+';font-weight:600">'+eur(entrou)+(entrouO?sub(fo(entrouO,mo)+' '+mo):'')+'</td>'
         +'<td style="'+td+';font-weight:600">'+eur(saldo)+(saldoO!=null?sub(fo(saldoO,mo)+' '+mo):'')+'</td>'
-        +'<td style="'+td+';font-weight:700;color:'+cl(res)+'">'+(res>=0?'+':'−')+eur(Math.abs(res))+(resO!=null?sub('<span style="color:'+cl(resO)+'">'+(resO>=0?'+':'−')+fo(resO,mo)+'</span>'):'')+'</td>'
+        +'<td style="'+td+';font-weight:600;color:'+cl(resReal)+'">'+(resReal>=0?'+':'−')+eur(Math.abs(resReal))+(resO!=null&&mo!=='EUR'?sub('<span style="color:'+cl(resO)+'">'+(resO>=0?'+':'−')+fo(resO,mo)+'</span>'):'')+'</td>'
+        +'<td style="'+td+';color:'+(Math.abs(resFx)<1?'#c9c9c6':cl(resFx))+'">'+(Math.abs(resFx)<1?'—':(resFx>=0?'+':'−')+eur(Math.abs(resFx)))+'</td>'
+        +'<td style="'+td+';font-weight:700;color:'+cl(res)+'">'+(res>=0?'+':'−')+eur(Math.abs(res))+'</td>'
         +'<td style="'+td+';font-weight:600;color:'+(twrCorr[c]==null?'#9b9b98':cl(twrCorr[c]))+'">'+(twrCorr[c]==null?'—':(twrCorr[c]>=0?'+':'')+twrCorr[c].toFixed(1)+'%')+'</td>'
         +'</tr>';
     });
@@ -675,10 +686,12 @@ async function loadGeral() {
       +'<td style="'+td+';color:#9b9b98">'+(Math.abs(tIntra)<1?'0':eur(tIntra))+'</td>'
       +'<td style="'+td+'">'+eur(tEntrou)+'</td>'
       +'<td style="'+td+'">'+eur(tSaldo)+'</td>'
+      +'<td style="'+td+';color:'+cl(tReal)+'">'+(tReal>=0?'+':'−')+eur(Math.abs(tReal))+'</td>'
+      +'<td style="'+td+';color:'+cl(tFx)+'">'+(tFx>=0?'+':'−')+eur(Math.abs(tFx))+'</td>'
       +'<td style="'+td+';color:'+cl(tRes)+'">'+(tRes>=0?'+':'−')+eur(Math.abs(tRes))+'</td>'
       +'<td style="'+td+';color:#9b9b98">—</td>'
       +'</tr>';
-    const head='<tr style="background:#fafaf9"><th style="'+thL+'">Corretora</th><th style="'+th+'">Aportes</th><th style="'+th+'">Retiradas</th><th style="'+th+'">Aporte<br>líq.</th><th style="'+th+'">Transf.<br>internas</th><th style="'+th+'">Capital<br>na conta</th><th style="'+th+'">Saldo<br>atual</th><th style="'+th+'">Resultado</th><th style="'+th+'">TWR</th></tr>';
+    const head='<tr style="background:#fafaf9"><th style="'+thL+'">Corretora</th><th style="'+th+'">Aportes</th><th style="'+th+'">Retiradas</th><th style="'+th+'">Aporte<br>líq.</th><th style="'+th+'">Transf.<br>internas</th><th style="'+th+'">Capital<br>na conta</th><th style="'+th+'">Saldo<br>atual</th><th style="'+th+'">Result.<br>real</th><th style="'+th+'">Efeito<br>cambial</th><th style="'+th+'">Resultado</th><th style="'+th+'">TWR</th></tr>';
     const gc=document.getElementById('geral-por-corretora');
     if(gc) gc.innerHTML='<div class="card" style="padding:0;overflow-x:auto">'
       +'<div class="card-label" style="padding:14px 18px 8px">Resultado por corretora (EUR) <span style="text-transform:none;letter-spacing:0;color:#c9c9c6">· transferências internas incluídas para refletir o capital real de cada conta</span></div>'
