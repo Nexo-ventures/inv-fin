@@ -352,7 +352,7 @@ let geralEvolucaoChart = null, geralMoedaChart = null, geralVarChart = null, ger
 async function loadGeral() {
   const [pat, posData_g, cash, rendaTot, custosTot, resultFech, fluxos, wiseData_g, cambioG, cambioHist, patMensal, snapsHist] = await Promise.all([
     get('/patrimonio_consolidado?select=mes,ordem,total_eur,xp_eur,av_eur,r4_eur,ibkr_eur,tem_provisorio&order=ordem.asc'),
-    get('/posicoes_abertas?select=corretora,moeda,preco_atual,quantidade,custo_total,data_entrada'),
+    get('/posicoes_abertas?select=corretora,ticker,moeda,preco_atual,quantidade,custo_total,data_entrada'),
     get('/operacoes?select=corretora,ticker,custo_total,preco_atual&status=eq.IGNORAR'),
     get('/renda?select=valor_eur,data'),
     get('/custos?select=valor_eur,data&corretora=neq.nan'),
@@ -663,7 +663,6 @@ async function loadGeral() {
         +'<td style="'+td+';font-weight:600">'+eur(entrou)+(entrouO?sub(fo(entrouO,mo)+' '+mo):'')+'</td>'
         +'<td style="'+td+';font-weight:600">'+eur(saldo)+(saldoO!=null?sub(fo(saldoO,mo)+' '+mo):'')+'</td>'
         +'<td style="'+td+';font-weight:700;color:'+cl(res)+'">'+(res>=0?'+':'−')+eur(Math.abs(res))+(resO!=null?sub('<span style="color:'+cl(resO)+'">'+(resO>=0?'+':'−')+fo(resO,mo)+'</span>'):'')+'</td>'
-        +'<td style="'+td+';font-weight:600;color:'+(entrou>0?cl(res/entrou):'#9b9b98')+'">'+(entrou>0?((res/entrou*100)>=0?'+':'')+(res/entrou*100).toFixed(1)+'%':'—')+'</td>'
         +'<td style="'+td+';font-weight:600;color:'+(twrCorr[c]==null?'#9b9b98':cl(twrCorr[c]))+'">'+(twrCorr[c]==null?'—':(twrCorr[c]>=0?'+':'')+twrCorr[c].toFixed(1)+'%')+'</td>'
         +'</tr>';
     });
@@ -677,10 +676,9 @@ async function loadGeral() {
       +'<td style="'+td+'">'+eur(tEntrou)+'</td>'
       +'<td style="'+td+'">'+eur(tSaldo)+'</td>'
       +'<td style="'+td+';color:'+cl(tRes)+'">'+(tRes>=0?'+':'−')+eur(Math.abs(tRes))+'</td>'
-      +'<td style="'+td+';color:'+(tEntrou>0?cl(tRes/tEntrou):'#9b9b98')+'">'+(tEntrou>0?((tRes/tEntrou*100)>=0?'+':'')+(tRes/tEntrou*100).toFixed(1)+'%':'—')+'</td>'
       +'<td style="'+td+';color:#9b9b98">—</td>'
       +'</tr>';
-    const head='<tr style="background:#fafaf9"><th style="'+thL+'">Corretora</th><th style="'+th+'">Aportes</th><th style="'+th+'">Retiradas</th><th style="'+th+'">Aporte<br>líq.</th><th style="'+th+'">Transf.<br>internas</th><th style="'+th+'">Capital<br>na conta</th><th style="'+th+'">Saldo<br>atual</th><th style="'+th+'">Resultado</th><th style="'+th+'">Rentabi-<br>lidade</th><th style="'+th+'">TWR</th></tr>';
+    const head='<tr style="background:#fafaf9"><th style="'+thL+'">Corretora</th><th style="'+th+'">Aportes</th><th style="'+th+'">Retiradas</th><th style="'+th+'">Aporte<br>líq.</th><th style="'+th+'">Transf.<br>internas</th><th style="'+th+'">Capital<br>na conta</th><th style="'+th+'">Saldo<br>atual</th><th style="'+th+'">Resultado</th><th style="'+th+'">TWR</th></tr>';
     const gc=document.getElementById('geral-por-corretora');
     if(gc) gc.innerHTML='<div class="card" style="padding:0;overflow-x:auto">'
       +'<div class="card-label" style="padding:14px 18px 8px">Resultado por corretora (EUR) <span style="text-transform:none;letter-spacing:0;color:#c9c9c6">· transferências internas incluídas para refletir o capital real de cada conta</span></div>'
