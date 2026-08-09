@@ -1410,7 +1410,56 @@ function renderHist(rows) {
       // Rentabilidade acumulada
       '<div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Rentabilidade acumulada mês a mês (%)</div><div style="position:relative;height:200px"><canvas id="hist-rent-chart"></canvas></div></div>'+
       // Resultado por setor barras
-      '<div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Resultado por setor (EUR)</div><div style="position:relative;height:240px"><canvas id="hist-setor-chart"></canvas></div></div>';
+      '<div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Resultado por setor (EUR)</div><div style="position:relative;height:240px"><canvas id="hist-setor-chart"></canvas></div></div>' +
+      (() => {
+        const CM={XP:'BRL',AV:'USD',IBKR:'USD',R4:'EUR'};
+        const ag={};
+        rows.forEach(r=>{
+          const c=r.corretora; if(!c) return;
+          if(!ag[c]) ag[c]={n:0,pos:0,resEur:0,resMoeda:0,moedas:new Set()};
+          const o=ag[c]; o.n++; o.moedas.add(r.moeda);
+          if((r.resultado_eur||0)>0) o.pos++;
+          o.resEur += (r.resultado_eur||0);
+          o.resMoeda += (r.resultado_moeda||0);
+        });
+        const ordem=Object.keys(ag).sort((a,b)=>ag[b].resEur-ag[a].resEur);
+        if(!ordem.length) return '';
+        const th='padding:9px 12px;text-align:right;font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.3px;color:#9b9b98;border-bottom:1px solid #f0f0ee;white-space:nowrap';
+        const thL=th.replace('text-align:right','text-align:left');
+        const td='padding:9px 12px;text-align:right;font-size:12px;border-bottom:1px solid #f5f5f4;white-space:nowrap';
+        const cl=v=>v>=0?'#1a7f4b':'#c0392b';
+        const SY={BRL:'R$',USD:'$',EUR:'€'};
+        let body='',tN=0,tPos=0,tEur=0,tReal=0;
+        ordem.forEach(c=>{
+          const o=ag[c];
+          const mo=o.moedas.size===1?[...o.moedas][0]:(CM[c]||'EUR');
+          const tx = mo==='BRL'?taxaAtual.brl : mo==='USD'?taxaAtual.usd : 1;
+          const real = tx? (mo==='EUR'?o.resMoeda:o.resMoeda/tx) : o.resEur;
+          const fx = o.resEur - real;
+          tN+=o.n; tPos+=o.pos; tEur+=o.resEur; tReal+=real;
+          const acerto=o.n?(o.pos/o.n*100):0;
+          body+='<tr>'
+            +'<td style="'+td+';text-align:left"><span class="pill p-'+c+'">'+c+'</span></td>'
+            +'<td style="'+td+';color:#6b6b68">'+o.n+'</td>'
+            +'<td style="'+td+';color:'+cl(real)+'">'+(real>=0?'+':'−')+'€'+num(Math.abs(real),2)+(mo!=='EUR'?'<div style="font-size:10px;color:#9b9b98">'+(o.resMoeda>=0?'+':'−')+SY[mo]+num(Math.abs(o.resMoeda),0)+'</div>':'')+'</td>'
+            +'<td style="'+td+';color:'+(Math.abs(fx)<1?'#c9c9c6':cl(fx))+'">'+(Math.abs(fx)<1?'—':(fx>=0?'+':'−')+'€'+num(Math.abs(fx),2))+'</td>'
+            +'<td style="'+td+';font-weight:700;color:'+cl(o.resEur)+'">'+(o.resEur>=0?'+':'−')+'€'+num(Math.abs(o.resEur),2)+'</td>'
+            +'<td style="'+td+';color:#6b6b68">'+acerto.toFixed(0)+'%</td>'
+            +'</tr>';
+        });
+        const tFx=tEur-tReal, tAc=tN?(tPos/tN*100):0;
+        const foot='<tr style="background:#fafaf9;font-weight:700;border-top:2px solid #e5e5e3">'
+          +'<td style="'+td+';text-align:left">Total</td>'
+          +'<td style="'+td+'">'+tN+'</td>'
+          +'<td style="'+td+';color:'+cl(tReal)+'">'+(tReal>=0?'+':'−')+'€'+num(Math.abs(tReal),2)+'</td>'
+          +'<td style="'+td+';color:'+cl(tFx)+'">'+(tFx>=0?'+':'−')+'€'+num(Math.abs(tFx),2)+'</td>'
+          +'<td style="'+td+';color:'+cl(tEur)+'">'+(tEur>=0?'+':'−')+'€'+num(Math.abs(tEur),2)+'</td>'
+          +'<td style="'+td+'">'+tAc.toFixed(0)+'%</td></tr>';
+        const head='<tr style="background:#fafaf9"><th style="'+thL+'">Corretora</th><th style="'+th+'">Ops</th><th style="'+th+'">Result.<br>real</th><th style="'+th+'">Efeito<br>cambial</th><th style="'+th+'">Resultado</th><th style="'+th+'">Taxa<br>acerto</th></tr>';
+        return '<div class="card" style="padding:0;margin-bottom:16px;overflow-x:auto">'
+          +'<div class="card-label" style="padding:14px 18px 8px">Resultado realizado por corretora (EUR)</div>'
+          +'<table style="width:100%;border-collapse:collapse;min-width:620px"><thead>'+head+'</thead><tbody>'+body+'</tbody><tfoot>'+foot+'</tfoot></table></div>';
+      })();
 
     // Gráfico rentabilidade acumulada
     const byMonthRent = {};
