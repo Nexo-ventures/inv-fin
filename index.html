@@ -521,17 +521,33 @@ async function loadGeral() {
     const rendaTotalV=(rendaTot||[]).reduce((s,r)=>s+(r.valor_eur||0),0);
     const custosTotalV=(custosTot||[]).reduce((s,r)=>s+(r.valor_eur||0),0);
     const rendaCustos=rendaTotalV-custosTotalV;
-    // abertas (não realizado atual, custo na taxa da compra)
-    let abertasTotal=0;
+    // abertas — usa o SNAPSHOT DO FECHAMENTO (mesma data do patrimônio), não o ao vivo
+    let abertasTotal=0, abertasAoVivo=0;
+    // mapa de preço do último snapshot
+    const snapUlt={}; let snapData=null;
+    (snapsHist||[]).forEach(s=>{ if(!snapData||s.data>snapData) snapData=s.data; });
+    (snapsHist||[]).forEach(s=>{ if(s.data===snapData) snapUlt[s.corretora+'_'+s.ticker]=s.custo_total; });
+    const rFech = snapData ? rateByKey[rkd(snapData)] : null;
     (posData_g||[]).forEach(p=>{
-      if(!p.preco_atual||!p.quantidade) return;
+      if(!p.quantidade) return;
       const mo=(p.moeda||'').toLowerCase();
-      const vm=p.preco_atual*p.quantidade;
-      const mercEur = p.moeda==='EUR'?vm:(curR[mo]?vm/curR[mo]:null);
       const er=rateByKey[rkd(p.data_entrada)];
       const custoEntry = p.moeda==='EUR'?p.custo_total:(er&&er[mo]?p.custo_total/er[mo]:null);
-      if(mercEur!=null&&custoEntry!=null) abertasTotal += mercEur-custoEntry;
+      if(custoEntry==null) return;
+      // valor no fechamento (snapshot): custo_total do snapshot = valor de mercado naquela data
+      const vFechMoeda = snapUlt[p.corretora+'_'+p.ticker];
+      if(vFechMoeda!=null){
+        const vFechEur = p.moeda==='EUR'?vFechMoeda:(rFech&&rFech[mo]?vFechMoeda/rFech[mo]:null);
+        if(vFechEur!=null) abertasTotal += vFechEur-custoEntry;
+      }
+      // ao vivo (referência)
+      if(p.preco_atual){
+        const vm=p.preco_atual*p.quantidade;
+        const mercEur = p.moeda==='EUR'?vm:(curR[mo]?vm/curR[mo]:null);
+        if(mercEur!=null) abertasAoVivo += mercEur-custoEntry;
+      }
     });
+    if(!snapData) abertasTotal = abertasAoVivo; // sem snapshot, cai pro ao vivo
     abertasLimpoG = abertasTotal;
     const capitalLiq=aportesTotal-retiradasTotal;
     const lucroTotal=patrimonioTotal-capitalLiq;
@@ -567,7 +583,7 @@ async function loadGeral() {
       +'</div>'
       +'<div style="display:flex;flex-wrap:wrap;align-items:stretch;gap:2px;border:1px solid #f0f0ee;border-radius:8px;overflow:hidden">'
       +item('Realizado',realizadoTotal,'trades fechados')+op+'+</div>'
-      +item('Abertas',abertasTotal,'não realizado')+op+'+</div>'
+      +item('Abertas',abertasTotal,'não realizado no fecho'+(snapData?' '+snapData.slice(8,10)+'/'+snapData.slice(5,7):''))+op+'+</div>'
       +item('Renda − Custos',rendaCustos,'renda '+eur(rendaTotalV)+' · custos '+eur(custosTotalV))+op+'+</div>'
       +item('Não atribuído',resto,'a investigar')+op+'=</div>'
       +'<div style="flex:1.2;min-width:130px;padding:10px 14px;background:'+(lucroTotal>=0?'#eafaf1':'#fdf3f1')+'"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;margin-bottom:3px">Resultado total</div><div style="font-size:19px;font-weight:700;color:'+cor(lucroTotal)+'">'+sg(lucroTotal)+'</div></div>'
@@ -606,6 +622,27 @@ async function loadGeral() {
     const cl=v=>v>=0?'#1a7f4b':'#c0392b';
     const sub=(txt)=>'<div style="font-size:10px;color:#9b9b98;margin-top:1px">'+txt+'</div>';
     const fo=(v,m)=>SYMB[m]+num(Math.abs(v),0);
+    // TWR por corretora (encadeia retorno mensal, imune a aportes/retiradas/internas)
+    const MKC={Jan:1,Fev:2,Feb:2,Mar:3,Abr:4,Apr:4,Mai:5,May:5,Jun:6,Jul:7,Ago:8,Aug:8,Set:9,Sep:9,Out:10,Oct:10,Nov:11,Dez:12,Dec:12};
+    const kM=m=>{const [mn,yr]=m.split('/');return yr+'-'+String(MKC[mn]||0).padStart(2,'0');};
+    const kD=d=>{const dt=new Date(d);return isNaN(dt)?null:dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0');};
+    const twrCorr={};
+    CORR.forEach(c=>{
+      const serie=pat.map(d=>c==='XP'?(d.xp_eur||0):c==='AV'?(d.av_eur||0):c==='IBKR'?(d.ibkr_eur||0):(d.r4_eur||0));
+      let f=1, ok=false;
+      for(let j=1;j<pat.length;j++){
+        const ini=serie[j-1], fim=serie[j];
+        if(!ini||ini<=0) continue;
+        const kk=kM(pat[j].mes);
+        let fl=0;
+        (fluxos||[]).forEach(r=>{ if(r.corretora!==c||kD(r.data)!==kk) return;
+          const v=r.valor_eur||0;
+          if(r.tipo==='APORTE') fl+=v; else if(r.tipo==='RETIRADA') fl-=Math.abs(v); else if(r.tipo==='TRANSFERENCIA_INTERNA') fl+=v; });
+        const rm=(fim-ini-fl)/ini;
+        if(isFinite(rm)){ f*=(1+rm); ok=true; }
+      }
+      twrCorr[c]= ok ? (f-1)*100 : null;
+    });
     let tAp=0,tRet=0,tIntra=0,tSaldo=0,body='';
     CORR.forEach(c=>{
       const d=ag[c], saldo=patByCorr[c]||0, mo=CMOEDA[c];
@@ -627,6 +664,7 @@ async function loadGeral() {
         +'<td style="'+td+';font-weight:600">'+eur(saldo)+(saldoO!=null?sub(fo(saldoO,mo)+' '+mo):'')+'</td>'
         +'<td style="'+td+';font-weight:700;color:'+cl(res)+'">'+(res>=0?'+':'−')+eur(Math.abs(res))+(resO!=null?sub('<span style="color:'+cl(resO)+'">'+(resO>=0?'+':'−')+fo(resO,mo)+'</span>'):'')+'</td>'
         +'<td style="'+td+';font-weight:600;color:'+(entrou>0?cl(res/entrou):'#9b9b98')+'">'+(entrou>0?((res/entrou*100)>=0?'+':'')+(res/entrou*100).toFixed(1)+'%':'—')+'</td>'
+        +'<td style="'+td+';font-weight:600;color:'+(twrCorr[c]==null?'#9b9b98':cl(twrCorr[c]))+'">'+(twrCorr[c]==null?'—':(twrCorr[c]>=0?'+':'')+twrCorr[c].toFixed(1)+'%')+'</td>'
         +'</tr>';
     });
     const tEntrou=tAp-tRet+tIntra, tRes=tSaldo-tEntrou, tPct=tEntrou>0?(tRes/tEntrou*100):null;
@@ -640,8 +678,9 @@ async function loadGeral() {
       +'<td style="'+td+'">'+eur(tSaldo)+'</td>'
       +'<td style="'+td+';color:'+cl(tRes)+'">'+(tRes>=0?'+':'−')+eur(Math.abs(tRes))+'</td>'
       +'<td style="'+td+';color:'+(tEntrou>0?cl(tRes/tEntrou):'#9b9b98')+'">'+(tEntrou>0?((tRes/tEntrou*100)>=0?'+':'')+(tRes/tEntrou*100).toFixed(1)+'%':'—')+'</td>'
+      +'<td style="'+td+';color:#9b9b98">—</td>'
       +'</tr>';
-    const head='<tr style="background:#fafaf9"><th style="'+thL+'">Corretora</th><th style="'+th+'">Aportes</th><th style="'+th+'">Retiradas</th><th style="'+th+'">Aporte<br>líq.</th><th style="'+th+'">Transf.<br>internas</th><th style="'+th+'">Capital<br>na conta</th><th style="'+th+'">Saldo<br>atual</th><th style="'+th+'">Resultado</th><th style="'+th+'">Rentabi-<br>lidade</th></tr>';
+    const head='<tr style="background:#fafaf9"><th style="'+thL+'">Corretora</th><th style="'+th+'">Aportes</th><th style="'+th+'">Retiradas</th><th style="'+th+'">Aporte<br>líq.</th><th style="'+th+'">Transf.<br>internas</th><th style="'+th+'">Capital<br>na conta</th><th style="'+th+'">Saldo<br>atual</th><th style="'+th+'">Resultado</th><th style="'+th+'">Rentabi-<br>lidade</th><th style="'+th+'">TWR</th></tr>';
     const gc=document.getElementById('geral-por-corretora');
     if(gc) gc.innerHTML='<div class="card" style="padding:0;overflow-x:auto">'
       +'<div class="card-label" style="padding:14px 18px 8px">Resultado por corretora (EUR) <span style="text-transform:none;letter-spacing:0;color:#c9c9c6">· transferências internas incluídas para refletir o capital real de cada conta</span></div>'
