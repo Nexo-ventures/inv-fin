@@ -658,7 +658,7 @@ async function loadGeral() {
     (custosTot||[]).forEach(r=>{ if(!r.corretora) return; rcC[r.corretora]=(rcC[r.corretora]||0)-(r.valor_eur||0); });
     {
       const snapU={}; let sD=null;
-      (snapsHist||[]).forEach(x=>{ if(!sD||x.data>sD) sD=x.data; });
+      (snapsHist||[]).forEach(x=>{ if(!ehFimMes(x.data)) return; if(!sD||x.data>sD) sD=x.data; });
       (snapsHist||[]).forEach(x=>{ if(x.data===sD) snapU[x.corretora+'_'+x.ticker]=x.custo_total; });
       const MKx={Jan:1,Fev:2,Feb:2,Mar:3,Abr:4,Apr:4,Mai:5,May:5,Jun:6,Jul:7,Ago:8,Aug:8,Set:9,Sep:9,Out:10,Oct:10,Nov:11,Dez:12,Dec:12};
       const kMx=m=>{const [mn,yr]=(m||'').split('/');return yr+'-'+String(MKx[mn]||0).padStart(2,'0');};
@@ -989,13 +989,18 @@ async function loadPosicoes() {
   // snapshot de fechamento = data mais recente em precos_historico
   posFechamento = {}; posFechamentoData = null;
   if (snaps && snaps.length) {
-    posFechamentoData = snaps[0].data; // já vem ordenado desc
+    // referência = último snapshot de FECHAMENTO DE MÊS (último dia do mês).
+    // Snapshots intramês (atualizações de preço ao vivo) não servem de referência.
+    const ehFimDeMes = d => { const dt=new Date(d+'T12:00:00'); const nx=new Date(dt); nx.setDate(nx.getDate()+1); return nx.getMonth()!==dt.getMonth(); };
+    const fechamentos = snaps.filter(s => ehFimDeMes(s.data));
+    posFechamentoData = fechamentos.length ? fechamentos[0].data : snaps[0].data;
     snaps.filter(s => s.data === posFechamentoData).forEach(s => { posFechamento[s.corretora+'_'+s.ticker] = s.preco; });
   }
   posFiltCorr = 'TODAS'; posFiltClasse = 'TODAS';
   renderPos(posData);
 }
 let posFechamento = {}, posFechamentoData = null;
+function ehFimMes(d){ const dt=new Date(d+'T12:00:00'); if(isNaN(dt)) return false; const nx=new Date(dt); nx.setDate(nx.getDate()+1); return nx.getMonth()!==dt.getMonth(); }
 // taxa (mes-chave) do fechamento p/ converter valor de fechamento na taxa correta
 function mesKeyDaData(dstr){ if(!dstr) return null; const d=new Date(dstr); const M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; return M[d.getMonth()]+'/'+d.getFullYear(); }
 
@@ -2087,10 +2092,11 @@ function mesSort(a, b) {
 const MAX_BRL = 6.75, MAX_USD = 1.24;
 let cambioChartBRL = null, cambioChartUSD = null, cambioChartPct = null;
 async function loadCambio() {
-  const [cambio, wise, patMes] = await Promise.all([
+  const [cambio, wise, patMes, snapsCam] = await Promise.all([
     get('/cambio?select=*'),
     get('/cambio_wise?select=*&order=data.asc'),
-    get('/patrimonio_mensal?select=mes,corretora,valor_orig,moeda,valor_eur')
+    get('/patrimonio_mensal?select=mes,corretora,valor_orig,moeda,valor_eur'),
+    get('/precos_historico?select=corretora,ticker,custo_total,moeda,data&order=data.asc')
   ]);
   wiseData = [...wise].reverse();
   const sorted = [...cambio].sort(mesSort);
@@ -2222,8 +2228,16 @@ async function loadCambio() {
     const tx={}; (cambio||[]).forEach(c=>{ tx[kM(c.mes)]={brl:c.eur_brl, usd:c.eur_usd}; });
     // saldo em moeda original por mês/corretora
     const sal={}; (patMes||[]).forEach(r=>{ const k=kM(r.mes); (sal[k]=sal[k]||{})[r.corretora]={val:r.valor_orig, moeda:r.moeda}; });
+    // saldo em USD das ações do IBKR por mês (via snapshots de precos_historico)
+    const ibkrUsdMes={};
+    (snapsCam||[]).forEach(x=>{
+      if(x.corretora!=='IBKR'||x.moeda!=='USD') return;
+      const dt=new Date(x.data); if(isNaN(dt)) return;
+      const k=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0');
+      ibkrUsdMes[k]=(ibkrUsdMes[k]||0)+(x.custo_total||0);
+    });
     const keys=Object.keys(sal).sort();
-    const linhas=[]; let accXP=0, accAV=0;
+    const linhas=[]; let accXP=0, accAV=0, accIB=0;
     for(let i=1;i<keys.length;i++){
       const kPrev=keys[i-1], kCur=keys[i];
       const tPrev=tx[kPrev], tCur=tx[kCur];
@@ -2236,10 +2250,14 @@ async function loadCambio() {
         return s.val*(1/rc - 1/rp); // mesmo dinheiro, só a taxa mudou
       };
       const fxXP=calc('XP','BRL'), fxAV=calc('AV','USD');
-      accXP+=fxXP; accAV+=fxAV;
+      // IBKR: ações em USD (saldo do mês anterior x variação da taxa)
+      let fxIB=0;
+      const sUsd=ibkrUsdMes[kPrev];
+      if(sUsd && tPrev.usd && tCur.usd) fxIB = sUsd*(1/tCur.usd - 1/tPrev.usd);
+      accXP+=fxXP; accAV+=fxAV; accIB+=fxIB;
       const [y,m]=kCur.split('-');
       const MN=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-      linhas.push({mes:MN[+m-1]+'/'+y.slice(2), xp:fxXP, av:fxAV, tot:fxXP+fxAV, acum:accXP+accAV});
+      linhas.push({mes:MN[+m-1]+'/'+y.slice(2), xp:fxXP, av:fxAV, ib:fxIB, tot:fxXP+fxAV+fxIB, acum:accXP+accAV+accIB});
     }
     // tabela
     const th='padding:9px 12px;text-align:right;font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.3px;color:#9b9b98;border-bottom:1px solid #f0f0ee;white-space:nowrap';
@@ -2252,27 +2270,30 @@ async function loadCambio() {
       body+='<tr><td style="'+td+';text-align:left;font-weight:500">'+l.mes+'</td>'
         +'<td style="'+td+';color:'+cl(l.xp)+'">'+fmt(l.xp)+'</td>'
         +'<td style="'+td+';color:'+cl(l.av)+'">'+fmt(l.av)+'</td>'
+        +'<td style="'+td+';color:'+cl(l.ib||0)+'">'+fmt(l.ib||0)+'</td>'
         +'<td style="'+td+';font-weight:600;color:'+cl(l.tot)+'">'+fmt(l.tot)+'</td>'
         +'<td style="'+td+';color:'+cl(l.acum)+'">'+fmt(l.acum)+'</td></tr>';
     });
-    linhas.forEach(l=>{ sXP+=l.xp; sAV+=l.av; });
+    let sIB=0; linhas.forEach(l=>{ sXP+=l.xp; sAV+=l.av; sIB+=(l.ib||0); });
     const foot='<tr style="background:#fafaf9;font-weight:700;border-top:2px solid #e5e5e3">'
       +'<td style="'+td+';text-align:left">Total</td>'
       +'<td style="'+td+';color:'+cl(sXP)+'">'+fmt(sXP)+'</td>'
       +'<td style="'+td+';color:'+cl(sAV)+'">'+fmt(sAV)+'</td>'
-      +'<td style="'+td+';color:'+cl(sXP+sAV)+'">'+fmt(sXP+sAV)+'</td>'
+      +'<td style="'+td+';color:'+cl(sIB)+'">'+fmt(sIB)+'</td>'
+      +'<td style="'+td+';color:'+cl(sXP+sAV+sIB)+'">'+fmt(sXP+sAV+sIB)+'</td>'
       +'<td style="'+td+';color:#9b9b98">—</td></tr>';
-    const head='<tr style="background:#fafaf9"><th style="'+thL+'">Mês</th><th style="'+th+'">XP (BRL)</th><th style="'+th+'">Avenue (USD)</th><th style="'+th+'">Total do mês</th><th style="'+th+'">Acumulado</th></tr>';
+    const head='<tr style="background:#fafaf9"><th style="'+thL+'">Mês</th><th style="'+th+'">XP (BRL)</th><th style="'+th+'">Avenue (USD)</th><th style="'+th+'">IBKR ações (USD)</th><th style="'+th+'">Total do mês</th><th style="'+th+'">Acumulado</th></tr>';
     const el=document.getElementById('cambio-efeito-tabela');
     if(el) el.innerHTML='<div class="card" style="padding:0;overflow-x:auto">'
-      +'<div class="card-label" style="padding:14px 18px 8px">Efeito cambial por mês <span style="text-transform:none;letter-spacing:0;color:#c9c9c6">· saldo em moeda × variação da taxa. IBKR e R4 são EUR nativo (sem efeito)</span></div>'
+      +'<div class="card-label" style="padding:14px 18px 8px">Efeito cambial por mês <span style="text-transform:none;letter-spacing:0;color:#c9c9c6">· saldo em moeda × variação da taxa. caixa IBKR e R4 são EUR nativo; só as ações USD do IBKR sofrem câmbio</span></div>'
       +'<table style="width:100%;border-collapse:collapse;min-width:560px"><thead>'+head+'</thead><tbody>'+body+'</tbody><tfoot>'+foot+'</tfoot></table></div>';
     // gráfico acumulado
     const fxC=document.getElementById('chart-fx-acum');
     if(fxC){ if(window._fxAcumChart) window._fxAcumChart.destroy(); window._fxAcumChart=new Chart(fxC,{type:'line',data:{labels:linhas.map(l=>l.mes),datasets:[
       {label:'Acumulado total',data:linhas.map(l=>l.acum),borderColor:'#1c1c1a',backgroundColor:'#1c1c1a10',borderWidth:2.5,pointRadius:3,tension:0.3,fill:true},
       {label:'XP (BRL)',data:linhas.map((l,i)=>linhas.slice(0,i+1).reduce((s,x)=>s+x.xp,0)),borderColor:'#e65100',backgroundColor:'transparent',borderWidth:1.5,pointRadius:2,tension:0.3},
-      {label:'Avenue (USD)',data:linhas.map((l,i)=>linhas.slice(0,i+1).reduce((s,x)=>s+x.av,0)),borderColor:'#1565c0',backgroundColor:'transparent',borderWidth:1.5,pointRadius:2,tension:0.3}
+      {label:'Avenue (USD)',data:linhas.map((l,i)=>linhas.slice(0,i+1).reduce((s,x)=>s+x.av,0)),borderColor:'#1565c0',backgroundColor:'transparent',borderWidth:1.5,pointRadius:2,tension:0.3},
+      {label:'IBKR ações (USD)',data:linhas.map((l,i)=>linhas.slice(0,i+1).reduce((s,x)=>s+(x.ib||0),0)),borderColor:'#6a1b9a',backgroundColor:'transparent',borderWidth:1.5,pointRadius:2,tension:0.3}
     ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{font:{size:10},boxWidth:10}},tooltip:{callbacks:{label:ctx=>' '+ctx.dataset.label+': '+(ctx.raw>=0?'+':'−')+eur(Math.abs(ctx.raw))}}},scales:{x:{grid:{display:false},ticks:{font:{size:9},maxTicksLimit:10}},y:{grid:{color:'#f0f0ee'},ticks:{font:{size:9},callback:v=>(v>=0?'+':'−')+eur(Math.abs(v))}}}}}); }
   }
 
