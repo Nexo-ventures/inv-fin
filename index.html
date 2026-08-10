@@ -166,7 +166,7 @@
 
   <div id="tab-variacoes" class="section">
     <div id="var-kpis"></div>
-    <div id="var-chart-wrap" class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Resultado acumulado por atualização (EUR)</div><div style="position:relative;height:210px"><canvas id="var-acum-chart"></canvas></div></div>
+    <div id="var-chart-wrap" class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Resultado não realizado ao longo do tempo (EUR)</div><div style="position:relative;height:210px"><canvas id="var-acum-chart"></canvas></div></div>
     <div id="var-tabela"></div>
   </div>
   <div id="tab-historico" class="section">
@@ -1311,7 +1311,7 @@ let histFiltCorr = 'TODAS', histFiltClasse = 'TODAS';
 // mesmas quantidades e mesma conversão para EUR.
 async function loadVariacoes() {
   const [pos, snaps, cambio] = await Promise.all([
-    get('/posicoes_abertas?select=corretora,ticker,moeda,quantidade,classe_ativo'),
+    get('/posicoes_abertas?select=corretora,ticker,moeda,quantidade,classe_ativo,custo_total,data_entrada'),
     get('/precos_historico?select=corretora,ticker,preco,data&order=data.asc'),
     get('/cambio?select=mes,eur_brl,eur_usd')
   ]);
@@ -1336,9 +1336,16 @@ async function loadVariacoes() {
       return { moeda: pr*p.quantidade, eur: (pr*p.quantidade)/r };
     });
     if(serie.every(x=>x===null)) return;
+    // custo de entrada convertido pela taxa do mês da compra
+    const tEnt=tx[kData(p.data_entrada)]||tx[ultK]||{};
+    const rEnt=tEnt[p.moeda]||1;
+    const custoEur = p.moeda==='EUR' ? p.custo_total : p.custo_total/rEnt;
     const varis=serie.map((v,i)=>{
-      if(i===0||v===null||serie[i-1]===null) return null;
-      return { eur: v.eur-serie[i-1].eur, moeda: v.moeda-serie[i-1].moeda };
+      if(v===null) return null;
+      // 1ª coluna (ou 1ª com preço): resultado acumulado até ali = mercado − custo
+      const anterior = i>0 ? serie[i-1] : null;
+      if(anterior===null) return { eur: v.eur-custoEur, moeda: v.moeda-p.custo_total, base:true };
+      return { eur: v.eur-anterior.eur, moeda: v.moeda-anterior.moeda };
     });
     linhas.push({...p, serie, varis});
   });
@@ -1349,8 +1356,9 @@ async function loadVariacoes() {
 
   // totais por data
   const totEur=datas.map((d,i)=>linhas.reduce((s,l)=>s+(l.varis[i]?l.varis[i].eur:0),0));
+  const somaLinha=l=>l.varis.reduce((s,v)=>s+(v?v.eur:0),0);
   const valTot=datas.map((d,i)=>linhas.reduce((s,l)=>s+(l.serie[i]?l.serie[i].eur:0),0));
-  let acc=0; const acumul=totEur.map(v=>{acc+=v;return acc;});
+  let acc=0; const acumul=totEur.map(v=>{acc+=v;return acc;}); // inclui a 1ª coluna (resultado até a data base)
 
   // --- KPIs ---
   const ultIdx=datas.length-1;
@@ -1363,7 +1371,7 @@ async function loadVariacoes() {
     '<div style="font-size:12px;color:#6b6b68;margin-bottom:10px">'+datas.length+' atualizações registradas · de <strong>'+fmtD(datas[0])+'</strong> a <strong>'+fmtD(datas[ultIdx])+'</strong></div>'+
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px">'+
     '<div class="card" style="padding:14px 18px"><div class="card-label">Última variação</div><div style="font-size:20px;font-weight:700;color:'+(ultVar==null?'#9b9b98':cor(ultVar))+'">'+(ultVar==null?'—':sg(ultVar))+'</div><div style="font-size:11px;color:#9b9b98">'+(datas.length>1?fmtD(datas[ultIdx-1])+' → '+fmtD(datas[ultIdx]):'—')+'</div></div>'+
-    '<div class="card" style="padding:14px 18px"><div class="card-label">Acumulado no período</div><div style="font-size:20px;font-weight:700;color:'+cor(acumul[ultIdx]||0)+'">'+sg(acumul[ultIdx]||0)+'</div><div style="font-size:11px;color:#9b9b98">desde '+fmtD(datas[0])+'</div></div>'+
+    '<div class="card" style="padding:14px 18px"><div class="card-label">Resultado não realizado</div><div style="font-size:20px;font-weight:700;color:'+cor(acumul[ultIdx]||0)+'">'+sg(acumul[ultIdx]||0)+'</div><div style="font-size:11px;color:#9b9b98">soma de todas as colunas</div></div>'+
     '<div class="card" style="padding:14px 18px"><div class="card-label">Subiram / caíram</div><div style="font-size:20px;font-weight:700"><span style="color:#1a7f4b">'+subiu+'</span> / <span style="color:#c0392b">'+caiu+'</span></div><div style="font-size:11px;color:#9b9b98">na última atualização</div></div>'+
     '<div class="card" style="padding:14px 18px"><div class="card-label">Valor a mercado</div><div style="font-size:20px;font-weight:700">'+eur(valTot[ultIdx]||0)+'</div><div style="font-size:11px;color:#9b9b98">confere com Posições Abertas</div></div>'+
     '</div>';
@@ -1378,21 +1386,21 @@ async function loadVariacoes() {
   const td='padding:8px 10px;text-align:right;font-size:12px;border-bottom:1px solid #f5f5f4;white-space:nowrap';
   const fixa='position:sticky;left:0;background:#fff;z-index:2;text-align:left;border-right:1px solid #f0f0ee';
   let head='<tr style="background:#fafaf9"><th style="'+th+';'+fixa+';background:#fafaf9">Ativo</th>';
-  datas.forEach((d,i)=>{ head += '<th style="'+th+'">'+(i===0?fmtD(d)+'<br><span style="font-weight:400;text-transform:none;letter-spacing:0">base</span>':fmtD(d))+'</th>'; });
+  datas.forEach((d,i)=>{ head += '<th style="'+th+'">'+(i===0?fmtD(d)+'<br><span style="font-weight:400;text-transform:none;letter-spacing:0">result. até aqui</span>':fmtD(d))+'</th>'; });
   head+='</tr>';
   let body='';
   linhas.forEach(l=>{
     body+='<tr><td style="'+td+';'+fixa+'"><span class="pill p-'+l.corretora+'">'+l.corretora+'</span> <strong>'+l.ticker+'</strong></td>';
     l.varis.forEach((v,i)=>{
-      if(i===0){ body+='<td style="'+td+';color:#c9c9c6">—</td>'; return; }
       if(v==null){ body+='<td style="'+td+';color:#c9c9c6">—</td>'; return; }
       const mo=l.moeda!=='EUR'?'<div style="font-size:10px;color:#9b9b98">'+(v.moeda>=0?'+':'−')+SY[l.moeda]+num(Math.abs(v.moeda),0)+'</div>':'';
-      body+='<td style="'+td+';color:'+cor(v.eur)+'">'+sg(v.eur)+mo+'</td>';
+      const bg=v.base?';background:#fafaf9':'';
+      body+='<td style="'+td+';color:'+cor(v.eur)+bg+'">'+sg(v.eur)+mo+'</td>';
     });
     body+='</tr>';
   });
   let foot='<tr style="background:#fafaf9;font-weight:700;border-top:2px solid #e5e5e3"><td style="'+td+';'+fixa+';background:#fafaf9">Total</td>';
-  datas.forEach((d,i)=>{ foot += i===0 ? '<td style="'+td+';color:#c9c9c6">—</td>' : '<td style="'+td+';color:'+cor(totEur[i])+'">'+sg(totEur[i])+'</td>'; });
+  datas.forEach((d,i)=>{ foot += '<td style="'+td+';color:'+cor(totEur[i])+(i===0?';background:#fafaf9':'')+'">'+sg(totEur[i])+'</td>'; });
   foot+='</tr><tr style="background:#fafaf9;font-size:11px"><td style="'+td+';'+fixa+';background:#fafaf9;color:#9b9b98">Valor a mercado</td>';
   datas.forEach((d,i)=>{ foot += '<td style="'+td+';color:#6b6b68">'+eur(valTot[i])+'</td>'; });
   foot+='</tr>';
