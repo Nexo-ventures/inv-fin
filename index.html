@@ -128,6 +128,10 @@
     <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Contribuição por corretora — patrimônio mensal (EUR)</div><div style="position:relative;height:220px"><canvas id="geral-corr-hist-chart"></canvas></div></div>
     <!-- Distribuição por moeda — evolução (após contribuição) -->
     <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Distribuição por moeda — evolução (EUR)</div><div style="position:relative;height:220px"><canvas id="geral-moeda-chart"></canvas></div></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+      <div class="card"><div class="card-label" style="margin-bottom:8px">Exposição geográfica (EUR)</div><div style="position:relative;height:230px"><canvas id="geral-geo-chart"></canvas></div></div>
+      <div id="geral-geo-tabela" class="card" style="padding:0;overflow-x:auto"></div>
+    </div>
   </div>
 
   <div id="tab-posicoes" class="section">
@@ -359,7 +363,7 @@ document.querySelectorAll('.nav-tab').forEach(t => {
 let geralEvolucaoChart = null, geralMoedaChart = null, geralVarChart = null, geralPnlChart = null;
 
 async function loadGeral() {
-  const [pat, posData_g, cash, rendaTot, custosTot, resultFech, fluxos, wiseData_g, cambioG, cambioHist, patMensal, snapsHist] = await Promise.all([
+  const [pat, posData_g, cash, rendaTot, custosTot, resultFech, fluxos, wiseData_g, cambioG, cambioHist, patMensal, snapsHist, ativosG] = await Promise.all([
     get('/patrimonio_consolidado?select=mes,ordem,total_eur,xp_eur,av_eur,r4_eur,ibkr_eur,tem_provisorio&order=ordem.asc'),
     get('/posicoes_abertas?select=corretora,ticker,moeda,preco_atual,quantidade,custo_total,data_entrada'),
     get('/operacoes?select=corretora,ticker,custo_total,preco_atual&status=eq.IGNORAR'),
@@ -371,7 +375,8 @@ async function loadGeral() {
     get('/cambio?select=mes,eur_brl,eur_usd&order=mes.desc&limit=1'),
     get('/cambio?select=mes,eur_brl,eur_usd&order=mes.asc'),
     get('/patrimonio_mensal?select=corretora,valor_orig,moeda,mes'),
-    get('/precos_historico?select=corretora,ticker,custo_total,moeda,data&order=data.asc')
+    get('/precos_historico?select=corretora,ticker,custo_total,moeda,data&order=data.asc'),
+    get('/ativos?select=id,corretora,regiao,pais')
   ]);
 
   const last = pat[pat.length - 1];
@@ -474,6 +479,88 @@ async function loadGeral() {
 
   // Gráfico moeda donut
   const moedaLabels = pat.map(d=>d.mes.split('/')[0]+'/'+d.mes.split('/')[1].slice(2));
+  // ===== Exposição geográfica (valor a mercado das posições abertas) =====
+  {
+    // taxa atual (independente da ordem de definição no resto da função)
+    const MKG={Jan:1,Fev:2,Feb:2,Mar:3,Abr:4,Apr:4,Mai:5,May:5,Jun:6,Jul:7,Ago:8,Aug:8,Set:9,Sep:9,Out:10,Oct:10,Nov:11,Dez:12,Dec:12};
+    const kMG=m=>{const [mn,yr]=(m||'').split('/');return yr+'-'+String(MKG[mn]||0).padStart(2,'0');};
+    let _bk=null, _bx=null;
+    (cambioHist||[]).forEach(c=>{ const k=kMG(c.mes); if(!_bk||k>_bk){_bk=k;_bx=c;} });
+    const taxaG = { brl:(_bx?_bx.eur_brl:null), usd:(_bx?_bx.eur_usd:null), eur:1 };
+    const regiaoDe = {};
+    (ativosG||[]).forEach(a => {
+      if (!a.regiao) return;
+      const tk = a.id.includes('_') ? a.id.slice(a.id.indexOf('_')+1) : a.id;
+      regiaoDe[a.corretora+'|'+tk] = { regiao:a.regiao, pais:a.pais };
+    });
+    const achaRegiao = (corr, ticker) => {
+      const d = regiaoDe[corr+'|'+ticker];
+      if (d) return d;
+      // renda fixa: id tem underscores extras (LCA_BNDES_JUN2028 vs XP_LCA_BNDES_JUN_2028)
+      const alvo = ticker.replace(/_/g,'');
+      for (const k in regiaoDe) {
+        const [c, t] = k.split('|');
+        if (c === corr && t.replace(/_/g,'') === alvo) return regiaoDe[k];
+      }
+      return null;
+    };
+    const porRegiao = {}, porPais = {};
+    let semRegiao = 0, totalGeo = 0;
+    (posData_g||[]).forEach(p => {
+      if (!p.preco_atual || !p.quantidade) return;
+      const mo = (p.moeda||'').toLowerCase();
+      const vm = p.preco_atual * p.quantidade;
+      const eurV = p.moeda==='EUR' ? vm : (taxaG[mo] ? vm/taxaG[mo] : null);
+      if (eurV == null) return;
+      totalGeo += eurV;
+      const d = achaRegiao(p.corretora, p.ticker);
+      if (!d) { semRegiao += eurV; return; }
+      porRegiao[d.regiao] = (porRegiao[d.regiao]||0) + eurV;
+      const chave = d.regiao+'|'+(d.pais||'—');
+      porPais[chave] = (porPais[chave]||0) + eurV;
+    });
+    if (semRegiao > 0) porRegiao['(sem região)'] = semRegiao;
+
+    const CORES = {'América do Norte':'#1565c0','América do Sul':'#e65100','Europa':'#1a7f4b',
+                   'Ásia':'#6a1b9a','Oriente Médio':'#c0392b','Caixa':'#9b9b98','(sem região)':'#c9c9c6'};
+    const ordem = Object.entries(porRegiao).sort((a,b)=>b[1]-a[1]);
+
+    const gc = document.getElementById('geral-geo-chart');
+    if (gc) {
+      if (window._geralGeoChart) window._geralGeoChart.destroy();
+      window._geralGeoChart = new Chart(gc, {type:'doughnut', data:{
+        labels: ordem.map(([r,v]) => r+' '+(totalGeo?(v/totalGeo*100).toFixed(1):'0')+'%'),
+        datasets:[{ data: ordem.map(([,v])=>v), backgroundColor: ordem.map(([r])=>CORES[r]||'#9b9b98'),
+                    borderWidth:2, borderColor:'#fff' }]
+      }, options:{responsive:true, maintainAspectRatio:false, plugins:{
+        legend:{position:'bottom', labels:{font:{size:10}, boxWidth:10, padding:8}},
+        tooltip:{callbacks:{label: c => ' '+eur(c.raw)+' ('+(totalGeo?(c.raw/totalGeo*100).toFixed(1):'0')+'%)'}}
+      }}});
+    }
+
+    const gt = document.getElementById('geral-geo-tabela');
+    if (gt) {
+      const th='padding:9px 12px;text-align:right;font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.3px;color:#9b9b98;border-bottom:1px solid #f0f0ee';
+      const thL=th.replace('text-align:right','text-align:left');
+      const td='padding:8px 12px;text-align:right;font-size:12px;border-bottom:1px solid #f5f5f4;white-space:nowrap';
+      let body='';
+      Object.entries(porPais).sort((a,b)=>b[1]-a[1]).forEach(([k,v]) => {
+        const [reg,pais]=k.split('|');
+        body += '<tr><td style="'+td+';text-align:left"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+(CORES[reg]||'#9b9b98')+';margin-right:7px"></span>'+pais+'</td>'
+             +  '<td style="'+td+';font-size:11px;color:#9b9b98;text-align:left">'+reg+'</td>'
+             +  '<td style="'+td+'">'+eur(v)+'</td>'
+             +  '<td style="'+td+';color:#6b6b68">'+(totalGeo?(v/totalGeo*100).toFixed(1):'0')+'%</td></tr>';
+      });
+      gt.innerHTML = '<div class="card-label" style="padding:14px 18px 8px">Por país de origem</div>'
+        + '<table style="width:100%;border-collapse:collapse"><thead><tr style="background:#fafaf9">'
+        + '<th style="'+thL+'">País</th><th style="'+thL+'">Região</th><th style="'+th+'">Valor</th><th style="'+th+'">%</th>'
+        + '</tr></thead><tbody>'+body+'</tbody>'
+        + '<tfoot><tr style="background:#fafaf9;font-weight:700;border-top:2px solid #e5e5e3">'
+        + '<td style="'+td+';text-align:left">Total</td><td></td><td style="'+td+'">'+eur(totalGeo)+'</td><td style="'+td+'">100%</td>'
+        + '</tr></tfoot></table>';
+    }
+  }
+
   // IBKR tem ações em USD: separa a parte em dólar (via snapshots) do caixa em euro
   const ibkrUsdPorMes = {};
   {
@@ -2178,7 +2265,8 @@ async function loadCambio() {
     get('/cambio?select=*'),
     get('/cambio_wise?select=*&order=data.asc'),
     get('/patrimonio_mensal?select=mes,corretora,valor_orig,moeda,valor_eur'),
-    get('/precos_historico?select=corretora,ticker,custo_total,moeda,data&order=data.asc')
+    get('/precos_historico?select=corretora,ticker,custo_total,moeda,data&order=data.asc'),
+    get('/ativos?select=id,corretora,regiao,pais')
   ]);
   wiseData = [...wise].reverse();
   const sorted = [...cambio].sort(mesSort);
