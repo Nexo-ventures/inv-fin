@@ -92,7 +92,6 @@
 <div class="nav">
   <div class="nav-tab active" data-tab="geral">Visão geral</div>
   <div class="nav-tab" data-tab="posicoes">Posições abertas</div>
-  <div class="nav-tab" data-tab="variacoes">Variações</div>
   <div class="nav-tab" data-tab="historico">Posições fechadas</div>
   <div class="nav-tab" data-tab="renda">Renda</div>
   <div class="nav-tab" data-tab="custos">Custos</div>
@@ -164,11 +163,6 @@
     </div>
   </div>
 
-  <div id="tab-variacoes" class="section">
-    <div id="var-kpis"></div>
-    <div id="var-chart-wrap" class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Resultado não realizado ao longo do tempo (EUR)</div><div style="position:relative;height:210px"><canvas id="var-acum-chart"></canvas></div></div>
-    <div id="var-tabela"></div>
-  </div>
   <div id="tab-historico" class="section">
     <div id="hist-kpis" style="margin-bottom:16px"></div>
     <div id="hist-anual" style="margin-bottom:16px"></div>
@@ -348,7 +342,6 @@ document.querySelectorAll('.nav-tab').forEach(t => {
     const id = t.dataset.tab;
     document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
     document.getElementById('tab-' + id).classList.add('active');
-    if (id === 'variacoes' && !window._varCarregado) { window._varCarregado = true; loadVariacoes(); }
     if (id === 'historico' && document.getElementById('hist-body').querySelector('.loading')) loadHistorico();
     if (id === 'renda'     && document.getElementById('renda-body').querySelector('.loading')) loadRenda();
     if (id === 'custos'    && document.getElementById('custos-body').querySelector('.loading')) loadCustos();
@@ -1077,6 +1070,13 @@ function renderPos(rows) {
   const comFech = comPreco.filter(r => r.valorFechEur != null);
   const totalValorFechEur = comFech.reduce((s,r)=>s+(r.valorFechEur||0),0);
   const totalCustoFechEntry = comFech.reduce((s,r)=>s+(r.custoEurEntry||0),0);
+  // custo convertido na taxa do MÊS DO FECHAMENTO -> permite separar mercado de câmbio no fecho
+  const totalCustoFechRate = comFech.reduce((s,r)=>{
+    const v = (r.moeda==='EUR') ? r.custo_total : toEur(r.custo_total, r.moeda, fechMesKey);
+    return s + (v||0);
+  },0);
+  const resultMercadoFech = totalValorFechEur - totalCustoFechRate;   // preço do ativo até o fecho
+  const efeitoCambialFechKpi = totalCustoFechRate - totalCustoFechEntry; // câmbio da compra até o fecho
   const naoRealFech = totalValorFechEur - totalCustoFechEntry;
   const rentFech = totalCustoFechEntry > 0 ? (naoRealFech / totalCustoFechEntry * 100) : null;
   const deltaNaoReal = totalResultEur - naoRealFech;     // evolução do resultado desde o fecho
@@ -1088,20 +1088,42 @@ function renderPos(rows) {
   const fechLabel = posFechamentoData ? posFechamentoData.slice(0,10).split('-').reverse().join('/') : null;
 
   // KPIs — linha 1 (ciclo) + linha 2 (métricas)
+  {
+  const ultSnapKpi = posSnapDatas.length ? posSnapDatas[posSnapDatas.length-1] : null;
+  const dLabel = d => d ? d.slice(8,10)+'/'+d.slice(5,7)+'/'+d.slice(0,4) : '—';
+  const cor = v => v>=0?'#1a7f4b':'#c0392b';
+  const card = (lbl,val,sub,destaque) => '<div class="card" style="padding:14px 18px'+(destaque||'')+'"><div class="card-label">'+lbl+'</div><div style="font-size:20px;font-weight:700'+(val.cor?';color:'+val.cor:'')+'">'+val.txt+'</div>'+(sub?'<div style="font-size:11px;color:#9b9b98">'+sub+'</div>':'')+'</div>';
+  const bloco = (titulo,cards) =>
+    '<div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:#9b9b98;margin-bottom:8px">'+titulo+'</div>'+
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px">'+cards+'</div>';
+
   document.getElementById('pos-kpis').innerHTML =
-    (fechLabel ? '<div style="font-size:12px;color:#6b6b68;margin-bottom:10px">Posições ao vivo (últimos preços) · comparado ao fechamento de <strong>'+fechLabel+'</strong></div>' : '') +
-    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:12px">' +
-    '<div class="card" style="padding:14px 18px"><div class="card-label">Valor a mercado</div><div style="font-size:20px;font-weight:700">' + eur(totalMercadoEur||null) + '</div><div style="font-size:11px;color:#9b9b98">' + comPreco.length + ' de ' + filtered.length + ' com cotação</div></div>' +
-    '<div class="card" style="padding:14px 18px"><div class="card-label">Custo total</div><div style="font-size:20px;font-weight:700">' + eur(totalCustoEur||null) + '</div><div style="font-size:11px;color:#9b9b98">taxa da compra</div></div>' +
-    '<div class="card" style="padding:14px 18px"><div class="card-label">Resultado de mercado</div><div style="font-size:20px;font-weight:700;color:' + (totalResultMercado>=0?'#1a7f4b':'#c0392b') + '">' + (totalMercadoEur?(totalResultMercado>=0?'+':'')+eur(totalResultMercado):'—') + '</div><div style="font-size:11px;color:#9b9b98">preço do ativo</div></div>' +
-    '<div class="card" style="padding:14px 18px"><div class="card-label">Efeito cambial</div><div style="font-size:20px;font-weight:700;color:' + (totalEfeitoCambial>=0?'#1a7f4b':'#c0392b') + '">' + (totalMercadoEur?(totalEfeitoCambial>=0?'+':'')+eur(totalEfeitoCambial):'—') + '</div><div style="font-size:11px;color:#9b9b98">câmbio desde a compra</div></div>' +
-    '<div class="card" style="padding:14px 18px"><div class="card-label">Resultado não realizado</div><div style="font-size:20px;font-weight:700;color:' + (totalResultEur>=0?'#1a7f4b':'#c0392b') + '">' + (totalMercadoEur ? (totalResultEur>=0?'+':'') + eur(totalResultEur) : '—') + '</div>' + (fechLabel && totalMercadoEur ? '<div style="font-size:11px;color:#9b9b98;margin-top:2px">fecho: '+(naoRealFech>=0?'+':'')+eur(naoRealFech)+' · <span style="color:'+(deltaNaoReal>=0?'#1a7f4b':'#c0392b')+'">Δ '+(deltaNaoReal>=0?'+':'')+eur(deltaNaoReal)+'</span></div>' : '<div style="font-size:11px;color:'+(rentPct!=null?(rentPct>=0?'#1a7f4b':'#c0392b'):'#9b9b98')+'">'+(rentPct!=null?(rentPct>=0?'+':'')+rentPct.toFixed(1)+'% sobre custo':'—')+'</div>') + '</div>' +
-    '</div>' +
-    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px">' +
-    '<div class="card" style="padding:14px 18px"><div class="card-label">Rentabilidade</div><div style="font-size:20px;font-weight:700;color:' + (rentPct!=null?(rentPct>=0?'#1a7f4b':'#c0392b'):'#1c1c1a') + '">' + (rentPct!=null?(rentPct>=0?'+':'')+rentPct.toFixed(2)+'%':'—') + '</div>' + (fechLabel && rentFech!=null ? '<div style="font-size:11px;color:#9b9b98;margin-top:2px">fecho: '+(rentFech>=0?'+':'')+rentFech.toFixed(2)+'% · <span style="color:'+((rentPct-rentFech)>=0?'#1a7f4b':'#c0392b')+'">Δ '+((rentPct-rentFech)>=0?'+':'')+(rentPct-rentFech).toFixed(2)+'pp</span></div>' : '<div style="font-size:11px;color:#9b9b98">não realizado sobre custo</div>') + '</div>' +
-    '<div class="card" style="padding:14px 18px"><div class="card-label">Taxa de acerto</div><div style="font-size:20px;font-weight:700">' + taxaAcerto + '%</div><div style="font-size:11px;color:#9b9b98">' + positivas.length + ' de ' + comPreco.length + ' posições</div></div>' +
-    '<div class="card" style="padding:14px 18px' + (emAlerta.length?';border:1px solid #f0c8c0':'') + '"><div class="card-label">Posições em alerta</div><div style="font-size:20px;font-weight:700;color:' + (emAlerta.length?'#c0392b':'#1a7f4b') + '">' + emAlerta.length + '</div><div style="font-size:11px;color:#9b9b98">abaixo de −8% (stop 8–10%)</div></div>' +
-    '</div>';
+    // ---------- BLOCO 1: FECHAMENTO ----------
+    bloco('No fechamento · '+dLabel(posFechamentoData),
+      card('Valor a mercado', {txt: eur(totalValorFechEur||null)}, comFech.length+' posições') +
+      card('Custo total', {txt: eur(totalCustoFechEntry||null)}, 'taxa da compra') +
+      card('Resultado de mercado', {txt:(resultMercadoFech>=0?'+':'')+eur(resultMercadoFech), cor:cor(resultMercadoFech)}, 'preço do ativo') +
+      card('Efeito cambial', {txt:(efeitoCambialFechKpi>=0?'+':'')+eur(efeitoCambialFechKpi), cor:cor(efeitoCambialFechKpi)}, 'câmbio desde a compra') +
+      card('Resultado não realizado', {txt:(naoRealFech>=0?'+':'')+eur(naoRealFech), cor:cor(naoRealFech)}, 'mercado + câmbio') +
+      card('Rentabilidade', {txt:(rentFech!=null?(rentFech>=0?'+':'')+rentFech.toFixed(2)+'%':'—'), cor:(rentFech!=null?cor(rentFech):null)}, 'sobre custo')
+    ) +
+    // ---------- BLOCO 2: ATUAL ----------
+    bloco('Atual · '+(ultSnapKpi?dLabel(ultSnapKpi):'últimos preços'),
+      card('Valor a mercado', {txt: eur(totalMercadoEur||null)}, comPreco.length+' de '+filtered.length+' com cotação') +
+      card('Custo total', {txt: eur(totalCustoEur||null)}, 'taxa da compra') +
+      card('Resultado de mercado', {txt:(totalMercadoEur?(totalResultMercado>=0?'+':'')+eur(totalResultMercado):'—'), cor:cor(totalResultMercado)}, 'preço do ativo') +
+      card('Efeito cambial', {txt:(totalMercadoEur?(totalEfeitoCambial>=0?'+':'')+eur(totalEfeitoCambial):'—'), cor:cor(totalEfeitoCambial)}, 'câmbio desde a compra') +
+      card('Resultado não realizado', {txt:(totalMercadoEur?(totalResultEur>=0?'+':'')+eur(totalResultEur):'—'), cor:cor(totalResultEur)}, 'mercado + câmbio') +
+      card('Rentabilidade', {txt:(rentPct!=null?(rentPct>=0?'+':'')+rentPct.toFixed(2)+'%':'—'), cor:(rentPct!=null?cor(rentPct):null)}, 'sobre custo')
+    ) +
+    // ---------- BLOCO 3: EVOLUÇÃO E RISCO ----------
+    bloco('Desde o fechamento · e risco',
+      card('Variação do resultado', {txt:(deltaNaoReal>=0?'+':'')+eur(deltaNaoReal), cor:cor(deltaNaoReal)}, 'quanto andou desde o fecho') +
+      card('Variação da rentabilidade', {txt:(rentFech!=null&&rentPct!=null?((rentPct-rentFech)>=0?'+':'')+(rentPct-rentFech).toFixed(2)+'pp':'—'), cor:(rentFech!=null&&rentPct!=null?cor(rentPct-rentFech):null)}, 'em pontos percentuais') +
+      card('Taxa de acerto', {txt: taxaAcerto+'%'}, positivas.length+' de '+comPreco.length+' posições') +
+      card('Posições em alerta', {txt: String(emAlerta.length), cor:(emAlerta.length?'#c0392b':'#1a7f4b')}, 'abaixo de −8% (stop 8–10%)', (emAlerta.length?';border:1px solid #f0c8c0':''))
+    );
+  }
 
   if (!filtered.length) { document.getElementById('pos-body').innerHTML = '<div class="empty">Nenhuma posição encontrada</div>'; return; }
 
@@ -1351,112 +1373,6 @@ function filtPos(btn) {
 
 let cambioRates = {};
 let histFiltCorr = 'TODAS', histFiltClasse = 'TODAS';
-
-// ===================== ABA VARIAÇÕES =====================
-// Mostra, por ativo, quanto variou entre cada snapshot de preços.
-// Sincronizada com Posições Abertas: parte da MESMA view (posicoes_abertas),
-// mesmas quantidades e mesma conversão para EUR.
-async function loadVariacoes() {
-  const [pos, snaps, cambio] = await Promise.all([
-    get('/posicoes_abertas?select=corretora,ticker,moeda,quantidade,classe_ativo,custo_total,data_entrada'),
-    get('/precos_historico?select=corretora,ticker,preco,data&order=data.asc'),
-    get('/cambio?select=mes,eur_brl,eur_usd')
-  ]);
-  const MK={Jan:1,Fev:2,Feb:2,Mar:3,Abr:4,Apr:4,Mai:5,May:5,Jun:6,Jul:7,Ago:8,Aug:8,Set:9,Sep:9,Out:10,Oct:10,Nov:11,Dez:12,Dec:12};
-  const kMes=m=>{const [mn,yr]=(m||'').split('/');return yr+'-'+String(MK[mn]||0).padStart(2,'0');};
-  const kData=d=>{const dt=new Date(d);return isNaN(dt)?null:dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0');};
-  const tx={}; (cambio||[]).forEach(c=>{ tx[kMes(c.mes)]={BRL:c.eur_brl, USD:c.eur_usd, EUR:1}; });
-  let ultK=null; Object.keys(tx).sort().forEach(k=>ultK=k);
-
-  const datas=[...new Set((snaps||[]).map(s=>s.data))].sort();
-  const preco={}; (snaps||[]).forEach(s=>{ preco[s.data+'|'+s.corretora+'|'+s.ticker]=s.preco; });
-  const fmtD=d=>d.slice(8,10)+'/'+d.slice(5,7);
-
-  // valor em EUR de cada ativo em cada data (qtd x preço / taxa do mês)
-  const linhas=[];
-  (pos||[]).forEach(p=>{
-    const serie=datas.map(d=>{
-      const pr=preco[d+'|'+p.corretora+'|'+p.ticker];
-      if(pr==null) return null;
-      const t=tx[kData(d)]||tx[ultK]||{};
-      const r=t[p.moeda]||1;
-      return { moeda: pr*p.quantidade, eur: (pr*p.quantidade)/r };
-    });
-    if(serie.every(x=>x===null)) return;
-    // custo de entrada convertido pela taxa do mês da compra
-    const tEnt=tx[kData(p.data_entrada)]||tx[ultK]||{};
-    const rEnt=tEnt[p.moeda]||1;
-    const custoEur = p.moeda==='EUR' ? p.custo_total : p.custo_total/rEnt;
-    const varis=serie.map((v,i)=>{
-      if(v===null) return null;
-      // 1ª coluna (ou 1ª com preço): resultado acumulado até ali = mercado − custo
-      const anterior = i>0 ? serie[i-1] : null;
-      if(anterior===null) return { eur: v.eur-custoEur, moeda: v.moeda-p.custo_total, base:true };
-      return { eur: v.eur-anterior.eur, moeda: v.moeda-anterior.moeda };
-    });
-    linhas.push({...p, serie, varis});
-  });
-  linhas.sort((a,b)=>{
-    const la=a.varis[a.varis.length-1], lb=b.varis[b.varis.length-1];
-    return (lb?lb.eur:-1e9)-(la?la.eur:-1e9);
-  });
-
-  // totais por data
-  const totEur=datas.map((d,i)=>linhas.reduce((s,l)=>s+(l.varis[i]?l.varis[i].eur:0),0));
-  const somaLinha=l=>l.varis.reduce((s,v)=>s+(v?v.eur:0),0);
-  const valTot=datas.map((d,i)=>linhas.reduce((s,l)=>s+(l.serie[i]?l.serie[i].eur:0),0));
-  let acc=0; const acumul=totEur.map(v=>{acc+=v;return acc;}); // inclui a 1ª coluna (resultado até a data base)
-
-  // --- KPIs ---
-  const ultIdx=datas.length-1;
-  const ultVar=ultIdx>0?totEur[ultIdx]:null;
-  const cor=v=>v>=0?'#1a7f4b':'#c0392b';
-  const sg=v=>(v>=0?'+':'−')+eur(Math.abs(v));
-  const subiu=linhas.filter(l=>l.varis[ultIdx]&&l.varis[ultIdx].eur>0).length;
-  const caiu=linhas.filter(l=>l.varis[ultIdx]&&l.varis[ultIdx].eur<0).length;
-  document.getElementById('var-kpis').innerHTML =
-    '<div style="font-size:12px;color:#6b6b68;margin-bottom:10px">'+datas.length+' atualizações registradas · de <strong>'+fmtD(datas[0])+'</strong> a <strong>'+fmtD(datas[ultIdx])+'</strong></div>'+
-    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px">'+
-    '<div class="card" style="padding:14px 18px"><div class="card-label">Última variação</div><div style="font-size:20px;font-weight:700;color:'+(ultVar==null?'#9b9b98':cor(ultVar))+'">'+(ultVar==null?'—':sg(ultVar))+'</div><div style="font-size:11px;color:#9b9b98">'+(datas.length>1?fmtD(datas[ultIdx-1])+' → '+fmtD(datas[ultIdx]):'—')+'</div></div>'+
-    '<div class="card" style="padding:14px 18px"><div class="card-label">Resultado não realizado</div><div style="font-size:20px;font-weight:700;color:'+cor(acumul[ultIdx]||0)+'">'+sg(acumul[ultIdx]||0)+'</div><div style="font-size:11px;color:#9b9b98">soma de todas as colunas</div></div>'+
-    '<div class="card" style="padding:14px 18px"><div class="card-label">Subiram / caíram</div><div style="font-size:20px;font-weight:700"><span style="color:#1a7f4b">'+subiu+'</span> / <span style="color:#c0392b">'+caiu+'</span></div><div style="font-size:11px;color:#9b9b98">na última atualização</div></div>'+
-    '<div class="card" style="padding:14px 18px"><div class="card-label">Valor a mercado</div><div style="font-size:20px;font-weight:700">'+eur(valTot[ultIdx]||0)+'</div><div style="font-size:11px;color:#9b9b98">confere com Posições Abertas</div></div>'+
-    '</div>';
-
-  // --- Gráfico acumulado ---
-  const gc=document.getElementById('var-acum-chart');
-  if(gc){ if(window._varAcumChart) window._varAcumChart.destroy(); window._varAcumChart=new Chart(gc,{type:'line',data:{labels:datas.map(fmtD),datasets:[{label:'Acumulado',data:acumul,borderColor:'#1c1c1a',backgroundColor:'#1c1c1a10',borderWidth:2.5,pointRadius:3,tension:0.3,fill:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>' '+sg(c.raw)}}},scales:{x:{grid:{display:false},ticks:{font:{size:9}}},y:{grid:{color:'#f0f0ee'},ticks:{font:{size:9},callback:v=>sg(v)}}}}}); }
-
-  // --- Tabela: 1 coluna por snapshot ---
-  const SY={BRL:'R$',USD:'$',EUR:'€'};
-  const th='padding:8px 10px;text-align:right;font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.3px;color:#9b9b98;border-bottom:1px solid #f0f0ee;white-space:nowrap';
-  const td='padding:8px 10px;text-align:right;font-size:12px;border-bottom:1px solid #f5f5f4;white-space:nowrap';
-  const fixa='position:sticky;left:0;background:#fff;z-index:2;text-align:left;border-right:1px solid #f0f0ee';
-  let head='<tr style="background:#fafaf9"><th style="'+th+';'+fixa+';background:#fafaf9">Ativo</th>';
-  datas.forEach((d,i)=>{ head += '<th style="'+th+'">'+(i===0?fmtD(d)+'<br><span style="font-weight:400;text-transform:none;letter-spacing:0">result. até aqui</span>':fmtD(d))+'</th>'; });
-  head+='</tr>';
-  let body='';
-  linhas.forEach(l=>{
-    body+='<tr><td style="'+td+';'+fixa+'"><span class="pill p-'+l.corretora+'">'+l.corretora+'</span> <strong>'+l.ticker+'</strong></td>';
-    l.varis.forEach((v,i)=>{
-      if(v==null){ body+='<td style="'+td+';color:#c9c9c6">—</td>'; return; }
-      const mo=l.moeda!=='EUR'?'<div style="font-size:10px;color:#9b9b98">'+(v.moeda>=0?'+':'−')+SY[l.moeda]+num(Math.abs(v.moeda),0)+'</div>':'';
-      const bg=v.base?';background:#fafaf9':'';
-      body+='<td style="'+td+';color:'+cor(v.eur)+bg+'">'+sg(v.eur)+mo+'</td>';
-    });
-    body+='</tr>';
-  });
-  let foot='<tr style="background:#fafaf9;font-weight:700;border-top:2px solid #e5e5e3"><td style="'+td+';'+fixa+';background:#fafaf9">Total</td>';
-  datas.forEach((d,i)=>{ foot += '<td style="'+td+';color:'+cor(totEur[i])+(i===0?';background:#fafaf9':'')+'">'+sg(totEur[i])+'</td>'; });
-  foot+='</tr><tr style="background:#fafaf9;font-size:11px"><td style="'+td+';'+fixa+';background:#fafaf9;color:#9b9b98">Valor a mercado</td>';
-  datas.forEach((d,i)=>{ foot += '<td style="'+td+';color:#6b6b68">'+eur(valTot[i])+'</td>'; });
-  foot+='</tr>';
-  document.getElementById('var-tabela').innerHTML =
-    '<div class="card" style="padding:0;overflow-x:auto">'+
-    '<div class="card-label" style="padding:14px 18px 8px">Variação por ativo entre atualizações (EUR)'+
-    '<span style="text-transform:none;letter-spacing:0;color:#c9c9c6"> · cada coluna compara com a atualização anterior</span></div>'+
-    '<table style="width:100%;border-collapse:collapse"><thead>'+head+'</thead><tbody>'+body+'</tbody><tfoot>'+foot+'</tfoot></table></div>';
-}
 
 async function loadHistorico() {
   const [hist, cambio] = await Promise.all([
