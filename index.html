@@ -1002,11 +1002,15 @@ async function loadPosicoes() {
     const fechamentos = snaps.filter(s => ehFimDeMes(s.data));
     posFechamentoData = fechamentos.length ? fechamentos[0].data : snaps[0].data;
     snaps.filter(s => s.data === posFechamentoData).forEach(s => { posFechamento[s.corretora+'_'+s.ticker] = s.preco; });
+    // datas de snapshot APÓS o fechamento (para as colunas expansíveis)
+    posSnapDatas = [...new Set(snaps.map(s=>s.data))].filter(d => d > posFechamentoData).sort();
+    posSnapPreco = {};
+    snaps.forEach(s => { posSnapPreco[s.data+'|'+s.corretora+'|'+s.ticker] = s.preco; });
   }
   posFiltCorr = 'TODAS'; posFiltClasse = 'TODAS';
   renderPos(posData);
 }
-let posFechamento = {}, posFechamentoData = null;
+let posFechamento = {}, posFechamentoData = null, posSnapDatas = [], posSnapPreco = {}, posExpandido = false;
 function ehFimMes(d){ const dt=new Date(d+'T12:00:00'); if(isNaN(dt)) return false; const nx=new Date(dt); nx.setDate(nx.getDate()+1); return nx.getMonth()!==dt.getMonth(); }
 // taxa (mes-chave) do fechamento p/ converter valor de fechamento na taxa correta
 function mesKeyDaData(dstr){ if(!dstr) return null; const d=new Date(dstr); const M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; return M[d.getMonth()]+'/'+d.getFullYear(); }
@@ -1044,7 +1048,20 @@ function renderPos(rows) {
     const precoFech = posFechamento[r.corretora+'_'+r.ticker] ?? null;
     const valorFechMoeda = (precoFech != null && r.quantidade) ? precoFech * r.quantidade : null;
     const valorFechEur = (r.moeda === 'EUR') ? valorFechMoeda : toEur(valorFechMoeda, r.moeda, fechMesKey);
-    return {...r, valorMercado, custoEur, custoEurEntry, mercadoEur, resultEur, rentPctRow, precoFech, valorFechEur, deltaFechEur: (mercadoEur!=null&&valorFechEur!=null)?mercadoEur-valorFechEur:null};
+    // resultado NO FECHAMENTO (valor de mercado em 31/07 menos custo na taxa da compra)
+    const resultFechEur = (valorFechEur!=null && custoEurEntry!=null) ? valorFechEur-custoEurEntry : null;
+    const rentFechRow = (precoFech!=null && r.custo_total) ? ((precoFech*r.quantidade - r.custo_total)/r.custo_total*100) : null;
+    // variação por snapshot (cada data vs a anterior; a primeira vs o fechamento)
+    const snapVar = {};
+    let refEur = valorFechEur, refPreco = precoFech;
+    posSnapDatas.forEach(d => {
+      const pr = posSnapPreco[d+'|'+r.corretora+'|'+r.ticker];
+      if (pr==null || refEur==null) { snapVar[d]=null; return; }
+      const vEur = (r.moeda==='EUR') ? pr*r.quantidade : toEur(pr*r.quantidade, r.moeda, mesKeyDaData(d));
+      snapVar[d] = (vEur!=null) ? vEur-refEur : null;
+      if (vEur!=null) { refEur=vEur; refPreco=pr; }
+    });
+    return {...r, valorMercado, custoEur, custoEurEntry, mercadoEur, resultEur, rentPctRow, precoFech, valorFechEur, resultFechEur, rentFechRow, snapVar, deltaFechEur: (mercadoEur!=null&&valorFechEur!=null)?mercadoEur-valorFechEur:null};
   });
 
   const comPreco = rowsCalc.filter(r => r.mercadoEur != null);
@@ -1201,15 +1218,20 @@ function renderPosTable(rowsCalc) {
     return dir * (va - vb);
   });
 
+  const fmtDia = d => d ? d.slice(8,10)+'/'+d.slice(5,7) : '';
+  const ultSnap = posSnapDatas.length ? posSnapDatas[posSnapDatas.length-1] : null;
+  const colsSnap = posExpandido ? posSnapDatas.map(d => ({key:'snap|'+d, label:fmtDia(d), cls:'tr', snap:d})) : [];
   const cols = [
     {key:'ticker', label:'Ativo', cls:''},
     {key:'corretora', label:'Corretora', cls:''},
     {key:'classe_ativo', label:'Classe', cls:''},
     {key:'setor', label:'Setor', cls:''},
-    {key:'resultEur', label:'Result.<br>EUR', cls:'tr'},
-    {key:'deltaFechEur', label:'Δ desde<br>fecho', cls:'tr'},
-    {key:'rentPctRow', label:'Rent.<br>%', cls:'tr'},
     {key:'mercadoEur', label:'Mercado<br>EUR', cls:'tr'},
+    {key:'resultFechEur', label:'Result. EUR<br><span style="font-weight:400;text-transform:none;letter-spacing:0;color:#c9c9c6">'+fmtDia(posFechamentoData)+'</span>', cls:'tr'},
+    {key:'rentFechRow', label:'Rent. %<br><span style="font-weight:400;text-transform:none;letter-spacing:0;color:#c9c9c6">'+fmtDia(posFechamentoData)+'</span>', cls:'tr'},
+    ...colsSnap,
+    {key:'deltaFechEur', label:(posExpandido?'▾':'▸')+' Desde fecho<br>até '+(ultSnap?fmtDia(ultSnap):'hoje'), cls:'tr', toggle:true},
+    {key:'rentPctRow', label:'Rent. %<br><span style="font-weight:400;text-transform:none;letter-spacing:0;color:#c9c9c6">atual</span>', cls:'tr'},
     {key:'peso', label:'Peso<br>%', cls:'tr'},
     {key:'data_entrada', label:'Entrada', cls:''},
     {key:'dias', label:'Dias', cls:'tr'},
@@ -1226,7 +1248,9 @@ function renderPosTable(rowsCalc) {
   const arrow = (k) => col===k ? (dir===1?' ↑':' ↓') : '';
 
   document.getElementById('pos-body').innerHTML = '<table style="font-size:12px"><thead><tr>' +
-    cols.map(c => '<th class="' + c.cls + '" style="' + thStyle(c.key) + '" onclick="sortPos(\'' + c.key + '\')">' + c.label + arrow(c.key) + '</th>').join('') +
+    cols.map(c => c.toggle
+      ? '<th class="'+c.cls+'" style="cursor:pointer;user-select:none;white-space:normal;min-width:60px;color:#1565c0" onclick="togglePosSnaps()" title="Clique para abrir/fechar as datas">'+c.label+'</th>'
+      : '<th class="' + c.cls + '" style="' + thStyle(c.key) + '" onclick="sortPos(\'' + c.key + '\')">' + c.label + arrow(c.key) + '</th>').join('') +
     '</tr></thead><tbody>' +
     sorted.map(r => {
       const dias = r.data_entrada ? Math.floor((today - new Date(r.data_entrada)) / 86400000) : null;
@@ -1237,10 +1261,12 @@ function renderPosTable(rowsCalc) {
         '<td><span class="pill p-' + r.corretora + '">' + r.corretora + '</span></td>' +
         '<td style="font-size:11px;color:#9b9b98">' + (r.classe_ativo||'—') + '</td>' +
         '<td style="font-size:11px;color:#9b9b98">' + (r.setor||'—') + '</td>' +
-        '<td class="tr ' + dc(r.resultEur) + '">' + (r.resultEur!=null?(r.resultEur>=0?'+':'')+eur(r.resultEur):'—') + '</td>' +
-        '<td class="tr ' + dc(r.deltaFechEur) + '">' + (r.deltaFechEur!=null?(r.deltaFechEur>=0?'+':'')+eur(r.deltaFechEur):'—') + '</td>' +
-        '<td class="tr ' + dc(r.rentPctRow) + '" style="font-size:11px">' + (r.rentPctRow!=null?(r.rentPctRow>=0?'+':'')+r.rentPctRow.toFixed(1)+'%':'—') + '</td>' +
         '<td class="tr" style="font-weight:500">' + (r.mercadoEur!=null?eur(r.mercadoEur):'—') + '</td>' +
+        '<td class="tr ' + dc(r.resultFechEur) + '">' + (r.resultFechEur!=null?(r.resultFechEur>=0?'+':'')+eur(r.resultFechEur):'—') + '</td>' +
+        '<td class="tr ' + dc(r.rentFechRow) + '" style="font-size:11px">' + (r.rentFechRow!=null?(r.rentFechRow>=0?'+':'')+r.rentFechRow.toFixed(1)+'%':'—') + '</td>' +
+        colsSnap.map(c => { const v=r.snapVar?r.snapVar[c.snap]:null; return '<td class="tr '+dc(v)+'" style="font-size:11px;background:#fbfbfa">'+(v!=null?(v>=0?'+':'')+eur(v):'—')+'</td>'; }).join('') +
+        '<td class="tr ' + dc(r.deltaFechEur) + '" style="font-weight:600">' + (r.deltaFechEur!=null?(r.deltaFechEur>=0?'+':'')+eur(r.deltaFechEur):'—') + '</td>' +
+        '<td class="tr ' + dc(r.rentPctRow) + '" style="font-size:11px">' + (r.rentPctRow!=null?(r.rentPctRow>=0?'+':'')+r.rentPctRow.toFixed(1)+'%':'—') + '</td>' +
         '<td class="tr" style="font-size:11px;color:#6b6b68">' + (peso!=null?peso.toFixed(1)+'%':'—') + '</td>' +
         '<td>' + dt(r.data_entrada) + '</td>' +
         '<td class="tr" style="font-size:11px;color:#9b9b98">' + (dias!=null?dias:'—') + '</td>' +
@@ -1258,17 +1284,26 @@ function renderPosTable(rowsCalc) {
       const tMerc = sorted.reduce((s,r)=>s+(r.mercadoEur||0),0);
       const tValFech = sorted.reduce((s,r)=>s+(r.valorFechEur||0),0);
       const tDelta = sorted.reduce((s,r)=>s+(r.deltaFechEur||0),0);
+      const tResFech = sorted.reduce((s,r)=>s+(r.resultFechEur||0),0);
       return '<tfoot><tr style="background:#fafaf9;font-weight:600;border-top:2px solid #e5e5e3">' +
         '<td style="padding:8px">Total ('+sorted.length+')</td><td></td><td></td><td></td>' +
-        '<td class="tr '+dc(tRes)+'">'+(tRes>=0?'+':'')+eur(tRes)+'</td>' +
+        '<td class="tr" style="font-weight:600">'+eur(tMerc)+'</td>' +
+        '<td class="tr '+dc(tResFech)+'">'+(tResFech>=0?'+':'')+eur(tResFech)+'</td>' +
+        '<td></td>' +
+        colsSnap.map(c => { const tv=sorted.reduce((a,r)=>a+((r.snapVar&&r.snapVar[c.snap])||0),0); return '<td class="tr '+dc(tv)+'" style="background:#fbfbfa">'+(tv>=0?'+':'')+eur(tv)+'</td>'; }).join('') +
         '<td class="tr '+dc(tDelta)+'">'+(tDelta>=0?'+':'')+eur(tDelta)+'</td>' +
         '<td></td>' +
-        '<td class="tr" style="font-weight:600">'+eur(tMerc)+'</td>' +
         '<td class="tr" style="font-size:11px;color:#6b6b68">100%</td>' +
         '<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>' +
         '<td class="tr" style="color:#6b6b68">'+eur(tValFech)+'</td>' +
         '</tr></tfoot>';
     })() + '</table>';
+}
+
+function togglePosSnaps() {
+  posExpandido = !posExpandido;
+  const filtered = posData.filter(r => (posFiltCorr==='TODAS'||r.corretora===posFiltCorr) && (posFiltClasse==='TODAS'||r.classe_ativo===posFiltClasse));
+  renderPos(posData);
 }
 
 function sortPos(col) {
@@ -1287,7 +1322,19 @@ function sortPos(col) {
     const valorFechMoeda = (precoFech != null && r.quantidade) ? precoFech * r.quantidade : null;
     const valorFechEur = (r.moeda === 'EUR') ? valorFechMoeda : toEur(valorFechMoeda, r.moeda, fechMesKey);
     const deltaFechEur = (mercadoEur != null && valorFechEur != null) ? mercadoEur - valorFechEur : null;
-    return {...r, valorMercado, custoEur, mercadoEur, resultEur, rentPctRow, precoFech, valorFechEur, deltaFechEur};
+    const custoEurEntry = (r.moeda === 'EUR') ? r.custo_total : toEur(r.custo_total, r.moeda, getMesKey(r.data_entrada));
+    const resultFechEur = (valorFechEur!=null && custoEurEntry!=null) ? valorFechEur-custoEurEntry : null;
+    const rentFechRow = (precoFech!=null && r.custo_total) ? ((precoFech*r.quantidade - r.custo_total)/r.custo_total*100) : null;
+    const snapVar = {};
+    let refEur = valorFechEur;
+    posSnapDatas.forEach(d => {
+      const pr = posSnapPreco[d+'|'+r.corretora+'|'+r.ticker];
+      if (pr==null || refEur==null) { snapVar[d]=null; return; }
+      const vEur = (r.moeda==='EUR') ? pr*r.quantidade : toEur(pr*r.quantidade, r.moeda, mesKeyDaData(d));
+      snapVar[d] = (vEur!=null) ? vEur-refEur : null;
+      if (vEur!=null) refEur=vEur;
+    });
+    return {...r, valorMercado, custoEur, custoEurEntry, mercadoEur, resultEur, rentPctRow, precoFech, valorFechEur, resultFechEur, rentFechRow, snapVar, deltaFechEur};
   });
   const totalMercadoEurAll = rowsCalc.reduce((s,r)=>s+(r.mercadoEur||0),0);
   const rowsWithPeso = rowsCalc.map(r => ({...r, peso: (r.mercadoEur!=null&&totalMercadoEurAll>0) ? r.mercadoEur/totalMercadoEurAll*100 : null}));
