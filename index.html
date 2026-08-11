@@ -99,6 +99,7 @@
   <div class="nav-tab active" data-tab="geral">Visão geral</div>
   <div class="nav-tab" data-tab="posicoes">Posições abertas</div>
   <div class="nav-tab" data-tab="historico">Posições fechadas</div>
+  <div class="nav-tab" data-tab="decisoes">Decisões</div>
   <div class="nav-tab" data-tab="renda">Renda</div>
   <div class="nav-tab" data-tab="custos">Custos</div>
   <div class="nav-tab" data-tab="cambio">Câmbio</div>
@@ -173,6 +174,18 @@
     </div>
   </div>
 
+  <div id="tab-decisoes" class="section">
+    <div id="dec-kpis"></div>
+    <div class="card" style="margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <div class="card-label">Registrar decisão</div>
+        <button class="fbtn" onclick="decToggleForm()" id="dec-btn-form">+ Nova entrada</button>
+      </div>
+      <div id="dec-form" style="display:none;padding-top:12px"></div>
+    </div>
+    <div id="dec-abertas" style="margin-bottom:16px"></div>
+    <div id="dec-tabela"></div>
+  </div>
   <div id="tab-historico" class="section">
     <div id="hist-kpis" style="margin-bottom:16px"></div>
     <div id="hist-anual" style="margin-bottom:16px"></div>
@@ -334,6 +347,26 @@ async function get(path) {
   return r.json();
 }
 
+async function post(path, body) {
+  const r = await fetch(BASE + path, {
+    method: 'POST',
+    headers: { ...H, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
+    body: JSON.stringify(body)
+  });
+  if (!r.ok) throw new Error(r.status + ': ' + await r.text());
+  return r.json();
+}
+
+async function patch(path, body) {
+  const r = await fetch(BASE + path, {
+    method: 'PATCH',
+    headers: { ...H, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
+    body: JSON.stringify(body)
+  });
+  if (!r.ok) throw new Error(r.status + ': ' + await r.text());
+  return r.json();
+}
+
 const eur  = n => n==null ? '—' : '€' + Number(n).toLocaleString('pt-BR', {minimumFractionDigits:0,maximumFractionDigits:0});
 const num  = (n,d=2) => n==null ? '—' : Number(n).toLocaleString('pt-BR', {minimumFractionDigits:d,maximumFractionDigits:d});
 const dc   = n => n==null ? '' : Number(n)>=0 ? 'pos' : 'neg';
@@ -352,6 +385,7 @@ document.querySelectorAll('.nav-tab').forEach(t => {
     const id = t.dataset.tab;
     document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
     document.getElementById('tab-' + id).classList.add('active');
+    if (id === 'decisoes'  && !window._decCarregado) { window._decCarregado = true; loadDecisoes(); }
     if (id === 'historico' && document.getElementById('hist-body').querySelector('.loading')) loadHistorico();
     if (id === 'renda'     && document.getElementById('renda-body').querySelector('.loading')) loadRenda();
     if (id === 'custos'    && document.getElementById('custos-body').querySelector('.loading')) loadCustos();
@@ -1466,6 +1500,139 @@ function filtPos(btn) {
 
 let cambioRates = {};
 let histFiltCorr = 'TODAS', histFiltClasse = 'TODAS';
+
+
+// ===================== ABA DECISÕES =====================
+let decData = [], decPosAbertas = [];
+
+async function loadDecisoes() {
+  const [dec, pos] = await Promise.all([
+    get('/log_decisoes?select=*&order=data_entrada.desc'),
+    get('/posicoes_abertas?select=corretora,ticker,preco_entrada,data_entrada')
+  ]);
+  decData = dec || [];
+  decPosAbertas = pos || [];
+  renderDecisoes();
+}
+
+function decToggleForm() {
+  const f = document.getElementById('dec-form');
+  const b = document.getElementById('dec-btn-form');
+  const abrir = f.style.display === 'none';
+  f.style.display = abrir ? 'block' : 'none';
+  b.textContent = abrir ? '× Fechar' : '+ Nova entrada';
+  if (abrir) decRenderForm();
+}
+
+function decRenderForm() {
+  const inp = 'width:100%;padding:8px 10px;border:1px solid #e5e5e3;border-radius:6px;font-size:13px;font-family:inherit;background:#fff';
+  const lbl = 'display:block;font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;margin-bottom:4px';
+  const cel = 'display:flex;flex-direction:column';
+  const hoje = new Date().toISOString().slice(0,10);
+  const ativos = [...new Set(decPosAbertas.map(p => p.corretora+' · '+p.ticker))].sort();
+
+  document.getElementById('dec-form').innerHTML =
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:12px">'+
+      '<div style="'+cel+'"><label style="'+lbl+'">Data entrada</label><input id="d-data" type="date" value="'+hoje+'" style="'+inp+'"></div>'+
+      '<div style="'+cel+'"><label style="'+lbl+'">Ativo</label><input id="d-ativo" list="d-ativos-list" placeholder="ex: NVDA" style="'+inp+'">'+
+        '<datalist id="d-ativos-list">'+ativos.map(a=>'<option value="'+a.split(' · ')[1]+'">').join('')+'</datalist></div>'+
+      '<div style="'+cel+'"><label style="'+lbl+'">Corretora</label><select id="d-corr" style="'+inp+'"><option value="">—</option><option>XP</option><option>AV</option><option>IBKR</option><option>R4</option></select></div>'+
+      '<div style="'+cel+'"><label style="'+lbl+'">Tipo</label><select id="d-tipo" style="'+inp+'"><option value="">—</option><option>Core</option><option>Tático</option></select></div>'+
+      '<div style="'+cel+'"><label style="'+lbl+'">Preço entrada</label><input id="d-preco" placeholder="ex: $212,09" style="'+inp+'"></div>'+
+      '<div style="'+cel+'"><label style="'+lbl+'">Stop definido</label><input id="d-stop" placeholder="ex: $195 (−8%)" style="'+inp+'"></div>'+
+      '<div style="'+cel+'"><label style="'+lbl+'">SuperTrend</label><input id="d-st" placeholder="ex: compra / venda" style="'+inp+'"></div>'+
+      '<div style="'+cel+'"><label style="'+lbl+'">Danelfin</label><input id="d-dan" placeholder="ex: 8/10" style="'+inp+'"></div>'+
+    '</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">'+
+      '<div style="'+cel+'"><label style="'+lbl+'">Motivo da entrada — a tese em uma linha</label><textarea id="d-motivo" rows="2" style="'+inp+';resize:vertical"></textarea></div>'+
+      '<div style="'+cel+'"><label style="'+lbl+'">Cenário macro (Conclusão Operacional)</label><textarea id="d-macro" rows="2" style="'+inp+';resize:vertical"></textarea></div>'+
+    '</div>'+
+    '<div style="display:flex;gap:10px;align-items:center">'+
+      '<button onclick="decSalvar()" style="padding:9px 20px;background:#1c1c1a;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-family:inherit">Salvar decisão</button>'+
+      '<span id="d-msg" style="font-size:12px"></span>'+
+    '</div>';
+}
+
+async function decSalvar() {
+  const v = id => (document.getElementById(id).value || '').trim() || null;
+  const msg = document.getElementById('d-msg');
+  if (!v('d-data') || !v('d-ativo')) { msg.innerHTML = '<span style="color:#c0392b">Data e ativo são obrigatórios</span>'; return; }
+  msg.innerHTML = '<span style="color:#9b9b98">salvando…</span>';
+  try {
+    await post('/log_decisoes', {
+      data_entrada: v('d-data'), ativo: v('d-ativo'), corretora: v('d-corr'), tipo: v('d-tipo'),
+      preco_entrada: v('d-preco'), stop_definido: v('d-stop'), supertrend: v('d-st'),
+      danelfin_score: v('d-dan'), motivo_entrada: v('d-motivo'), cenario_macro: v('d-macro')
+    });
+    msg.innerHTML = '<span style="color:#1a7f4b">✓ registrada</span>';
+    await loadDecisoes();
+    setTimeout(() => { decToggleForm(); msg.innerHTML=''; }, 900);
+  } catch (e) {
+    msg.innerHTML = '<span style="color:#c0392b">Erro: '+e.message.slice(0,90)+'</span>';
+  }
+}
+
+function renderDecisoes() {
+  const abertas = decData.filter(d => !d.data_saida);
+  const fechadas = decData.filter(d => d.data_saida);
+  const comStop = abertas.filter(d => d.stop_definido && !/não definido|nao definido|—/i.test(d.stop_definido));
+  const core = decData.filter(d => d.tipo === 'Core').length;
+  const tatico = decData.filter(d => d.tipo === 'Tático').length;
+
+  // posições abertas SEM decisão registrada
+  const comDec = new Set(decData.filter(d=>!d.data_saida).map(d => (d.ativo||'').toUpperCase()));
+  const semRegistro = decPosAbertas.filter(p => !comDec.has((p.ticker||'').toUpperCase()));
+
+  const card = (l,v,s,c) => '<div class="card" style="padding:14px 18px"><div class="card-label">'+l+'</div>'+
+    '<div style="font-size:20px;font-weight:700'+(c?';color:'+c:'')+'">'+v+'</div>'+
+    (s?'<div style="font-size:11px;color:#9b9b98">'+s+'</div>':'')+'</div>';
+
+  document.getElementById('dec-kpis').innerHTML =
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px">'+
+    card('Decisões registradas', String(decData.length), abertas.length+' abertas · '+fechadas.length+' fechadas') +
+    card('Com stop definido', comStop.length+'/'+abertas.length, 'entre as abertas', comStop.length<abertas.length?'#c0392b':'#1a7f4b') +
+    card('Core / Tático', core+' / '+tatico, 'classificação') +
+    card('Sem registro', String(semRegistro.length), 'posições abertas sem decisão', semRegistro.length?'#c0392b':'#1a7f4b') +
+    '</div>';
+
+  // aviso das posições sem decisão registrada
+  const wrap = document.getElementById('dec-abertas');
+  if (semRegistro.length) {
+    wrap.innerHTML = '<div class="card" style="padding:14px 18px;border:1px solid #f0c8c0;background:#fdf9f8">'+
+      '<div class="card-label" style="color:#c0392b;margin-bottom:6px">'+semRegistro.length+' posições abertas sem decisão registrada</div>'+
+      '<div style="font-size:12px;color:#6b6b68;line-height:1.7">'+
+      semRegistro.map(p => '<span style="display:inline-block;background:#fff;border:1px solid #f0e5e3;border-radius:5px;padding:2px 8px;margin:2px 4px 2px 0"><strong>'+p.ticker+'</strong> <span style="color:#9b9b98">'+p.corretora+'</span></span>').join('')+
+      '</div><div style="font-size:11px;color:#9b9b98;margin-top:8px">Sem tese e stop registrados, a revisão vira palpite. Registre ao menos as que estão em alerta.</div></div>';
+  } else wrap.innerHTML = '';
+
+  // tabela
+  const th='padding:9px 12px;text-align:left;font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.3px;color:#9b9b98;border-bottom:1px solid #f0f0ee';
+  const td='padding:10px 12px;font-size:12px;border-bottom:1px solid #f5f5f4;vertical-align:top';
+  let body='';
+  decData.forEach(d => {
+    const aberta = !d.data_saida;
+    const semStop = aberta && (!d.stop_definido || /não definido|nao definido|—/i.test(d.stop_definido));
+    body += '<tr'+(aberta?' style="background:#fbfdfc"':'')+'>'+
+      '<td style="'+td+';white-space:nowrap">'+dt(d.data_entrada)+(d.data_saida?'<div style="font-size:10px;color:#9b9b98">→ '+dt(d.data_saida)+'</div>':'<div style="font-size:10px;color:#1a7f4b">aberta</div>')+'</td>'+
+      '<td style="'+td+'"><strong>'+(d.ativo||'—')+'</strong>'+(d.corretora?' <span class="pill p-'+d.corretora+'">'+d.corretora+'</span>':'')+
+        (d.tipo?'<div style="font-size:10px;color:#9b9b98">'+d.tipo+'</div>':'')+'</td>'+
+      '<td style="'+td+';white-space:nowrap">'+(d.preco_entrada||'—')+(d.preco_saida?'<div style="font-size:10px;color:#9b9b98">→ '+d.preco_saida+'</div>':'')+'</td>'+
+      '<td style="'+td+';white-space:nowrap'+(semStop?';color:#c0392b':'')+'">'+(d.stop_definido||'—')+'</td>'+
+      '<td style="'+td+';max-width:260px">'+(d.motivo_entrada||'—')+
+        (d.motivo_saida?'<div style="font-size:11px;color:#6b6b68;margin-top:4px;padding-top:4px;border-top:1px dashed #f0f0ee"><strong>saída:</strong> '+d.motivo_saida+'</div>':'')+'</td>'+
+      '<td style="'+td+';white-space:nowrap" class="'+dc(d.resultado_eur)+'">'+(d.resultado_eur!=null?(d.resultado_eur>=0?'+':'')+eur(d.resultado_eur):'—')+'</td>'+
+      '<td style="'+td+';max-width:240px;font-size:11px;color:#6b6b68">'+(d.licao||'—')+
+        (d.execucao_correta?'<div style="margin-top:3px;font-size:10px;color:#9b9b98">execução: '+d.execucao_correta+'</div>':'')+'</td>'+
+      '</tr>';
+  });
+  document.getElementById('dec-tabela').innerHTML =
+    '<div class="card" style="padding:0;overflow-x:auto">'+
+    '<div class="card-label" style="padding:14px 18px 8px">Log de decisões</div>'+
+    '<table style="width:100%;border-collapse:collapse;min-width:900px"><thead><tr style="background:#fafaf9">'+
+    '<th style="'+th+'">Data</th><th style="'+th+'">Ativo</th><th style="'+th+'">Preço</th><th style="'+th+'">Stop</th>'+
+    '<th style="'+th+'">Tese / motivo</th><th style="'+th+'">Result.</th><th style="'+th+'">Lição</th>'+
+    '</tr></thead><tbody>'+(body||'<tr><td colspan="7" style="'+td+';color:#9b9b98;text-align:center;padding:26px">Nenhuma decisão registrada ainda</td></tr>')+'</tbody></table></div>';
+}
 
 async function loadHistorico() {
   const [hist, cambio] = await Promise.all([
