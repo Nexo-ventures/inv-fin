@@ -56,6 +56,12 @@
   .fbtn { padding: 4px 10px; border-radius: 6px; border: 1px solid #e5e5e3; background: transparent; font-size: 12px; cursor: pointer; color: #6b6b68; transition: all .15s; }
   .fbtn.on, .fbtn:hover { background: #1c1c1a; color: #fff; border-color: #1c1c1a; }
   .tbl-scroll { overflow-x: auto; }
+  /* primeira coluna congelada ao rolar na horizontal */
+  table.fixa-1 th:first-child,
+  table.fixa-1 td:first-child { position: sticky; left: 0; z-index: 3; background: #fff; box-shadow: 1px 0 0 #f0f0ee; }
+  table.fixa-1 thead th:first-child { z-index: 4; background: #fafaf9; }
+  table.fixa-1 tfoot td:first-child { z-index: 4; background: #fafaf9; }
+  table.fixa-1 tr:hover td:first-child { background: #fafaf9; }
   table { width: 100%; border-collapse: collapse; min-width: 600px; }
   th { padding: 9px 14px; text-align: left; font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: .4px; color: #9b9b98; border-bottom: 1px solid #f0f0ee; background: #fafaf9; white-space: nowrap; }
   td { padding: 10px 14px; font-size: 13px; border-bottom: 1px solid #f0f0ee; }
@@ -1269,7 +1275,7 @@ function renderPosTable(rowsCalc) {
   const thStyle = (k) => 'cursor:pointer;user-select:none;white-space:normal;min-width:50px' + (col===k ? ';color:#1a7f4b' : '');
   const arrow = (k) => col===k ? (dir===1?' ↑':' ↓') : '';
 
-  document.getElementById('pos-body').innerHTML = '<table style="font-size:12px"><thead><tr>' +
+  document.getElementById('pos-body').innerHTML = '<table class="fixa-1" style="font-size:12px"><thead><tr>' +
     cols.map(c => c.toggle
       ? '<th class="'+c.cls+'" style="cursor:pointer;user-select:none;white-space:normal;min-width:60px;color:#1565c0" onclick="togglePosSnaps()" title="Clique para abrir/fechar as datas">'+c.label+'</th>'
       : '<th class="' + c.cls + '" style="' + thStyle(c.key) + '" onclick="sortPos(\'' + c.key + '\')">' + c.label + arrow(c.key) + '</th>').join('') +
@@ -1279,7 +1285,7 @@ function renderPosTable(rowsCalc) {
       const peso = (r.mercadoEur != null && totalMercadoEurAll > 0) ? (r.mercadoEur / totalMercadoEurAll * 100) : null;
       const alerta = r.rentPctRow != null && r.rentPctRow <= -8;
       return '<tr style="' + (alerta?'background:#fdf3f1;box-shadow:inset 3px 0 0 #c0392b':'') + '">' +
-        '<td class="ticker" style="cursor:pointer;text-decoration:underline dotted" onclick="abrirModal(\'' + r.ticker + '\')">' + (alerta?'⚠ ':'') + r.ticker + '</td>' +
+        '<td class="ticker" style="cursor:pointer;text-decoration:underline dotted' + (alerta?';background:#fdf3f1':'') + '" onclick="abrirModal(\'' + r.ticker + '\')">' + (alerta?'⚠ ':'') + r.ticker + '</td>' +
         '<td><span class="pill p-' + r.corretora + '">' + r.corretora + '</span></td>' +
         '<td style="font-size:11px;color:#9b9b98">' + (r.classe_ativo||'—') + '</td>' +
         '<td style="font-size:11px;color:#9b9b98">' + (r.setor||'—') + '</td>' +
@@ -1308,7 +1314,7 @@ function renderPosTable(rowsCalc) {
       const tDelta = sorted.reduce((s,r)=>s+(r.deltaFechEur||0),0);
       const tResFech = sorted.reduce((s,r)=>s+(r.resultFechEur||0),0);
       return '<tfoot><tr style="background:#fafaf9;font-weight:600;border-top:2px solid #e5e5e3">' +
-        '<td style="padding:8px">Total ('+sorted.length+')</td><td></td><td></td><td></td>' +
+        '<td style="padding:8px;background:#fafaf9">Total ('+sorted.length+')</td><td></td><td></td><td></td>' +
         '<td class="tr" style="font-weight:600">'+eur(tMerc)+'</td>' +
         '<td class="tr '+dc(tResFech)+'">'+(tResFech>=0?'+':'')+eur(tResFech)+'</td>' +
         '<td></td>' +
