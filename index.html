@@ -110,6 +110,7 @@
 
   <div id="tab-geral" class="section active">
     <!-- KPI de fechamento — decomposição do resultado -->
+    <div id="geral-saude"></div>
     <div id="geral-fechamento" style="margin-bottom:20px"></div>
     <div id="geral-por-corretora" style="margin-bottom:20px"></div>
     <!-- Tabela mensal consolidada -->
@@ -397,7 +398,7 @@ document.querySelectorAll('.nav-tab').forEach(t => {
 let geralEvolucaoChart = null, geralMoedaChart = null, geralVarChart = null, geralPnlChart = null;
 
 async function loadGeral() {
-  const [pat, posData_g, cash, rendaTot, custosTot, resultFech, fluxos, wiseData_g, cambioG, cambioHist, patMensal, snapsHist, ativosG] = await Promise.all([
+  const [pat, posData_g, cash, rendaTot, custosTot, resultFech, fluxos, wiseData_g, cambioG, cambioHist, patMensal, snapsHist, ativosG, logExec] = await Promise.all([
     get('/patrimonio_consolidado?select=mes,ordem,total_eur,xp_eur,av_eur,r4_eur,ibkr_eur,tem_provisorio&order=ordem.asc'),
     get('/posicoes_abertas?select=corretora,ticker,moeda,preco_atual,quantidade,custo_total,data_entrada'),
     get('/operacoes?select=corretora,ticker,custo_total,preco_atual&status=eq.IGNORAR'),
@@ -410,7 +411,8 @@ async function loadGeral() {
     get('/cambio?select=mes,eur_brl,eur_usd&order=mes.asc'),
     get('/patrimonio_mensal?select=corretora,valor_orig,moeda,mes'),
     get('/precos_historico?select=corretora,ticker,custo_total,moeda,data&order=data.asc'),
-    get('/ativos?select=id,corretora,regiao,pais')
+    get('/ativos?select=id,corretora,regiao,pais'),
+    get('/log_execucao?select=*&order=executado_em.desc&limit=5').catch(()=>[])
   ]);
 
   const last = pat[pat.length - 1];
@@ -634,7 +636,7 @@ async function loadGeral() {
   const MES_NUM_G={Jan:0,Fev:1,Feb:1,Mar:2,Abr:3,Apr:3,Mai:4,May:4,Jun:5,Jul:6,Ago:7,Aug:7,Set:8,Sep:8,Out:9,Oct:9,Nov:10,Dez:11,Dec:11};
   const mesToIdx = mn => (mn in MES_NUM_G) ? MES_NUM_G[mn] : MES_ORDER2.indexOf(mn);
   const fluxosSemCB = fluxos.filter(r=>r.corretora!=='CB'&&r.corretora!=='nan'&&r.tipo!=='TRANSFERENCIA_INTERNA'&&r.data);
-  let abertasLimpoG = 0; // não realizado atual limpo (custo na taxa da compra), p/ separar Abertas vs Resto na tabela
+  let abertasLimpoG = 0, decompG = null; // não realizado atual limpo (custo na taxa da compra), p/ separar Abertas vs Resto na tabela
 
   // === KPI de fechamento — decomposição do resultado ===
   {
@@ -683,6 +685,7 @@ async function loadGeral() {
     const lucroTotal=patrimonioTotal-capitalLiq;
     const resto=lucroTotal-realizadoTotal-abertasTotal-rendaCustos;
     const semCambio=realizadoTotal+abertasTotal+rendaCustos;
+    decompG = { realizado: realizadoTotal, abertas: abertasTotal, rendaCustos, resto, total: lucroTotal };
     const rentGeral = capitalLiq>0 ? (lucroTotal/capitalLiq*100) : 0;
     // TWR — retorno encadeado mês a mês (imune a aportes/retiradas)
     let twrFactor=1, twrOk=false;
@@ -726,6 +729,84 @@ async function loadGeral() {
       +'</div>'
       +'<div style="font-size:11px;color:#9b9b98;line-height:1.5;margin-top:10px">Realizado + Abertas + (Renda − Custos). O "não atribuído" é a diferença residual entre o patrimônio e a soma das partes.</div>'
       +'</div>';
+  }
+
+  // ===== PAINEL DE SAÚDE — só aparece quando há problema =====
+  {
+    const av = [];   // alertas (vermelho)
+    const at = [];   // atenção (amarelo)
+    const MSN={Jan:1,Fev:2,Feb:2,Mar:3,Abr:4,Apr:4,Mai:5,May:5,Jun:6,Jul:7,Ago:8,Aug:8,Set:9,Sep:9,Out:10,Oct:10,Nov:11,Dez:12,Dec:12};
+    const kSN = m => { const [mn,yr]=(m||'').split('/'); return yr+'-'+String(MSN[mn]||0).padStart(2,'0'); };
+    const hoje = new Date();
+    const diasUteisDesde = d => {
+      let n=0; const dt=new Date(d+'T12:00:00');
+      while (dt < hoje) { dt.setDate(dt.getDate()+1); const w=dt.getDay(); if(w>=1&&w<=5) n++; }
+      return n;
+    };
+
+    // 1. rotina automática de preços
+    const ultExec = (logExec||[])[0];
+    const ultSnapData = (snapsHist||[]).reduce((a,x)=> (!a||x.data>a)?x.data:a, null);
+    if (ultSnapData) {
+      const atraso = diasUteisDesde(ultSnapData);
+      if (atraso >= 2) av.push('Preços desatualizados há '+atraso+' dias úteis (último snapshot: '+ultSnapData.slice(8,10)+'/'+ultSnapData.slice(5,7)+'). A rotina automática pode ter falhado.');
+      else if (atraso === 1 && hoje.getHours() >= 20) at.push('Preços de hoje ainda não foram atualizados (a rotina roda às 19h).');
+    }
+    if (ultExec && ultExec.ok === false) av.push('Última execução da rotina falhou: '+(ultExec.erro||'erro não informado'));
+    if (ultExec && ultExec.falhas) at.push('Tickers sem cotação na última rotina: '+ultExec.falhas);
+
+    // 2. posições sem preço
+    const semPreco = (posData_g||[]).filter(p => !p.preco_atual || p.preco_atual <= 0);
+    if (semPreco.length) at.push(semPreco.length+' posição(ões) sem cotação: '+semPreco.map(p=>p.ticker).join(', '));
+
+    // 3. fechamento mensal pendente
+    if (last) {
+      const kUlt = kSN(last.mes);
+      const ref = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+      ref.setMonth(ref.getMonth()-1);
+      const kAnterior = ref.getFullYear()+'-'+String(ref.getMonth()+1).padStart(2,'0');
+      if (kUlt < kAnterior) av.push('Fechamento mensal pendente: o último mês registrado é '+last.mes+'.');
+      if (last.tem_provisorio) at.push('O mês '+last.mes+' está marcado como provisório.');
+    }
+
+    // 4. câmbio do mês corrente
+    const kAtual = hoje.getFullYear()+'-'+String(hoje.getMonth()+1).padStart(2,'0');
+    const temCambio = (cambioHist||[]).some(c => kSN(c.mes) === kAtual);
+    if (!temCambio) at.push('Sem taxa de câmbio cadastrada para o mês corrente.');
+
+    // 5. ativos sem cadastro
+    const idsAtivos = new Set((ativosG||[]).map(a => a.corretora+'|'+(a.id.includes('_')?a.id.slice(a.id.indexOf('_')+1):a.id)));
+    const semCadastro = (posData_g||[]).filter(p => {
+      if (idsAtivos.has(p.corretora+'|'+p.ticker)) return false;
+      const alvo=(p.ticker||'').replace(/_/g,'');
+      for (const k of idsAtivos) { const [c,t]=k.split('|'); if(c===p.corretora && t.replace(/_/g,'')===alvo) return false; }
+      return true;
+    });
+    if (semCadastro.length) at.push(semCadastro.length+' ativo(s) sem cadastro em `ativos`: '+semCadastro.map(p=>p.ticker).join(', '));
+
+    // 6. identidade do resultado
+    if (decompG) {
+      const somaPartes = decompG.realizado + decompG.abertas + decompG.rendaCustos + decompG.resto;
+      if (Math.abs(somaPartes - decompG.total) > 5)
+        av.push('Identidade do resultado não fecha: as partes somam '+eur(somaPartes)+' mas o resultado total é '+eur(decompG.total)+'.');
+    }
+
+    const el = document.getElementById('geral-saude');
+    if (!av.length && !at.length) { el.innerHTML = ''; }
+    else {
+      const item = (txt, cor, bg) => '<div style="display:flex;gap:8px;align-items:flex-start;padding:7px 0"><span style="color:'+cor+';font-weight:700;line-height:1.4">•</span><span style="font-size:12px;color:#3c3c3a;line-height:1.5">'+txt+'</span></div>';
+      el.innerHTML =
+        '<div class="card" style="margin-bottom:16px;border:1px solid '+(av.length?'#f0c8c0':'#f0e2c0')+';background:'+(av.length?'#fdf9f8':'#fdfcf7')+'">'+
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'+
+        '<div class="card-label" style="color:'+(av.length?'#c0392b':'#b8860b')+'">'+
+        (av.length? av.length+' alerta'+(av.length>1?'s':'') : 'Verificação do sistema')+
+        (at.length? (av.length?' · ':'')+at.length+' ponto'+(at.length>1?'s':'')+' de atenção' : '')+'</div>'+
+        (ultExec? '<span style="font-size:10px;color:#9b9b98">última rotina: '+dt(ultExec.executado_em)+' '+(ultExec.origem||'')+'</span>':'')+
+        '</div>'+
+        av.map(t=>item(t,'#c0392b')).join('')+
+        at.map(t=>item(t,'#b8860b')).join('')+
+        '</div>';
+    }
   }
 
   // === Tabela: resultado por corretora (inclui transferências internas p/ linhas verdadeiras) ===
@@ -2433,7 +2514,8 @@ async function loadCambio() {
     get('/cambio_wise?select=*&order=data.asc'),
     get('/patrimonio_mensal?select=mes,corretora,valor_orig,moeda,valor_eur'),
     get('/precos_historico?select=corretora,ticker,custo_total,moeda,data&order=data.asc'),
-    get('/ativos?select=id,corretora,regiao,pais')
+    get('/ativos?select=id,corretora,regiao,pais'),
+    get('/log_execucao?select=*&order=executado_em.desc&limit=5').catch(()=>[])
   ]);
   wiseData = [...wise].reverse();
   const sorted = [...cambio].sort(mesSort);
