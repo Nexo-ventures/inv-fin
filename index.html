@@ -74,6 +74,14 @@
   .p-AV   { background: #e3f2fd; color: #1565c0; }
   .p-R4   { background: #fff3e0; color: #e65100; }
   .p-IBKR { background: #f3e5f5; color: #6a1b9a; }
+  .s-PENDENTE  { background: #f0f0ee; color: #6b6b68; }
+  .s-WATCHLIST { background: #e3f2fd; color: #1565c0; }
+  .s-APROVADO  { background: #e8f5e9; color: #2e7d32; }
+  .s-STANDBY   { background: #fff3e0; color: #e65100; }
+  .s-REPROVADO { background: #fdecea; color: #c0392b; }
+  .s-COMPRADA  { background: #f3e5f5; color: #6a1b9a; }
+  .s-VENDIDA   { background: #eceff1; color: #37474f; }
+  .radar-status-select { padding:6px 10px;border:1px solid #e5e5e3;border-radius:6px;font-size:12px;font-family:inherit;background:#fff }
   .loading { padding: 40px; text-align: center; color: #9b9b98; font-size: 13px; }
   .empty { padding: 40px; text-align: center; color: #9b9b98; font-size: 13px; }
   .err { padding: 20px; color: #c0392b; font-size: 13px; }
@@ -97,6 +105,7 @@
 
 <div class="nav">
   <div class="nav-tab active" data-tab="geral">Visão geral</div>
+  <div class="nav-tab" data-tab="radar">Radar</div>
   <div class="nav-tab" data-tab="posicoes">Posições abertas</div>
   <div class="nav-tab" data-tab="historico">Posições fechadas</div>
   <div class="nav-tab" data-tab="decisoes">Decisões</div>
@@ -133,6 +142,45 @@
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
       <div class="card"><div class="card-label" style="margin-bottom:8px">Exposição geográfica (EUR)</div><div style="position:relative;height:230px"><canvas id="geral-geo-chart"></canvas></div></div>
       <div id="geral-geo-tabela" class="card" style="padding:0;overflow-x:auto"></div>
+    </div>
+  </div>
+
+  <div id="tab-radar" class="section">
+    <div id="radar-kpis"></div>
+    <div class="card" style="margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <div class="card-label">Novo candidato</div>
+        <button class="fbtn" onclick="radarToggleNovoForm()" id="radar-btn-novo">+ Novo candidato</button>
+      </div>
+      <div id="radar-novo-form" style="display:none;padding-top:12px"></div>
+    </div>
+    <div class="card" style="padding:0">
+      <div class="table-head">
+        <span class="table-title">Radar de candidatos</span>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <div style="display:flex;gap:4px;flex-wrap:wrap;padding-right:8px;border-right:1px solid #e5e5e3">
+            <button class="fbtn on" data-dim="status" data-v="TODOS" onclick="filtRadar(this)">Todos</button>
+            <button class="fbtn" data-dim="status" data-v="PENDENTE" onclick="filtRadar(this)">Pendente</button>
+            <button class="fbtn" data-dim="status" data-v="WATCHLIST" onclick="filtRadar(this)">Watchlist</button>
+            <button class="fbtn" data-dim="status" data-v="APROVADO" onclick="filtRadar(this)">Aprovado</button>
+            <button class="fbtn" data-dim="status" data-v="STANDBY" onclick="filtRadar(this)">Standby</button>
+            <button class="fbtn" data-dim="status" data-v="REPROVADO" onclick="filtRadar(this)">Reprovado</button>
+            <button class="fbtn" data-dim="status" data-v="COMPRADA" onclick="filtRadar(this)">Comprada</button>
+            <button class="fbtn" data-dim="status" data-v="VENDIDA" onclick="filtRadar(this)">Vendida</button>
+          </div>
+          <div style="display:flex;gap:4px;flex-wrap:wrap;padding-right:8px;border-right:1px solid #e5e5e3">
+            <button class="fbtn on" data-dim="mercado" data-v="TODOS" onclick="filtRadar(this)">Todo mercado</button>
+            <button class="fbtn" data-dim="mercado" data-v="BR" onclick="filtRadar(this)">BR</button>
+            <button class="fbtn" data-dim="mercado" data-v="US" onclick="filtRadar(this)">US</button>
+            <button class="fbtn" data-dim="mercado" data-v="EU" onclick="filtRadar(this)">EU</button>
+            <button class="fbtn" data-dim="mercado" data-v="ASIA" onclick="filtRadar(this)">Ásia</button>
+          </div>
+          <div style="display:flex;gap:4px">
+            <input id="radar-busca" placeholder="buscar ticker ou nome..." oninput="renderRadar()" style="padding:4px 10px;border:1px solid #e5e5e3;border-radius:6px;font-size:12px;font-family:inherit;min-width:180px">
+          </div>
+        </div>
+      </div>
+      <div class="tbl-scroll" id="radar-body"><div class="loading">carregando...</div></div>
     </div>
   </div>
 
@@ -368,6 +416,15 @@ async function patch(path, body) {
   return r.json();
 }
 
+async function del(path) {
+  const r = await fetch(BASE + path, { method: 'DELETE', headers: H });
+  if (!r.ok) throw new Error(r.status + ': ' + await r.text());
+  return true;
+}
+
+const STORAGE_BASE = 'https://ogkomoewpaxwmlbdlvfi.supabase.co/storage/v1';
+const RADAR_BUCKET = 'radar-anexos';
+
 const eur  = n => n==null ? '—' : '€' + Number(n).toLocaleString('pt-BR', {minimumFractionDigits:0,maximumFractionDigits:0});
 const num  = (n,d=2) => n==null ? '—' : Number(n).toLocaleString('pt-BR', {minimumFractionDigits:d,maximumFractionDigits:d});
 const dc   = n => n==null ? '' : Number(n)>=0 ? 'pos' : 'neg';
@@ -386,6 +443,7 @@ document.querySelectorAll('.nav-tab').forEach(t => {
     const id = t.dataset.tab;
     document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
     document.getElementById('tab-' + id).classList.add('active');
+    if (id === 'radar'     && !window._radarCarregado) { window._radarCarregado = true; loadRadar(); }
     if (id === 'decisoes'  && !window._decCarregado) { window._decCarregado = true; loadDecisoes(); }
     if (id === 'historico' && document.getElementById('hist-body').querySelector('.loading')) loadHistorico();
     if (id === 'renda'     && document.getElementById('renda-body').querySelector('.loading')) loadRenda();
@@ -1618,7 +1676,16 @@ function decToggleForm() {
   if (abrir) decRenderForm();
 }
 
-function decRenderForm() {
+async function decPopulateRadarOptions(selecionado) {
+  const sel = document.getElementById('d-radarid');
+  if (!sel) return;
+  let list = [];
+  try { list = await get('/radar_ativos?select=id,ticker,nome,status&order=ticker.asc'); } catch (e) { list = []; }
+  sel.innerHTML = '<option value="">— nenhum —</option>' +
+    list.map(r => '<option value="'+r.id+'"'+(selecionado===r.id?' selected':'')+'>'+r.ticker+' — '+(r.nome||'')+' ('+(RADAR_STATUS_LABEL[r.status]||r.status)+')</option>').join('');
+}
+
+async function decRenderForm() {
   const inp = 'width:100%;padding:8px 10px;border:1px solid #e5e5e3;border-radius:6px;font-size:13px;font-family:inherit;background:#fff';
   const lbl = 'display:block;font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;margin-bottom:4px';
   const cel = 'display:flex;flex-direction:column';
@@ -1636,6 +1703,7 @@ function decRenderForm() {
       '<div style="'+cel+'"><label style="'+lbl+'">Stop definido</label><input id="d-stop" placeholder="ex: $195 (−8%)" style="'+inp+'"></div>'+
       '<div style="'+cel+'"><label style="'+lbl+'">SuperTrend</label><input id="d-st" placeholder="ex: compra / venda" style="'+inp+'"></div>'+
       '<div style="'+cel+'"><label style="'+lbl+'">Danelfin</label><input id="d-dan" placeholder="ex: 8/10" style="'+inp+'"></div>'+
+      '<div style="'+cel+'"><label style="'+lbl+'">Candidato do radar (opcional)</label><select id="d-radarid" style="'+inp+'"><option value="">— nenhum —</option></select></div>'+
     '</div>'+
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">'+
       '<div style="'+cel+'"><label style="'+lbl+'">Motivo da entrada — a tese em uma linha</label><textarea id="d-motivo" rows="2" style="'+inp+';resize:vertical"></textarea></div>'+
@@ -1645,6 +1713,7 @@ function decRenderForm() {
       '<button onclick="decSalvar()" style="padding:9px 20px;background:#1c1c1a;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-family:inherit">Salvar decisão</button>'+
       '<span id="d-msg" style="font-size:12px"></span>'+
     '</div>';
+  await decPopulateRadarOptions();
 }
 
 async function decSalvar() {
@@ -1656,7 +1725,8 @@ async function decSalvar() {
     await post('/log_decisoes', {
       data_entrada: v('d-data'), ativo: v('d-ativo'), corretora: v('d-corr'), tipo: v('d-tipo'),
       preco_entrada: v('d-preco'), stop_definido: v('d-stop'), supertrend: v('d-st'),
-      danelfin_score: v('d-dan'), motivo_entrada: v('d-motivo'), cenario_macro: v('d-macro')
+      danelfin_score: v('d-dan'), motivo_entrada: v('d-motivo'), cenario_macro: v('d-macro'),
+      radar_id: v('d-radarid')
     });
     msg.innerHTML = '<span style="color:#1a7f4b">✓ registrada</span>';
     await loadDecisoes();
@@ -1726,6 +1796,402 @@ function renderDecisoes() {
     '<th style="'+th+'">Data</th><th style="'+th+'">Ativo</th><th style="'+th+'">Preço</th><th style="'+th+'">Stop</th>'+
     '<th style="'+th+'">Tese / motivo</th><th style="'+th+'">Result.</th><th style="'+th+'">Lição</th>'+
     '</tr></thead><tbody>'+(body||'<tr><td colspan="7" style="'+td+';color:#9b9b98;text-align:center;padding:26px">Nenhuma decisão registrada ainda</td></tr>')+'</tbody></table></div>';
+}
+
+// ===================== ABA RADAR =====================
+let radarData = [];
+let radarFiltStatus = 'TODOS', radarFiltMercado = 'TODOS';
+const RADAR_STATUS_LABEL = { PENDENTE:'Pendente', WATCHLIST:'Watchlist', APROVADO:'Aprovado', STANDBY:'Standby', REPROVADO:'Reprovado', COMPRADA:'Comprada', VENDIDA:'Vendida' };
+
+async function loadRadar() {
+  const r = await get('/radar_ativos?select=*&order=data_inclusao.desc');
+  radarData = r || [];
+  renderRadar();
+}
+
+function radarToggleNovoForm() {
+  const f = document.getElementById('radar-novo-form');
+  const b = document.getElementById('radar-btn-novo');
+  const abrir = f.style.display === 'none';
+  f.style.display = abrir ? 'block' : 'none';
+  b.textContent = abrir ? '× Fechar' : '+ Novo candidato';
+  if (abrir) radarRenderNovoForm();
+}
+
+function radarRenderNovoForm() {
+  const inp = 'width:100%;padding:8px 10px;border:1px solid #e5e5e3;border-radius:6px;font-size:13px;font-family:inherit;background:#fff';
+  const lbl = 'display:block;font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;margin-bottom:4px';
+  const cel = 'display:flex;flex-direction:column';
+  const statusOpts = Object.keys(RADAR_STATUS_LABEL).map(s => '<option value="'+s+'"'+(s==='PENDENTE'?' selected':'')+'>'+RADAR_STATUS_LABEL[s]+'</option>').join('');
+
+  document.getElementById('radar-novo-form').innerHTML =
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:12px">' +
+      '<div style="'+cel+'"><label style="'+lbl+'">Ticker *</label><input id="rn-ticker" placeholder="ex: NVDA" style="'+inp+'"></div>' +
+      '<div style="'+cel+'"><label style="'+lbl+'">Mercado *</label><select id="rn-mercado" style="'+inp+'"><option value="">—</option><option value="BR">BR</option><option value="US">US</option><option value="EU">EU</option><option value="ASIA">Ásia</option></select></div>' +
+      '<div style="'+cel+'"><label style="'+lbl+'">Nome</label><input id="rn-nome" style="'+inp+'"></div>' +
+      '<div style="'+cel+'"><label style="'+lbl+'">Bolsa</label><input id="rn-bolsa" placeholder="ex: NASDAQ" style="'+inp+'"></div>' +
+      '<div style="'+cel+'"><label style="'+lbl+'">Tipo</label><input id="rn-tipo" placeholder="ex: AÇÃO, FII..." style="'+inp+'"></div>' +
+      '<div style="'+cel+'"><label style="'+lbl+'">Setor</label><input id="rn-setor" style="'+inp+'"></div>' +
+      '<div style="'+cel+'"><label style="'+lbl+'">Subsetor</label><input id="rn-subsetor" style="'+inp+'"></div>' +
+      '<div style="'+cel+'"><label style="'+lbl+'">País</label><input id="rn-pais" style="'+inp+'"></div>' +
+      '<div style="'+cel+'"><label style="'+lbl+'">Corretora alvo</label><select id="rn-corretora" style="'+inp+'"><option value="">—</option><option>XP</option><option>AV</option><option>IBKR</option><option>R4</option></select></div>' +
+      '<div style="'+cel+'"><label style="'+lbl+'">Status inicial</label><select id="rn-status" style="'+inp+'">'+statusOpts+'</select></div>' +
+      '<div style="'+cel+'"><label style="'+lbl+'">Fonte</label><input id="rn-fonte" placeholder="quem indicou / onde achou" style="'+inp+'"></div>' +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">' +
+      '<div style="'+cel+'"><label style="'+lbl+'">O que faz</label><textarea id="rn-descricao" rows="2" style="'+inp+';resize:vertical"></textarea></div>' +
+      '<div style="'+cel+'"><label style="'+lbl+'">Motivo do radar</label><textarea id="rn-motivo" rows="2" style="'+inp+';resize:vertical"></textarea></div>' +
+    '</div>' +
+    '<div style="'+cel+';margin-bottom:12px"><label style="'+lbl+'">Gatilho de compra (opcional)</label><textarea id="rn-gatilho" rows="2" style="'+inp+';resize:vertical"></textarea></div>' +
+    '<div style="display:flex;gap:10px;align-items:center">' +
+      '<button onclick="radarSalvarNovo()" style="padding:9px 20px;background:#1c1c1a;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-family:inherit">Adicionar ao radar</button>' +
+      '<span id="rn-msg" style="font-size:12px"></span>' +
+    '</div>';
+}
+
+async function radarSalvarNovo() {
+  const v = fid => (document.getElementById(fid).value || '').trim() || null;
+  const msg = document.getElementById('rn-msg');
+  const ticker = v('rn-ticker'), mercado = v('rn-mercado');
+  if (!ticker || !mercado) { msg.innerHTML = '<span style="color:#c0392b">Ticker e mercado são obrigatórios</span>'; return; }
+  const id = mercado + '_' + ticker.toUpperCase().replace(/\s+/g,'');
+  msg.innerHTML = '<span style="color:#9b9b98">salvando…</span>';
+  try {
+    await post('/radar_ativos', {
+      id, ticker: ticker.toUpperCase(), nome: v('rn-nome'), mercado, bolsa: v('rn-bolsa'),
+      tipo_ativo: v('rn-tipo'), setor: v('rn-setor'), subsetor: v('rn-subsetor'), pais: v('rn-pais'),
+      corretora_alvo: v('rn-corretora'), status: v('rn-status') || 'PENDENTE', fonte: v('rn-fonte'),
+      descricao: v('rn-descricao'), motivo_radar: v('rn-motivo'), gatilho_compra: v('rn-gatilho')
+    });
+    msg.innerHTML = '<span style="color:#1a7f4b">✓ adicionado</span>';
+    await loadRadar();
+    setTimeout(() => { radarToggleNovoForm(); msg.innerHTML=''; }, 900);
+  } catch (e) {
+    const dup = /duplicate key|already exists/i.test(e.message);
+    msg.innerHTML = '<span style="color:#c0392b">'+(dup ? 'Já existe candidato '+id+' no radar' : 'Erro: '+e.message.slice(0,100))+'</span>';
+  }
+}
+
+function filtRadar(btn) {
+  const dim = btn.dataset.dim, val = btn.dataset.v;
+  document.querySelectorAll('#tab-radar [data-dim="'+dim+'"]').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  if (dim === 'status') radarFiltStatus = val; else radarFiltMercado = val;
+  renderRadar();
+}
+
+function renderRadar() {
+  const porStatus = {};
+  radarData.forEach(r => { porStatus[r.status] = (porStatus[r.status]||0) + 1; });
+  const nAprovado = porStatus['APROVADO'] || 0;
+
+  const card = (lbl,val,sub,destaque) => '<div class="card" style="padding:14px 18px'+(destaque||'')+'"><div class="card-label">'+lbl+'</div><div style="font-size:20px;font-weight:700'+(val.cor?';color:'+val.cor:'')+'">'+val.txt+'</div>'+(sub?'<div style="font-size:11px;color:#9b9b98">'+sub+'</div>':'')+'</div>';
+
+  document.getElementById('radar-kpis').innerHTML =
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:16px">' +
+    card('Total candidatos', {txt: String(radarData.length)}, 'no radar') +
+    card('Pendente', {txt: String(porStatus['PENDENTE']||0)}, 'a analisar') +
+    card('Watchlist', {txt: String(porStatus['WATCHLIST']||0)}, 'acompanhamento ativo') +
+    card('Aprovado', {txt: String(nAprovado), cor:(nAprovado?'#c0392b':'#1a7f4b')}, 'gatilho confirmado — avaliar compra', (nAprovado?';border:1px solid #f0c8c0':'')) +
+    card('Standby', {txt: String(porStatus['STANDBY']||0)}, 'tese boa, não é a hora') +
+    card('Comprada / Vendida', {txt: (porStatus['COMPRADA']||0)+' / '+(porStatus['VENDIDA']||0)}, 'virou posição real') +
+    '</div>';
+
+  const busca = (document.getElementById('radar-busca').value || '').trim().toLowerCase();
+  let filtered = radarData;
+  if (radarFiltStatus !== 'TODOS') filtered = filtered.filter(r => r.status === radarFiltStatus);
+  if (radarFiltMercado !== 'TODOS') filtered = filtered.filter(r => r.mercado === radarFiltMercado);
+  if (busca) filtered = filtered.filter(r => (r.ticker||'').toLowerCase().includes(busca) || (r.nome||'').toLowerCase().includes(busca));
+
+  if (!filtered.length) { document.getElementById('radar-body').innerHTML = '<div class="empty">Nenhum candidato encontrado</div>'; return; }
+
+  let body = '';
+  filtered.forEach(r => {
+    body += '<tr style="cursor:pointer" onclick="abrirRadarModal(\''+r.id+'\')">' +
+      '<td class="ticker">'+(r.ticker||'—')+'<div style="font-size:11px;color:#9b9b98;font-weight:400">'+(r.nome||'')+'</div></td>' +
+      '<td>'+(r.mercado||'—')+(r.bolsa?' <span style="color:#9b9b98">· '+r.bolsa+'</span>':'')+'</td>' +
+      '<td>'+(r.setor||'—')+(r.subsetor?'<div style="font-size:11px;color:#9b9b98">'+r.subsetor+'</div>':'')+'</td>' +
+      '<td><span class="pill s-'+r.status+'">'+(RADAR_STATUS_LABEL[r.status]||r.status)+'</span></td>' +
+      '<td>'+(r.fonte||'—')+'</td>' +
+      '<td class="tr">'+dt(r.data_inclusao)+'</td>' +
+      '</tr>';
+  });
+  document.getElementById('radar-body').innerHTML =
+    '<table><thead><tr><th>Ticker</th><th>Mercado</th><th>Setor</th><th>Status</th><th>Fonte</th><th class="tr">Inclusão</th></tr></thead><tbody>'+body+'</tbody></table>';
+}
+
+async function abrirRadarModal(id) {
+  const r = radarData.find(x => x.id === id);
+  if (!r) return;
+  window._radarModalId = id;
+
+  document.getElementById('radar-modal-ticker').textContent = r.ticker;
+  document.getElementById('radar-modal-nome').textContent = [r.nome, r.mercado, r.bolsa, r.tipo_ativo].filter(Boolean).join(' · ');
+
+  const statusOpts = Object.keys(RADAR_STATUS_LABEL).map(s => '<option value="'+s+'"'+(s===r.status?' selected':'')+'>'+RADAR_STATUS_LABEL[s]+'</option>').join('');
+  document.getElementById('radar-modal-status').innerHTML =
+    '<select id="radar-status-select" class="radar-status-select">'+statusOpts+'</select> '+
+    '<button class="fbtn" onclick="radarSalvarStatus()">Salvar status</button> '+
+    '<span id="radar-status-msg" style="font-size:11px"></span>';
+
+  const fields = [
+    ['Setor', r.setor], ['Subsetor', r.subsetor], ['País', r.pais], ['Bolsa', r.bolsa],
+    ['Tipo', r.tipo_ativo], ['Fonte', r.fonte],
+    ['Score Danelfin', r.score_danelfin], ['Score StatusInvest', r.score_statusinvest],
+    ['SuperTrend', r.supertrend], ['Regime de mercado', r.regime_mercado],
+    ['Data de inclusão', dt(r.data_inclusao)], ['Último status em', dt(r.data_ultimo_status)],
+  ];
+  document.getElementById('radar-modal-body').innerHTML =
+    fields.filter(([,v])=>v).map(([l,v])=>'<div class="modal-item"><div class="modal-label">'+l+'</div><div class="modal-value">'+v+'</div></div>').join('') +
+    (r.descricao ? '<div class="modal-item modal-tese"><div class="modal-label">O que faz</div><div class="modal-value" style="font-size:12px;font-weight:400;line-height:1.5">'+r.descricao+'</div></div>' : '') +
+    (r.motivo_radar ? '<div class="modal-item modal-tese"><div class="modal-label">Motivo do radar</div><div class="modal-value" style="font-size:12px;font-weight:400;line-height:1.5">'+r.motivo_radar+'</div></div>' : '');
+
+  document.getElementById('radar-gatilho-txt').value = r.gatilho_compra || '';
+  document.getElementById('radar-notas-txt').value = r.notas || '';
+
+  document.getElementById('radar-analises-list').innerHTML = '<div class="loading">carregando...</div>';
+  document.getElementById('radar-decisoes-list').innerHTML = '<div class="loading">carregando...</div>';
+  document.getElementById('radar-anexos-grid').innerHTML = '<div class="loading">carregando...</div>';
+  document.getElementById('radar-analise-form').style.display = 'none';
+  document.getElementById('radar-modal').style.display = 'block';
+
+  const [analises, decisoes, anexos] = await Promise.all([
+    get('/radar_analises?select=*&radar_id=eq.'+encodeURIComponent(id)+'&order=data.desc'),
+    get('/log_decisoes?select=*&radar_id=eq.'+encodeURIComponent(id)+'&order=data_entrada.desc'),
+    radarListarAnexos(id)
+  ]);
+  renderRadarAnalises(analises || []);
+  renderRadarDecisoes(decisoes || []);
+  renderRadarAnexos(id, anexos || []);
+}
+
+function renderRadarAnalises(analises) {
+  if (!analises.length) { document.getElementById('radar-analises-list').innerHTML = '<div style="font-size:12px;color:#9b9b98;padding:8px 0">Nenhuma análise registrada ainda.</div>'; return; }
+  document.getElementById('radar-analises-list').innerHTML = analises.map(a =>
+    '<div class="modal-item" style="margin-bottom:8px">' +
+    '<div style="display:flex;justify-content:space-between;gap:8px"><div class="modal-label">'+dt(a.data)+' · '+(a.tipo_analise||'—')+(a.fonte?' · '+a.fonte:'')+'</div>'+(a.score!=null?'<div style="font-size:11px;color:#9b9b98">score '+a.score+'</div>':'')+'</div>' +
+    (a.sinal?'<div style="font-size:11px;color:#6b6b68;margin-top:2px">'+a.sinal+'</div>':'') +
+    '<div style="font-size:12px;margin-top:4px">'+a.conclusao+'</div>' +
+    (a.status_resultante?'<div style="font-size:10px;color:#9b9b98;margin-top:4px">→ status: '+(RADAR_STATUS_LABEL[a.status_resultante]||a.status_resultante)+'</div>':'') +
+    '</div>'
+  ).join('');
+}
+
+function renderRadarDecisoes(decisoes) {
+  if (!decisoes.length) { document.getElementById('radar-decisoes-list').innerHTML = '<div style="font-size:12px;color:#9b9b98;padding:8px 0">Nenhuma decisão linkada ainda.</div>'; return; }
+  document.getElementById('radar-decisoes-list').innerHTML = decisoes.map(d =>
+    '<div class="modal-item" style="margin-bottom:8px">' +
+    '<div class="modal-label">'+dt(d.data_entrada)+(d.data_saida?' → '+dt(d.data_saida):' · aberta')+(d.corretora?' · '+d.corretora:'')+'</div>' +
+    (d.motivo_entrada?'<div style="font-size:12px;margin-top:4px">'+d.motivo_entrada+'</div>':'') +
+    (d.resultado_eur!=null?'<div style="font-size:11px;margin-top:4px" class="'+dc(d.resultado_eur)+'">'+(d.resultado_eur>=0?'+':'')+eur(d.resultado_eur)+'</div>':'') +
+    '</div>'
+  ).join('');
+}
+
+function fecharRadarModal() { document.getElementById('radar-modal').style.display = 'none'; }
+
+async function radarSalvarStatus() {
+  const id = window._radarModalId;
+  const val = document.getElementById('radar-status-select').value;
+  const msg = document.getElementById('radar-status-msg');
+  msg.innerHTML = '<span style="color:#9b9b98">salvando…</span>';
+  try {
+    await patch('/radar_ativos?id=eq.'+encodeURIComponent(id), { status: val, data_ultimo_status: new Date().toISOString().slice(0,10) });
+    msg.innerHTML = '<span style="color:#1a7f4b">✓ salvo</span>';
+    await loadRadar();
+  } catch (e) {
+    msg.innerHTML = '<span style="color:#c0392b">Erro: '+e.message.slice(0,90)+'</span>';
+  }
+}
+
+async function radarSalvarGatilho() {
+  const id = window._radarModalId;
+  const val = (document.getElementById('radar-gatilho-txt').value || '').trim() || null;
+  const msg = document.getElementById('radar-gatilho-msg');
+  msg.innerHTML = '<span style="color:#9b9b98">salvando…</span>';
+  try {
+    await patch('/radar_ativos?id=eq.'+encodeURIComponent(id), { gatilho_compra: val });
+    msg.innerHTML = '<span style="color:#1a7f4b">✓ salvo</span>';
+    await loadRadar();
+    setTimeout(()=>{ msg.innerHTML=''; }, 1500);
+  } catch (e) {
+    msg.innerHTML = '<span style="color:#c0392b">Erro: '+e.message.slice(0,90)+'</span>';
+  }
+}
+
+async function radarSalvarNotas() {
+  const id = window._radarModalId;
+  const val = (document.getElementById('radar-notas-txt').value || '').trim() || null;
+  const msg = document.getElementById('radar-notas-msg');
+  msg.innerHTML = '<span style="color:#9b9b98">salvando…</span>';
+  try {
+    await patch('/radar_ativos?id=eq.'+encodeURIComponent(id), { notas: val });
+    msg.innerHTML = '<span style="color:#1a7f4b">✓ salvo</span>';
+    await loadRadar();
+    setTimeout(()=>{ msg.innerHTML=''; }, 1500);
+  } catch (e) {
+    msg.innerHTML = '<span style="color:#c0392b">Erro: '+e.message.slice(0,90)+'</span>';
+  }
+}
+
+async function radarListarAnexos(id) {
+  try {
+    const r = await fetch(STORAGE_BASE+'/object/list/'+RADAR_BUCKET, {
+      method: 'POST',
+      headers: { ...H, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prefix: id+'/', limit: 100, sortBy: { column:'created_at', order:'desc' } })
+    });
+    if (!r.ok) return [];
+    const list = await r.json();
+    return (list||[]).filter(f => f && f.name && f.id);
+  } catch (e) { return []; }
+}
+
+function renderRadarAnexos(id, files) {
+  const wrap = document.getElementById('radar-anexos-grid');
+  if (!files.length) { wrap.innerHTML = '<div style="font-size:12px;color:#9b9b98">Nenhum anexo ainda.</div>'; return; }
+  wrap.innerHTML = files.map(f => {
+    const url = STORAGE_BASE+'/object/public/'+RADAR_BUCKET+'/'+id+'/'+encodeURIComponent(f.name);
+    const isImg = /\.(png|jpe?g|gif|webp)$/i.test(f.name);
+    const fEsc = f.name.replace(/'/g, "\\'");
+    return '<div style="position:relative;display:inline-block;margin:0 8px 8px 0;vertical-align:top">' +
+      (isImg
+        ? '<a href="'+url+'" target="_blank"><img src="'+url+'" style="width:96px;height:96px;object-fit:cover;border-radius:6px;border:1px solid #e5e5e3;display:block"></a>'
+        : '<a href="'+url+'" target="_blank" style="display:flex;align-items:center;justify-content:center;width:96px;height:96px;border-radius:6px;border:1px solid #e5e5e3;font-size:10px;color:#6b6b68;text-align:center;padding:6px;word-break:break-all">'+f.name+'</a>') +
+      '<button onclick="radarExcluirAnexo(\''+id+'\',\''+fEsc+'\')" title="Excluir anexo" style="position:absolute;top:-6px;right:-2px;background:#c0392b;color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer;line-height:1;padding:0">×</button>' +
+      '</div>';
+  }).join('');
+}
+
+async function radarUploadAnexo() {
+  const id = window._radarModalId;
+  const inp = document.getElementById('radar-anexo-file');
+  const msg = document.getElementById('radar-anexo-msg');
+  if (!inp.files.length) return;
+  msg.innerHTML = '<span style="color:#9b9b98">enviando…</span>';
+  try {
+    for (const file of inp.files) {
+      const path = id+'/'+Date.now()+'_'+file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+      const r = await fetch(STORAGE_BASE+'/object/'+RADAR_BUCKET+'/'+path, {
+        method: 'POST',
+        headers: { ...H, 'Content-Type': file.type || 'application/octet-stream' },
+        body: file
+      });
+      if (!r.ok) throw new Error(r.status+': '+await r.text());
+    }
+    inp.value = '';
+    msg.innerHTML = '<span style="color:#1a7f4b">✓ enviado</span>';
+    renderRadarAnexos(id, await radarListarAnexos(id));
+    setTimeout(()=>{ msg.innerHTML=''; }, 1500);
+  } catch (e) {
+    msg.innerHTML = '<span style="color:#c0392b">Erro: '+e.message.slice(0,120)+'</span>';
+  }
+}
+
+async function radarExcluirAnexo(id, filename) {
+  try {
+    await fetch(STORAGE_BASE+'/object/'+RADAR_BUCKET+'/'+id+'/'+encodeURIComponent(filename), { method:'DELETE', headers: H });
+    renderRadarAnexos(id, await radarListarAnexos(id));
+  } catch (e) { console.error(e); }
+}
+
+async function radarIrParaDecisao() {
+  const r = radarData.find(x => x.id === window._radarModalId);
+  if (!r) return;
+  fecharRadarModal();
+  document.querySelector('.nav-tab[data-tab="decisoes"]').click();
+  if (!window._decCarregado) { window._decCarregado = true; await loadDecisoes(); }
+  document.getElementById('dec-form').style.display = 'block';
+  document.getElementById('dec-btn-form').textContent = '× Fechar';
+  await decRenderForm();
+  document.getElementById('d-ativo').value = r.ticker;
+  if (r.corretora_alvo) document.getElementById('d-corr').value = r.corretora_alvo;
+  document.getElementById('d-motivo').value = r.gatilho_compra || r.motivo_radar || '';
+  const sel = document.getElementById('d-radarid');
+  if (sel) sel.value = r.id;
+}
+
+async function radarExcluir() {
+  const btn = document.getElementById('radar-del-btn');
+  const msg = document.getElementById('radar-del-msg');
+  if (!btn.dataset.armed) {
+    btn.dataset.armed = '1';
+    btn.textContent = 'Confirmar exclusão?';
+    btn.style.background = '#c0392b'; btn.style.color = '#fff'; btn.style.borderColor = '#c0392b';
+    setTimeout(() => {
+      if (btn.dataset.armed) { btn.dataset.armed = ''; btn.textContent = 'Excluir candidato'; btn.style.background = ''; btn.style.color = ''; btn.style.borderColor = ''; }
+    }, 3000);
+    return;
+  }
+  const id = window._radarModalId;
+  msg.innerHTML = '<span style="color:#9b9b98">excluindo…</span>';
+  try {
+    await del('/radar_ativos?id=eq.'+encodeURIComponent(id));
+    fecharRadarModal();
+    await loadRadar();
+  } catch (e) {
+    msg.innerHTML = '<span style="color:#c0392b">Erro: '+e.message.slice(0,160)+' — provavelmente há decisões linkadas a este candidato.</span>';
+    btn.dataset.armed = ''; btn.textContent = 'Excluir candidato'; btn.style.background = ''; btn.style.color = ''; btn.style.borderColor = '';
+  }
+}
+
+function radarToggleAnaliseForm() {
+  const f = document.getElementById('radar-analise-form');
+  const abrir = f.style.display === 'none';
+  f.style.display = abrir ? 'block' : 'none';
+  if (abrir) radarRenderAnaliseForm();
+}
+
+function radarRenderAnaliseForm() {
+  const inp = 'width:100%;padding:8px 10px;border:1px solid #e5e5e3;border-radius:6px;font-size:13px;font-family:inherit;background:#fff';
+  const lbl = 'display:block;font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;margin-bottom:4px';
+  const cel = 'display:flex;flex-direction:column';
+  const hoje = new Date().toISOString().slice(0,10);
+  const r = radarData.find(x => x.id === window._radarModalId);
+  const statusOpts = '<option value="">— manter status atual —</option>' + Object.keys(RADAR_STATUS_LABEL).map(s => '<option value="'+s+'"'+(r&&s===r.status?' selected':'')+'>'+RADAR_STATUS_LABEL[s]+'</option>').join('');
+
+  document.getElementById('radar-analise-form').innerHTML =
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:10px">' +
+      '<div style="'+cel+'"><label style="'+lbl+'">Data</label><input id="ra-data" type="date" value="'+hoje+'" style="'+inp+'"></div>' +
+      '<div style="'+cel+'"><label style="'+lbl+'">Tipo</label><select id="ra-tipo" style="'+inp+'"><option value="">—</option><option>FUNDAMENTALISTA</option><option>TECNICA</option><option>MACRO</option><option>REVISAO_STOP</option></select></div>' +
+      '<div style="'+cel+'"><label style="'+lbl+'">Fonte</label><input id="ra-fonte" placeholder="Danelfin, StatusInvest..." style="'+inp+'"></div>' +
+      '<div style="'+cel+'"><label style="'+lbl+'">Score</label><input id="ra-score" type="number" step="0.1" style="'+inp+'"></div>' +
+    '</div>' +
+    '<div style="'+cel+';margin-bottom:10px"><label style="'+lbl+'">Sinal</label><input id="ra-sinal" placeholder="ex: SuperTrend VERDE" style="'+inp+'"></div>' +
+    '<div style="'+cel+';margin-bottom:10px"><label style="'+lbl+'">Conclusão</label><textarea id="ra-conclusao" rows="2" style="'+inp+';resize:vertical"></textarea></div>' +
+    '<div style="'+cel+';margin-bottom:12px"><label style="'+lbl+'">Status resultante</label><select id="ra-status" style="'+inp+'">'+statusOpts+'</select></div>' +
+    '<div style="display:flex;gap:10px;align-items:center">' +
+      '<button onclick="radarSalvarAnalise()" style="padding:9px 20px;background:#1c1c1a;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-family:inherit">Salvar análise</button>' +
+      '<span id="ra-msg" style="font-size:12px"></span>' +
+    '</div>';
+}
+
+async function radarSalvarAnalise() {
+  const id = window._radarModalId;
+  const v = fid => (document.getElementById(fid).value || '').trim() || null;
+  const msg = document.getElementById('ra-msg');
+  if (!v('ra-data') || !v('ra-tipo') || !v('ra-conclusao')) { msg.innerHTML = '<span style="color:#c0392b">Data, tipo e conclusão são obrigatórios</span>'; return; }
+  msg.innerHTML = '<span style="color:#9b9b98">salvando…</span>';
+  try {
+    const statusResultante = v('ra-status');
+    await post('/radar_analises', {
+      radar_id: id, data: v('ra-data'), tipo_analise: v('ra-tipo'), fonte: v('ra-fonte'),
+      score: v('ra-score'), sinal: v('ra-sinal'), conclusao: v('ra-conclusao'), status_resultante: statusResultante
+    });
+    if (statusResultante) {
+      await patch('/radar_ativos?id=eq.'+encodeURIComponent(id), { status: statusResultante, data_ultimo_status: new Date().toISOString().slice(0,10) });
+    }
+    msg.innerHTML = '<span style="color:#1a7f4b">✓ registrada</span>';
+    await loadRadar();
+    const analises = await get('/radar_analises?select=*&radar_id=eq.'+encodeURIComponent(id)+'&order=data.desc');
+    renderRadarAnalises(analises || []);
+    if (statusResultante) {
+      document.getElementById('radar-status-select').value = statusResultante;
+    }
+    setTimeout(() => { radarToggleAnaliseForm(); msg.innerHTML=''; }, 900);
+  } catch (e) {
+    msg.innerHTML = '<span style="color:#c0392b">Erro: '+e.message.slice(0,90)+'</span>';
+  }
 }
 
 async function loadHistorico() {
@@ -3025,8 +3491,65 @@ function abrirModal(ticker) {
   document.getElementById('ativo-modal').style.display = 'block';
 }
 function fecharModal() { document.getElementById('ativo-modal').style.display = 'none'; }
-document.addEventListener('keydown', e => { if(e.key==='Escape') fecharModal(); });
+document.addEventListener('keydown', e => { if(e.key==='Escape') { fecharModal(); fecharRadarModal(); } });
 </script>
+  <div id="radar-modal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.4);backdrop-filter:blur(2px)" onclick="if(event.target===this)fecharRadarModal()">
+    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:16px;padding:28px;min-width:320px;max-width:600px;width:92%;max-height:88vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.2)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div>
+          <div id="radar-modal-ticker" style="font-size:22px;font-weight:700;color:#1c1c1a"></div>
+          <div id="radar-modal-nome" style="font-size:12px;color:#9b9b98;margin-top:2px"></div>
+        </div>
+        <button onclick="fecharRadarModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#9b9b98;padding:4px 8px">✕</button>
+      </div>
+      <div id="radar-modal-status" style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid #f0f0ee"></div>
+      <div id="radar-modal-body" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px"></div>
+      <div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid #f0f0ee">
+        <div class="modal-label" style="margin-bottom:6px">Gatilho de compra</div>
+        <textarea id="radar-gatilho-txt" rows="2" style="width:100%;padding:8px 10px;border:1px solid #e5e5e3;border-radius:6px;font-size:13px;font-family:inherit;background:#fff;resize:vertical;margin-bottom:6px"></textarea>
+        <div style="display:flex;gap:10px;align-items:center">
+          <button class="fbtn" onclick="radarSalvarGatilho()">Salvar gatilho</button>
+          <span id="radar-gatilho-msg" style="font-size:11px"></span>
+        </div>
+      </div>
+      <div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid #f0f0ee">
+        <div class="modal-label" style="margin-bottom:6px">Notas</div>
+        <textarea id="radar-notas-txt" rows="3" placeholder="anotações livres — acompanhamento, dúvidas, o que observar..." style="width:100%;padding:8px 10px;border:1px solid #e5e5e3;border-radius:6px;font-size:13px;font-family:inherit;background:#fff;resize:vertical;margin-bottom:6px"></textarea>
+        <div style="display:flex;gap:10px;align-items:center">
+          <button class="fbtn" onclick="radarSalvarNotas()">Salvar notas</button>
+          <span id="radar-notas-msg" style="font-size:11px"></span>
+        </div>
+      </div>
+      <div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid #f0f0ee">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div class="modal-label" style="margin-bottom:0">Histórico de análises</div>
+          <button class="fbtn" onclick="radarToggleAnaliseForm()">+ Nova análise</button>
+        </div>
+        <div id="radar-analise-form" style="display:none;margin-bottom:12px;padding:12px;background:#fafaf9;border-radius:8px"></div>
+        <div id="radar-analises-list"></div>
+      </div>
+      <div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid #f0f0ee">
+        <div class="modal-label" style="margin-bottom:8px">Anexos — prints, gráficos, dados</div>
+        <div id="radar-anexos-grid" style="margin-bottom:8px"></div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <input id="radar-anexo-file" type="file" accept="image/*,.pdf" multiple style="font-size:12px">
+          <button class="fbtn" onclick="radarUploadAnexo()">Enviar</button>
+          <span id="radar-anexo-msg" style="font-size:11px"></span>
+        </div>
+      </div>
+      <div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid #f0f0ee">
+        <div class="modal-label" style="margin-bottom:8px">Decisões linkadas</div>
+        <div id="radar-decisoes-list"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+        <button class="fbtn" onclick="radarIrParaDecisao()">Registrar decisão de compra →</button>
+        <div style="display:flex;gap:10px;align-items:center">
+          <span id="radar-del-msg" style="font-size:11px"></span>
+          <button id="radar-del-btn" class="fbtn" onclick="radarExcluir()">Excluir candidato</button>
+        </div>
+      </div>
+    </div>
+  </div>
   <div id="ativo-modal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.4);backdrop-filter:blur(2px)" onclick="if(event.target===this)fecharModal()">
     <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:16px;padding:28px;min-width:320px;max-width:520px;width:90%;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.2)">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
