@@ -68,7 +68,9 @@
   tr:last-child td { border-bottom: none; }
   tr:hover td { background: #fafaf9; }
   .tr { text-align: right; }
-  .ticker { font-weight: 500; }
+  .ticker { font-weight: 500; line-height: 1.2; }
+  /* linha com nome da empresa: mantém a altura compacta */
+  td.ticker { padding-top: 6px; padding-bottom: 6px; }
   .pill { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 500; }
   .p-XP   { background: #e8f5e9; color: #2e7d32; }
   .p-AV   { background: #e3f2fd; color: #1565c0; }
@@ -190,6 +192,7 @@
       <div id="pos-top5g" class="card" style="padding:14px 18px"></div>
       <div id="pos-top5p" class="card" style="padding:14px 18px"></div>
     </div>
+    <div class="card" style="margin-bottom:16px"><div class="card-label" style="margin-bottom:8px">Evolução diária das posições abertas (EUR)</div><div style="position:relative;height:220px"><canvas id="pos-evol-chart"></canvas></div></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
       <div class="card"><div class="card-label" style="margin-bottom:8px">Resultado não realizado por classe (EUR)</div><div style="position:relative;height:200px"><canvas id="pos-classe-chart"></canvas></div></div>
       <div class="card"><div class="card-label" style="margin-bottom:8px">Maiores posições (% do valor a mercado)</div><div style="position:relative;height:200px"><canvas id="pos-conc-chart"></canvas></div></div>
@@ -1255,7 +1258,8 @@ async function loadPosicoes() {
   const [pos, cambio, snaps] = await Promise.all([
     get('/posicoes_abertas?select=*&order=data_entrada.asc'),
     get('/cambio?select=mes,eur_brl,eur_usd'),
-    get('/precos_historico?select=corretora,ticker,preco,data&order=data.desc')
+    get('/precos_historico?select=corretora,ticker,preco,data&order=data.desc'),
+    carregarNomesAtivos()
   ]);
   posData = pos;
   cambioRates = {};
@@ -1281,6 +1285,29 @@ async function loadPosicoes() {
   }
   posFiltCorr = 'TODAS'; posFiltClasse = 'TODAS';
   renderPos(posData);
+}
+let nomesAtivos = {};
+function nomeDoAtivo(corretora, ticker) {
+  if (!ticker) return null;
+  const direto = nomesAtivos[corretora+'|'+ticker];
+  if (direto) return direto;
+  const alvo = String(ticker).replace(/_/g,'');
+  for (const k in nomesAtivos) {
+    const [c,t] = k.split('|');
+    if (c === corretora && t.replace(/_/g,'') === alvo) return nomesAtivos[k];
+  }
+  return null;
+}
+async function carregarNomesAtivos() {
+  if (Object.keys(nomesAtivos).length) return;
+  try {
+    const lista = await get('/ativos?select=id,corretora,nome');
+    (lista||[]).forEach(a => {
+      if (!a.nome) return;
+      const tk = a.id.includes('_') ? a.id.slice(a.id.indexOf('_')+1) : a.id;
+      nomesAtivos[a.corretora+'|'+tk] = a.nome;
+    });
+  } catch(e) { console.warn('nomes de ativos:', e); }
 }
 let posFechamento = {}, posFechamentoData = null, posSnapDatas = [], posSnapPreco = {}, posExpandido = false;
 function ehFimMes(d){ const dt=new Date(d+'T12:00:00'); if(isNaN(dt)) return false; const nx=new Date(dt); nx.setDate(nx.getDate()+1); return nx.getMonth()!==dt.getMonth(); }
@@ -1425,6 +1452,51 @@ function renderPos(rows) {
   const cc = document.getElementById('pos-classe-chart');
   if (cc) { if(posClasseChart) posClasseChart.destroy(); posClasseChart = new Chart(cc, {type:'bar', data:{labels:klassesSorted.map(([c,v])=>c+' ('+(totalResultEurAbs?((Math.abs(v)/totalResultEurAbs)*100).toFixed(1):'0')+'%)'), datasets:[{data:klassesSorted.map(([,v])=>v), backgroundColor:klassesSorted.map(([c,v])=>(CLASS_COLORS[c]||'#9b9b98')+(v>=0?'cc':'88')), borderRadius:4}]}, options:{indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>{const v=ctx.raw; return ' €'+v.toLocaleString('de-DE',{minimumFractionDigits:2});}}}}, scales:{x:{grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>'€'+v.toLocaleString('de-DE')}}, y:{grid:{display:false}, ticks:{font:{size:10}}}}}}); }
 
+  // ===== Evolução diária das posições abertas =====
+  // Barras: quanto o conjunto variou em cada snapshot.
+  // Linha:  acumulado desde o fechamento de referência.
+  {
+    const fmtDia = d => d.slice(8,10)+'/'+d.slice(5,7);
+    const varPorData = posSnapDatas.map(d =>
+      rowsCalc.reduce((s,r) => s + ((r.snapVar && r.snapVar[d]) || 0), 0)
+    );
+    let acc = 0;
+    const acumulado = varPorData.map(v => { acc += v; return acc; });
+
+    const ec = document.getElementById('pos-evol-chart');
+    if (ec && posSnapDatas.length) {
+      if (window._posEvolChart) window._posEvolChart.destroy();
+      window._posEvolChart = new Chart(ec, {
+        data: {
+          labels: posSnapDatas.map(fmtDia),
+          datasets: [
+            { type:'bar', label:'Variação do dia', data: varPorData, order: 2,
+              backgroundColor: varPorData.map(v => v>=0 ? '#1a7f4bcc' : '#c0392bcc'),
+              borderRadius: 4, yAxisID: 'y' },
+            { type:'line', label:'Acumulado desde o fechamento', data: acumulado, order: 1,
+              borderColor:'#1c1c1a', backgroundColor:'transparent', borderWidth: 2,
+              pointRadius: 3, tension: 0.3, yAxisID: 'yAcum' }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { labels: { font:{size:10}, boxWidth:10 } },
+            tooltip: { callbacks: { label: c => ' ' + c.dataset.label + ': ' + (c.raw>=0?'+':'−') + eur(Math.abs(c.raw)) } }
+          },
+          scales: {
+            x: { grid:{display:false}, ticks:{font:{size:9}} },
+            y:     { position:'left',  grid:{color:'#f0f0ee'}, ticks:{font:{size:9}, callback:v=>(v>=0?'+':'−')+eur(Math.abs(v))} },
+            yAcum: { position:'right', grid:{display:false},   ticks:{font:{size:9}, color:'#6b6b68', callback:v=>(v>=0?'+':'−')+eur(Math.abs(v))} }
+          }
+        }
+      });
+    } else if (ec) {
+      ec.parentElement.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#9b9b98;font-size:12px">Sem atualizações registradas após o fechamento</div>';
+    }
+  }
+
   // Gráfico de concentração — top 8 posições por peso (% do valor a mercado)
   const totalMercConc = rowsCalc.reduce((s,r)=>s+(r.mercadoEur||0),0);
   const concSorted = rowsCalc.filter(r=>r.mercadoEur!=null && totalMercConc>0)
@@ -1558,7 +1630,8 @@ function renderPosTable(rowsCalc) {
       const peso = (r.mercadoEur != null && totalMercadoEurAll > 0) ? (r.mercadoEur / totalMercadoEurAll * 100) : null;
       const alerta = r.rentPctRow != null && r.rentPctRow <= -8;
       return '<tr style="' + (alerta?'background:#fdf3f1;box-shadow:inset 3px 0 0 #c0392b':'') + '">' +
-        '<td class="ticker" style="cursor:pointer;text-decoration:underline dotted' + (alerta?';background:#fdf3f1':'') + '" onclick="abrirModal(\'' + r.ticker + '\')">' + (alerta?'⚠ ':'') + r.ticker + '</td>' +
+        '<td class="ticker" style="cursor:pointer;text-decoration:underline dotted' + (alerta?';background:#fdf3f1':'') + '" onclick="abrirModal(\'' + r.ticker + '\')">' + (alerta?'⚠ ':'') + r.ticker +
+          (nomeDoAtivo(r.corretora, r.ticker) ? '<div style="font-size:10px;color:#9b9b98;font-weight:400;text-decoration:none;line-height:1.25;margin-top:1px">'+nomeDoAtivo(r.corretora, r.ticker)+'</div>' : '') + '</td>' +
         '<td><span class="pill p-' + r.corretora + '">' + r.corretora + '</span></td>' +
         '<td style="font-size:11px;color:#9b9b98">' + (r.classe_ativo||'—') + '</td>' +
         '<td style="font-size:11px;color:#9b9b98">' + (r.setor||'—') + '</td>' +
@@ -2197,7 +2270,8 @@ async function radarSalvarAnalise() {
 async function loadHistorico() {
   const [hist, cambio] = await Promise.all([
     get('/resultado_fechado?select=*&order=data_saida.desc&limit=200'),
-    get('/cambio?select=mes,eur_brl,eur_usd')
+    get('/cambio?select=mes,eur_brl,eur_usd'),
+    carregarNomesAtivos()
   ]);
   histData = hist.map(r => ({...r, categoria: r.categoria || (r.tipo === 'RF' ? 'RF' : (r.tipo === 'ETF' ? 'ETF' : (r.tipo === 'FUNDO' ? 'FUNDO' : 'ACAO')))}));
   cambioRates = {};
@@ -2565,7 +2639,7 @@ function renderHist(rows) {
       const receitaEur = r.moeda === 'EUR' ? r.receita_total : toEur(r.receita_total, r.moeda, mesS);
       const rent = r.resultado_moeda != null && r.custo_total ? (r.resultado_moeda / r.custo_total * 100) : null;
       return `<tr>
-        <td class="ticker" style="cursor:pointer;text-decoration:underline dotted" onclick="abrirModal('${r.ticker}')">${r.ticker}</td>
+        <td class="ticker" style="cursor:pointer;text-decoration:underline dotted" onclick="abrirModal('${r.ticker}')">${r.ticker}${nomeDoAtivo(r.corretora, r.ticker) ? '<div style="font-size:10px;color:#9b9b98;font-weight:400;text-decoration:none;line-height:1.25;margin-top:1px">'+nomeDoAtivo(r.corretora, r.ticker)+'</div>' : ''}</td>
         <td><span class="pill p-${r.corretora}">${r.corretora}</span></td>
         <td style="font-size:11px;color:#9b9b98">${r.classe_ativo||'—'}</td>
         <td style="font-size:11px;color:#9b9b98">${r.setor||'—'}</td>
