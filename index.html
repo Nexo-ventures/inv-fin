@@ -1894,7 +1894,16 @@ function renderPosTable(rowsCalc) {
   const totalMercadoEurAll = rowsCalc.reduce((s,r) => s + (r.mercadoEur||0), 0);
 
   const sorted = [...rowsCalc].sort((a,b) => {
-    let va = a[col], vb = b[col];
+    let va, vb;
+    if (col === 'gate') {
+      const ordem = { APROVADO:1, ATENCAO:2, REPROVADO:3 };
+      va = ordem[(classifRadar[(a.ticker||'').toUpperCase()]||{}).fc_gate] || 9;
+      vb = ordem[(classifRadar[(b.ticker||'').toUpperCase()]||{}).fc_gate] || 9;
+    } else if (col === 'setor') {
+      va = classif(a.ticker,'setor',a.setor); vb = classif(b.ticker,'setor',b.setor);
+    } else {
+      va = a[col]; vb = b[col];
+    }
     if (va == null) return 1; if (vb == null) return -1;
     if (typeof va === 'string') return dir * va.localeCompare(vb);
     return dir * (va - vb);
@@ -1905,9 +1914,7 @@ function renderPosTable(rowsCalc) {
   const colsSnap = posExpandido ? posSnapDatas.map(d => ({key:'snap|'+d, label:fmtDia(d), cls:'tr', snap:d})) : [];
   const cols = [
     {key:'ticker', label:'Ativo', cls:''},
-    {key:'corretora', label:'Corretora', cls:''},
-    {key:'classe_ativo', label:'Classe', cls:''},
-    {key:'setor', label:'Setor', cls:''},
+    {key:'gate', label:'Gate', cls:''},
     {key:'mercadoEur', label:'Mercado<br>EUR', cls:'tr'},
     {key:'resultFechEur', label:'Result. EUR<br><span style="font-weight:400;text-transform:none;letter-spacing:0;color:#c9c9c6">'+fmtDia(posFechamentoData)+'</span>', cls:'tr'},
     {key:'rentFechRow', label:'Rent. %<br><span style="font-weight:400;text-transform:none;letter-spacing:0;color:#c9c9c6">'+fmtDia(posFechamentoData)+'</span>', cls:'tr'},
@@ -1924,6 +1931,9 @@ function renderPosTable(rowsCalc) {
     {key:'moeda', label:'Moeda', cls:''},
     {key:'precoFech', label:'Preço<br>fech', cls:'tr'},
     {key:'valorFechEur', label:'V.fech<br>EUR', cls:'tr'},
+    {key:'classe_ativo', label:'Classe', cls:''},
+    {key:'setor', label:'Setor', cls:''},
+    {key:'corretora', label:'Corretora', cls:''},
   ];
 
   const thStyle = (k) => 'cursor:pointer;user-select:none;white-space:normal;min-width:50px' + (col===k ? ';color:#1a7f4b' : '');
@@ -1968,12 +1978,18 @@ function renderPosTable(rowsCalc) {
         const tit = (prox.t==='prazo'?'prazo-limite':'próximo earnings')+' '+(diasFalta<0?'(vencido)':'('+diasFalta+'d)');
         return ' <span style="display:inline-block;background:'+bg+';color:'+cor+';border-radius:4px;padding:1px 5px;font-size:9px;font-weight:600;vertical-align:middle" title="'+tit+'">⏰ '+lbl+'</span>';
       })();
+      // #2 Coluna Gate: badge do fc_gate da posição (do radar)
+      const gateVal = rc.fc_gate || null;
+      const gateBadge = (() => {
+        if (!gateVal) return '<td style="text-align:center;color:#d9d9d6;font-size:10px">—</td>';
+        const cfg = {APROVADO:['#1a7f4b','#e8f5e9','🟢'],ATENCAO:['#8a6d00','#fdf6e3','🟡'],REPROVADO:['#c0392b','#fdeeec','🔴']}[gateVal] || ['#9b9b98','#f4f4f2',''];
+        return '<td style="text-align:center"><span style="display:inline-block;background:'+cfg[1]+';color:'+cfg[0]+';border-radius:4px;padding:1px 6px;font-size:9px;font-weight:700;letter-spacing:.2px" title="Gate do Fundamental Check">'+cfg[2]+' '+gateVal.slice(0,4)+'</span></td>';
+      })();
+      const subsetorTxt = classif(r.ticker,'subsetor',r.subsetor);
       return '<tr style="' + (corAlerta?'background:'+bgAlerta+';box-shadow:inset 3px 0 0 '+corAlerta:'') + '">' +
         '<td class="ticker" style="cursor:pointer;text-decoration:underline dotted' + (corAlerta?';background:'+bgAlerta:'') + '" onclick="abrirModal(\'' + r.ticker + '\')" title="'+(alertaTipo==='stop'?'furou o stop configurado':alvoOK?'atingiu o alvo de saída':gatOK?'atingiu o gatilho de entrada':alerta?'queda ≥ 8% (sem stop configurado)':'')+'">' + marcador + r.ticker + evtBadge +
           (nomeDoAtivo(r.corretora, r.ticker) ? '<div style="font-size:10px;color:#9b9b98;font-weight:400;text-decoration:none;line-height:1.25;margin-top:1px">'+nomeDoAtivo(r.corretora, r.ticker)+'</div>' : '') + '</td>' +
-        '<td><span class="pill p-' + r.corretora + '">' + r.corretora + '</span></td>' +
-        '<td style="font-size:11px;color:#9b9b98">' + (r.classe_ativo||'—') + '</td>' +
-        '<td style="font-size:11px;color:#9b9b98">' + (classif(r.ticker,'setor',r.setor)||'—') + '</td>' +
+        gateBadge +
         '<td class="tr" style="font-weight:500">' + (r.mercadoEur!=null?eur(r.mercadoEur):'—') + '</td>' +
         '<td class="tr ' + dc(r.resultFechEur) + '">' + (r.resultFechEur!=null?(r.resultFechEur>=0?'+':'')+eur(r.resultFechEur):'—') + '</td>' +
         '<td class="tr ' + dc(r.rentFechRow) + '" style="font-size:11px">' + (r.rentFechRow!=null?(r.rentFechRow>=0?'+':'')+r.rentFechRow.toFixed(1)+'%':'—') + '</td>' +
@@ -1990,6 +2006,10 @@ function renderPosTable(rowsCalc) {
         '<td style="font-size:11px;color:#6b6b68">' + r.moeda + '</td>' +
         '<td class="tr" style="font-size:11px;color:#6b6b68">' + (r.precoFech!=null?num(r.precoFech,2):'—') + '</td>' +
         '<td class="tr" style="color:#6b6b68">' + (r.valorFechEur!=null?eur(r.valorFechEur):'—') + '</td>' +
+        // #4 Classe · Setor(+subsetor) · Corretora movidos para o final
+        '<td style="font-size:11px;color:#9b9b98">' + (r.classe_ativo||'—') + '</td>' +
+        '<td style="font-size:11px;color:#9b9b98">' + (classif(r.ticker,'setor',r.setor)||'—') + (subsetorTxt?'<div style="font-size:10px;color:#c0c0bd">'+subsetorTxt+'</div>':'') + '</td>' +
+        '<td><span class="pill p-' + r.corretora + '">' + r.corretora + '</span></td>' +
         '</tr>';
     }).join('') + '</tbody>' +
     (() => {
@@ -2104,7 +2124,7 @@ let classifRadar = {};
 async function carregarClassifRadar() {
   if (Object.keys(classifRadar).length) return classifRadar;
   try {
-    const r = await get('/radar_ativos?select=ticker,setor,subsetor,pais,regiao_macro,bolsa,tipo_ativo,stop_preco,gatilho_preco,alvo_preco,prazo_alerta,fc_proximo_earnings');
+    const r = await get('/radar_ativos?select=ticker,setor,subsetor,pais,regiao_macro,bolsa,tipo_ativo,stop_preco,gatilho_preco,alvo_preco,prazo_alerta,fc_proximo_earnings,fc_gate,stop_no_broker,alvo_no_broker,gatilho_no_broker');
     (r||[]).forEach(x => { classifRadar[(x.ticker||'').toUpperCase()] = x; });
   } catch(e) { console.warn('classificação do radar:', e.message); }
   return classifRadar;
@@ -2586,8 +2606,9 @@ async function fcSalvarStop() {
     await patch('/radar_ativos?id=eq.'+encodeURIComponent(window._radarModalId), { stop_preco: parseNum(val) });
     const r = radarData.find(x => x.id === window._radarModalId); if (r) r.stop_preco = parseNum(val);
     if (typeof fcRenderAlertaPreco==='function') fcRenderAlertaPreco();
-    msg.innerHTML = '<span style="color:#1a7f4b">✓ salvo</span>';
-    setTimeout(()=>{ msg.innerHTML=''; }, 2000);
+    const avisoBroker = (r && r.stop_no_broker) ? ' <span style="color:#d67328">⚠️ preço mudou — atualize a ordem no broker</span>' : '';
+    msg.innerHTML = '<span style="color:#1a7f4b">✓ salvo</span>'+avisoBroker;
+    setTimeout(()=>{ msg.innerHTML=''; }, 4000);
   } catch(e) { msg.innerHTML = '<span style="color:#c0392b">Erro: '+e.message.slice(0,60)+'</span>'; }
 }
 
@@ -2601,8 +2622,9 @@ async function fcSalvarAlvo() {
     await patch('/radar_ativos?id=eq.'+encodeURIComponent(window._radarModalId), { alvo_preco: parseNum(val) });
     const r = radarData.find(x => x.id === window._radarModalId); if (r) r.alvo_preco = parseNum(val);
     if (typeof fcRenderAlertaPreco==='function') fcRenderAlertaPreco();
-    msg.innerHTML = '<span style="color:#1a7f4b">✓ salvo</span>';
-    setTimeout(()=>{ msg.innerHTML=''; }, 2000);
+    const avisoBroker = (r && r.alvo_no_broker) ? ' <span style="color:#d67328">⚠️ preço mudou — atualize a ordem no broker</span>' : '';
+    msg.innerHTML = '<span style="color:#1a7f4b">✓ salvo</span>'+avisoBroker;
+    setTimeout(()=>{ msg.innerHTML=''; }, 4000);
   } catch(e) { msg.innerHTML = '<span style="color:#c0392b">Erro: '+e.message.slice(0,60)+'</span>'; }
 }
 
@@ -2618,6 +2640,22 @@ async function fcSalvarPrazo() {
     msg.innerHTML = '<span style="color:#1a7f4b">✓ salvo</span>';
     setTimeout(()=>{ msg.innerHTML=''; }, 2000);
   } catch(e) { msg.innerHTML = '<span style="color:#c0392b">Erro: '+e.message.slice(0,60)+'</span>'; }
+}
+
+// Salva a flag "ativo no broker" (stop / alvo / gatilho)
+async function fcSalvarBrokerFlag(tipo) {
+  const map = { stop:'stop_no_broker', alvo:'alvo_no_broker', gatilho:'gatilho_no_broker' };
+  const idMap = { stop:'fc-stop-broker', alvo:'fc-alvo-broker', gatilho:'fc-gatilho-broker' };
+  const col = map[tipo]; const chk = document.getElementById(idMap[tipo]);
+  if (!col || !chk) return;
+  const val = chk.checked;
+  try {
+    await patch('/radar_ativos?id=eq.'+encodeURIComponent(window._radarModalId), { [col]: val });
+    const r = radarData.find(x => x.id === window._radarModalId); if (r) r[col] = val;
+    // re-renderiza o modal para atualizar o rótulo/cor do checkbox
+    const rr = radarData.find(x => x.id === window._radarModalId);
+    if (rr && typeof renderFundamentalCheck==='function') renderFundamentalCheck(rr);
+  } catch(e) { console.warn('broker flag:', e.message); }
 }
 
 // Copia o contexto/nota formatado para colar no chat ao reanalisar
@@ -2842,14 +2880,18 @@ function renderFundamentalCheck(r) {
     +   '<div><label style="display:block;font-size:9px;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;margin-bottom:3px">🔴 Stop (saída na perda)</label>'
     +     '<div style="display:flex;gap:8px;align-items:center"><input id="fc-stop-preco" type="text" inputmode="decimal" placeholder="ex: 1450.00" value="'+(r.stop_preco!=null?r.stop_preco:'')+'" style="width:130px;padding:8px 10px;border:1px solid #e5e5e3;border-radius:6px;font-size:13px;font-family:inherit;background:#fff">'
     +     '<button class="fbtn" onclick="fcSalvarStop()">Salvar</button><span id="fc-stop-msg" style="font-size:11px"></span></div>'
-    +     (r.stop_preco!=null ? '<div style="font-size:10px;color:#d67328;margin-top:4px">⚠️ Confirme que o stop está ativo no broker (não só aqui)</div>' : '')
+    +     (r.stop_preco!=null ? '<label style="display:flex;align-items:center;gap:5px;margin-top:5px;font-size:11px;cursor:pointer;color:'+(r.stop_no_broker?'#1a7f4b':'#d67328')+'"><input type="checkbox" id="fc-stop-broker" '+(r.stop_no_broker?'checked':'')+' onchange="fcSalvarBrokerFlag(\'stop\')" style="cursor:pointer">'+(r.stop_no_broker?'✅ ativo no broker':'⚠️ só no sistema — configurar no broker')+'</label>' : '')
     +   '</div>'
     +   '<div><label style="display:block;font-size:9px;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;margin-bottom:3px">🎯 Alvo (saída no lucro)</label>'
     +     '<div style="display:flex;gap:8px;align-items:center"><input id="fc-alvo-preco" type="text" inputmode="decimal" placeholder="ex: 1900.00" value="'+(r.alvo_preco!=null?r.alvo_preco:'')+'" style="width:130px;padding:8px 10px;border:1px solid #e5e5e3;border-radius:6px;font-size:13px;font-family:inherit;background:#fff">'
-    +     '<button class="fbtn" onclick="fcSalvarAlvo()">Salvar</button><span id="fc-alvo-msg" style="font-size:11px"></span></div></div>'
+    +     '<button class="fbtn" onclick="fcSalvarAlvo()">Salvar</button><span id="fc-alvo-msg" style="font-size:11px"></span></div>'
+    +     (r.alvo_preco!=null ? '<label style="display:flex;align-items:center;gap:5px;margin-top:5px;font-size:11px;cursor:pointer;color:'+(r.alvo_no_broker?'#1a7f4b':'#d67328')+'"><input type="checkbox" id="fc-alvo-broker" '+(r.alvo_no_broker?'checked':'')+' onchange="fcSalvarBrokerFlag(\'alvo\')" style="cursor:pointer">'+(r.alvo_no_broker?'✅ ativo no broker':'⚠️ só no sistema — configurar no broker')+'</label>' : '')
+    +   '</div>'
     +   '<div><label style="display:block;font-size:9px;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;margin-bottom:3px">🟢 Gatilho (entrada)</label>'
     +     '<div style="display:flex;gap:8px;align-items:center"><input id="radar-gatilho-preco" type="text" inputmode="decimal" placeholder="ex: 1650.00" value="'+(r.gatilho_preco!=null?r.gatilho_preco:'')+'" style="width:130px;padding:8px 10px;border:1px solid #e5e5e3;border-radius:6px;font-size:13px;font-family:inherit;background:#fff">'
-    +     '<button class="fbtn" onclick="radarSalvarGatilhoPreco()">Salvar</button><span id="radar-gatilho-msg" style="font-size:11px"></span></div></div>'
+    +     '<button class="fbtn" onclick="radarSalvarGatilhoPreco()">Salvar</button><span id="radar-gatilho-msg" style="font-size:11px"></span></div>'
+    +     (r.gatilho_preco!=null ? '<label style="display:flex;align-items:center;gap:5px;margin-top:5px;font-size:11px;cursor:pointer;color:'+(r.gatilho_no_broker?'#1a7f4b':'#d67328')+'"><input type="checkbox" id="fc-gatilho-broker" '+(r.gatilho_no_broker?'checked':'')+' onchange="fcSalvarBrokerFlag(\'gatilho\')" style="cursor:pointer">'+(r.gatilho_no_broker?'✅ ativo no broker':'⚠️ só no sistema — configurar no broker')+'</label>' : '')
+    +   '</div>'
     +   '<div><label style="display:block;font-size:9px;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;margin-bottom:3px">⏰ Prazo (data-limite)</label>'
     +     '<div style="display:flex;gap:8px;align-items:center"><input id="fc-prazo-alerta" type="date" value="'+(r.prazo_alerta||'')+'" style="width:150px;padding:7px 10px;border:1px solid #e5e5e3;border-radius:6px;font-size:13px;font-family:inherit;background:#fff">'
     +     '<button class="fbtn" onclick="fcSalvarPrazo()">Salvar</button><span id="fc-prazo-msg" style="font-size:11px"></span></div></div>'
@@ -2957,8 +2999,9 @@ async function radarSalvarGatilhoPreco() {
     await patch('/radar_ativos?id=eq.'+encodeURIComponent(window._radarModalId), { gatilho_preco: parseNum(val) });
     const r = radarData.find(x => x.id === window._radarModalId); if (r) r.gatilho_preco = parseNum(val);
     if (typeof fcRenderAlertaPreco==='function') fcRenderAlertaPreco();
-    msg.innerHTML = '<span style="color:#1a7f4b">✓ salvo</span>';
-    setTimeout(()=>{ msg.innerHTML=''; }, 2000);
+    const avisoBroker = (r && r.gatilho_no_broker) ? ' <span style="color:#d67328">⚠️ preço mudou — atualize a ordem no broker</span>' : '';
+    msg.innerHTML = '<span style="color:#1a7f4b">✓ salvo</span>'+avisoBroker;
+    setTimeout(()=>{ msg.innerHTML=''; }, 4000);
   } catch(e) {
     msg.innerHTML = '<span style="color:#c0392b">Erro: '+e.message.slice(0,60)+'</span>';
   }
