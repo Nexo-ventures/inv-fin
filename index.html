@@ -785,8 +785,36 @@ async function loadGeral() {
       else if (atraso === 1 && !ehFimDeSemana && hoje.getHours() >= 20)
         at.push('Preços de hoje ainda não foram atualizados (a rotina roda às 19h).');
     }
-    if (ultExec && ultExec.ok === false) av.push('Última execução da rotina falhou: '+(ultExec.erro||'erro não informado'));
-    if (ultExec && ultExec.falhas) at.push('Tickers sem cotação na última rotina: '+ultExec.falhas);
+    // Estado do LOG da rotina. Princípio: uma linha de log só diz algo sobre o dia
+    // dela. Uma linha antiga com ok:true NÃO significa "rodou hoje" — pode ser que a
+    // função tenha morrido sem registrar nada (falha silenciosa). Por isso todo
+    // julgamento aqui considera a DATA do registro, não só o conteúdo.
+    {
+      const diaSemanaL = hoje.getDay();
+      const fimDeSemanaL = (diaSemanaL === 0 || diaSemanaL === 6);
+      const dExec = ultExec && ultExec.executado_em ? String(ultExec.executado_em).slice(0,10) : null;
+      const atrasoLog = dExec ? diasUteisDesde(dExec) : null;
+      const ddmm = d => d ? d.slice(8,10)+'/'+d.slice(5,7) : '—';
+
+      if (!ultExec) {
+        av.push('A rotina automática de preços nunca registrou execução. Verifique se a função e o cron estão ativos.');
+      } else {
+        // Silêncio do log: nem sucesso nem erro há dias úteis = provavelmente
+        // quebrou antes de conseguir registrar.
+        if (atrasoLog != null && atrasoLog >= 2 && !fimDeSemanaL)
+          av.push('A rotina de preços não registra execução há '+atrasoLog+' dias úteis (última: '+ddmm(dExec)+'). Pode ter quebrado sem chegar a registrar — confira os logs da Edge Function.');
+
+        // Falha registrada: recente é alarme; antiga é histórico, não urgência de hoje.
+        if (ultExec.ok === false) {
+          if (atrasoLog != null && atrasoLog <= 1)
+            av.push('Última execução da rotina falhou: '+(ultExec.erro||'erro não informado'));
+          else
+            at.push('A última execução registrada da rotina ('+ddmm(dExec)+') falhou: '+(ultExec.erro||'erro não informado'));
+        }
+
+        if (ultExec.falhas) at.push('Tickers sem cotação na última rotina ('+ddmm(dExec)+'): '+ultExec.falhas);
+      }
+    }
 
     // 2. posições sem preço
     const semPreco = (posData_g||[]).filter(p => !p.preco_atual || p.preco_atual <= 0);
