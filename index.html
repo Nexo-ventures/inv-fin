@@ -107,8 +107,8 @@
 
 <div class="nav">
   <div class="nav-tab" data-tab="radar">Radar</div>
-  <div class="nav-tab active" data-tab="geral">Patrimônio</div>
-  <div class="nav-tab" data-tab="posicoes">Posições abertas</div>
+  <div class="nav-tab" data-tab="geral">Patrimônio</div>
+  <div class="nav-tab active" data-tab="posicoes">Posições abertas</div>
   <div class="nav-tab" data-tab="historico">Posições fechadas</div>
   <div class="nav-tab" data-tab="renda">Renda</div>
   <div class="nav-tab" data-tab="custos">Custos</div>
@@ -119,7 +119,7 @@
 
 <div class="content">
 
-  <div id="tab-geral" class="section active">
+  <div id="tab-geral" class="section">
     <!-- KPI de fechamento — decomposição do resultado -->
     <div id="geral-saude"></div>
     <div id="geral-fechamento" style="margin-bottom:20px"></div>
@@ -186,7 +186,7 @@
     </div>
   </div>
 
-  <div id="tab-posicoes" class="section">
+  <div id="tab-posicoes" class="section active">
     <div id="pos-kpis"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
       <div id="pos-top5g" class="card" style="padding:14px 18px"></div>
@@ -2249,6 +2249,12 @@ function renderRadar() {
   filtered = [...filtered].sort((a,b) => {
     let x = a[radarSortCol], y = b[radarSortCol];
     if (radarSortCol === 'setor') { x = classif(a.ticker,'setor',a.setor); y = classif(b.ticker,'setor',b.setor); }
+    if (radarSortCol === 'fc_frescura') {
+      const ord = { atual:1, revisao:2, desatualizado:3 };
+      const fa = fcFrescura(a), fb = fcFrescura(b);
+      x = fa ? ord[fa.estado] : 9; y = fb ? ord[fb.estado] : 9;
+      return radarSortAsc ? (x-y) : (y-x);
+    }
     x = x == null ? '' : x; y = y == null ? '' : y;
     const cmp = (radarSortCol === 'data_inclusao')
       ? String(x).localeCompare(String(y))
@@ -2266,6 +2272,9 @@ function renderRadar() {
       '<td>'+(classif(r.ticker,'setor',r.setor)||'—')+((classif(r.ticker,'subsetor',r.subsetor))?'<div style="font-size:11px;color:#9b9b98">'+classif(r.ticker,'subsetor',r.subsetor)+'</div>':'')+'</td>' +
       '<td><span class="pill s-'+r.status+'">'+(RADAR_STATUS_LABEL[r.status]||r.status)+'</span></td>' +
       '<td>'+(r.fc_gate ? fcBadge(r.fc_gate, fcCorGate(r.fc_gate)) : '<span style="color:#c9c9c6">—</span>')+(fcConfluenciaTabela(r)?'<div style="margin-top:3px">'+fcConfluenciaTabela(r)+'</div>':'')+'</td>' +
+      '<td>'+(r.fc_tecnico ? fcBadge(fcLabelTecnico(r.fc_tecnico), fcCorTecnico(r.fc_tecnico)) : '<span style="color:#c9c9c6">—</span>')+'</td>' +
+      '<td>'+(r.core_tatico ? fcBadge(r.core_tatico, '#6b6b68') : '<span style="color:#c9c9c6">—</span>')+'</td>' +
+      '<td>'+(() => { const f = fcFrescura(r); return f ? '<span style="font-size:11px;color:'+f.cor+'" title="'+f.label+'">'+f.label.split(' ')[0]+'</span>' : '<span style="color:#c9c9c6">—</span>'; })()+'</td>' +
       '<td>'+(r.fonte||'—')+'</td>' +
       '<td class="tr">'+dt(r.data_inclusao)+'</td>' +
       '</tr>';
@@ -2278,7 +2287,7 @@ function renderRadar() {
   document.getElementById('radar-body').innerHTML =
     '<table><thead><tr>'
     + thR('ticker','Ticker') + thR('mercado','Mercado') + thR('setor','Setor')
-    + thR('status','Status') + thR('fc_gate','Gate') + thR('fonte','Fonte') + thR('data_inclusao','Inclusão','tr')
+    + thR('status','Status') + thR('fc_gate','Gate') + thR('fc_tecnico','Técnico') + thR('core_tatico','Natureza') + thR('fc_frescura','Frescura') + thR('fonte','Fonte') + thR('data_inclusao','Inclusão','tr')
     + '</tr></thead><tbody>'+body+'</tbody></table>';
 }
 
