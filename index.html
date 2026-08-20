@@ -2558,6 +2558,24 @@ async function fcConfirmarGravar(forcado) {
   }
 }
 
+// Converte texto de preço para número aceitando vírgula OU ponto decimal,
+// e separador de milhar BR (1.496,50) ou US (1,496.50).
+// (usuário BR digita "36,20"; Number("36,20") daria NaN → salvava null).
+function parseNum(v) {
+  let s = (v||'').trim();
+  if (s === '') return null;
+  const temPonto = s.includes('.'), temVirgula = s.includes(',');
+  if (temPonto && temVirgula) {
+    // o último separador é o decimal; o outro é milhar → remove o de milhar
+    if (s.lastIndexOf(',') > s.lastIndexOf('.')) s = s.replace(/\./g,'').replace(',', '.'); // BR: 1.496,50
+    else s = s.replace(/,/g,'');                                                            // US: 1,496.50
+  } else if (temVirgula) {
+    s = s.replace(',', '.');   // só vírgula = decimal BR
+  }
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+}
+
 // Salva stop_preco (campo seu, à parte)
 async function fcSalvarStop() {
   const el = document.getElementById('fc-stop-preco');
@@ -2565,8 +2583,8 @@ async function fcSalvarStop() {
   const val = (el.value||'').trim();
   msg.innerHTML = '<span style="color:#9b9b98">salvando…</span>';
   try {
-    await patch('/radar_ativos?id=eq.'+encodeURIComponent(window._radarModalId), { stop_preco: val ? Number(val) : null });
-    const r = radarData.find(x => x.id === window._radarModalId); if (r) r.stop_preco = val ? Number(val) : null;
+    await patch('/radar_ativos?id=eq.'+encodeURIComponent(window._radarModalId), { stop_preco: parseNum(val) });
+    const r = radarData.find(x => x.id === window._radarModalId); if (r) r.stop_preco = parseNum(val);
     if (typeof fcRenderAlertaPreco==='function') fcRenderAlertaPreco();
     msg.innerHTML = '<span style="color:#1a7f4b">✓ salvo</span>';
     setTimeout(()=>{ msg.innerHTML=''; }, 2000);
@@ -2580,8 +2598,8 @@ async function fcSalvarAlvo() {
   const val = (el.value||'').trim();
   msg.innerHTML = '<span style="color:#9b9b98">salvando…</span>';
   try {
-    await patch('/radar_ativos?id=eq.'+encodeURIComponent(window._radarModalId), { alvo_preco: val ? Number(val) : null });
-    const r = radarData.find(x => x.id === window._radarModalId); if (r) r.alvo_preco = val ? Number(val) : null;
+    await patch('/radar_ativos?id=eq.'+encodeURIComponent(window._radarModalId), { alvo_preco: parseNum(val) });
+    const r = radarData.find(x => x.id === window._radarModalId); if (r) r.alvo_preco = parseNum(val);
     if (typeof fcRenderAlertaPreco==='function') fcRenderAlertaPreco();
     msg.innerHTML = '<span style="color:#1a7f4b">✓ salvo</span>';
     setTimeout(()=>{ msg.innerHTML=''; }, 2000);
@@ -2936,8 +2954,8 @@ async function radarSalvarGatilhoPreco() {
   const val = (el.value || '').trim();
   msg.innerHTML = '<span style="color:#9b9b98">salvando…</span>';
   try {
-    await patch('/radar_ativos?id=eq.'+encodeURIComponent(window._radarModalId), { gatilho_preco: val ? Number(val) : null });
-    const r = radarData.find(x => x.id === window._radarModalId); if (r) r.gatilho_preco = val ? Number(val) : null;
+    await patch('/radar_ativos?id=eq.'+encodeURIComponent(window._radarModalId), { gatilho_preco: parseNum(val) });
+    const r = radarData.find(x => x.id === window._radarModalId); if (r) r.gatilho_preco = parseNum(val);
     if (typeof fcRenderAlertaPreco==='function') fcRenderAlertaPreco();
     msg.innerHTML = '<span style="color:#1a7f4b">✓ salvo</span>';
     setTimeout(()=>{ msg.innerHTML=''; }, 2000);
