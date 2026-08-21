@@ -2677,6 +2677,7 @@ function fcPctDoAtual(precoAlvo) {
 async function fcSalvarStop() {
   const el = document.getElementById('fc-stop-preco');
   const msg = document.getElementById('fc-stop-msg');
+  const pctSpan = document.getElementById('fc-stop-pct');
   const val = (el.value||'').trim();
   msg.innerHTML = '<span style="color:#9b9b98">salvando…</span>';
   try {
@@ -2684,7 +2685,8 @@ async function fcSalvarStop() {
     const r = radarData.find(x => x.id === window._radarModalId); if (r) r.stop_preco = parseNum(val);
     if (typeof fcRenderAlertaPreco==='function') fcRenderAlertaPreco();
     const avisoBroker = (r && r.stop_no_broker) ? ' <span style="color:#d67328">⚠️ preço mudou — atualize a ordem no broker</span>' : '';
-    msg.innerHTML = '<span style="color:#1a7f4b">✓ salvo</span>'+fcPctDoAtual(parseNum(val))+avisoBroker;
+    if (pctSpan) pctSpan.innerHTML = fcPctDoAtual(parseNum(val));  // fica fixo, não some
+    msg.innerHTML = '<span style="color:#1a7f4b">✓ salvo</span>'+avisoBroker;
     setTimeout(()=>{ msg.innerHTML=''; }, 4000);
   } catch(e) { msg.innerHTML = '<span style="color:#c0392b">Erro: '+e.message.slice(0,60)+'</span>'; }
 }
@@ -2693,6 +2695,7 @@ async function fcSalvarStop() {
 async function fcSalvarAlvo() {
   const el = document.getElementById('fc-alvo-preco');
   const msg = document.getElementById('fc-alvo-msg');
+  const pctSpan = document.getElementById('fc-alvo-pct');
   const val = (el.value||'').trim();
   msg.innerHTML = '<span style="color:#9b9b98">salvando…</span>';
   try {
@@ -2700,7 +2703,8 @@ async function fcSalvarAlvo() {
     const r = radarData.find(x => x.id === window._radarModalId); if (r) r.alvo_preco = parseNum(val);
     if (typeof fcRenderAlertaPreco==='function') fcRenderAlertaPreco();
     const avisoBroker = (r && r.alvo_no_broker) ? ' <span style="color:#d67328">⚠️ preço mudou — atualize a ordem no broker</span>' : '';
-    msg.innerHTML = '<span style="color:#1a7f4b">✓ salvo</span>'+fcPctDoAtual(parseNum(val))+avisoBroker;
+    if (pctSpan) pctSpan.innerHTML = fcPctDoAtual(parseNum(val));  // fica fixo, não some
+    msg.innerHTML = '<span style="color:#1a7f4b">✓ salvo</span>'+avisoBroker;
     setTimeout(()=>{ msg.innerHTML=''; }, 4000);
   } catch(e) { msg.innerHTML = '<span style="color:#c0392b">Erro: '+e.message.slice(0,60)+'</span>'; }
 }
@@ -2956,12 +2960,12 @@ function renderFundamentalCheck(r) {
     + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px">'
     +   '<div><label style="display:block;font-size:9px;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;margin-bottom:3px">🔴 Stop (saída na perda)</label>'
     +     '<div style="display:flex;gap:8px;align-items:center"><input id="fc-stop-preco" type="text" inputmode="decimal" placeholder="ex: 1450.00" value="'+(r.stop_preco!=null?r.stop_preco:'')+'" style="width:130px;padding:8px 10px;border:1px solid #e5e5e3;border-radius:6px;font-size:13px;font-family:inherit;background:#fff">'
-    +     '<button class="fbtn" onclick="fcSalvarStop()">Salvar</button><span id="fc-stop-msg" style="font-size:11px"></span></div>'
+    +     '<button class="fbtn" onclick="fcSalvarStop()">Salvar</button><span id="fc-stop-msg" style="font-size:11px"></span><span id="fc-stop-pct" style="font-size:11px;font-weight:600">'+fcPctDoAtual(r.stop_preco)+'</span></div>'
     +     (r.stop_preco!=null ? '<label style="display:flex;align-items:center;gap:5px;margin-top:5px;font-size:11px;cursor:pointer;color:'+(r.stop_no_broker?'#1a7f4b':'#d67328')+'"><input type="checkbox" id="fc-stop-broker" '+(r.stop_no_broker?'checked':'')+' onchange="fcSalvarBrokerFlag(\'stop\')" style="cursor:pointer">'+(r.stop_no_broker?'✅ ativo no broker':'⚠️ só no sistema — configurar no broker')+'</label>' : '')
     +   '</div>'
     +   '<div><label style="display:block;font-size:9px;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;margin-bottom:3px">🎯 Alvo (saída no lucro)</label>'
     +     '<div style="display:flex;gap:8px;align-items:center"><input id="fc-alvo-preco" type="text" inputmode="decimal" placeholder="ex: 1900.00" value="'+(r.alvo_preco!=null?r.alvo_preco:'')+'" style="width:130px;padding:8px 10px;border:1px solid #e5e5e3;border-radius:6px;font-size:13px;font-family:inherit;background:#fff">'
-    +     '<button class="fbtn" onclick="fcSalvarAlvo()">Salvar</button><span id="fc-alvo-msg" style="font-size:11px"></span></div>'
+    +     '<button class="fbtn" onclick="fcSalvarAlvo()">Salvar</button><span id="fc-alvo-msg" style="font-size:11px"></span><span id="fc-alvo-pct" style="font-size:11px;font-weight:600">'+fcPctDoAtual(r.alvo_preco)+'</span></div>'
     +     (r.alvo_preco!=null ? '<label style="display:flex;align-items:center;gap:5px;margin-top:5px;font-size:11px;cursor:pointer;color:'+(r.alvo_no_broker?'#1a7f4b':'#d67328')+'"><input type="checkbox" id="fc-alvo-broker" '+(r.alvo_no_broker?'checked':'')+' onchange="fcSalvarBrokerFlag(\'alvo\')" style="cursor:pointer">'+(r.alvo_no_broker?'✅ ativo no broker':'⚠️ só no sistema — configurar no broker')+'</label>' : '')
     +   '</div>'
     +   '<div><label style="display:block;font-size:9px;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;margin-bottom:3px">🟢 Gatilho (entrada)</label>'
@@ -2970,7 +2974,7 @@ function renderFundamentalCheck(r) {
     +       '<option value="abaixo"'+((r.gatilho_direcao||'abaixo')==='abaixo'?' selected':'')+'>≤ pullback (cai até)</option>'
     +       '<option value="acima"'+(r.gatilho_direcao==='acima'?' selected':'')+'>≥ rompimento (sobe até)</option>'
     +     '</select>'
-    +     '<button class="fbtn" onclick="radarSalvarGatilhoPreco()">Salvar</button><span id="radar-gatilho-msg" style="font-size:11px"></span></div>'
+    +     '<button class="fbtn" onclick="radarSalvarGatilhoPreco()">Salvar</button><span id="radar-gatilho-msg" style="font-size:11px"></span><span id="radar-gatilho-pct" style="font-size:11px;font-weight:600">'+fcPctDoAtual(r.gatilho_preco)+'</span></div>'
     +     (r.gatilho_preco!=null ? '<label style="display:flex;align-items:center;gap:5px;margin-top:5px;font-size:11px;cursor:pointer;color:'+(r.gatilho_no_broker?'#1a7f4b':'#d67328')+'"><input type="checkbox" id="fc-gatilho-broker" '+(r.gatilho_no_broker?'checked':'')+' onchange="fcSalvarBrokerFlag(\'gatilho\')" style="cursor:pointer">'+(r.gatilho_no_broker?'✅ ativo no broker':'⚠️ só no sistema — configurar no broker')+'</label>' : '')
     +   '</div>'
     +   '<div><label style="display:block;font-size:9px;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;margin-bottom:3px">⏰ Prazo (data-limite)</label>'
@@ -3075,6 +3079,7 @@ async function radarSalvarGatilhoPreco() {
   const el = document.getElementById('radar-gatilho-preco');
   const dirEl = document.getElementById('radar-gatilho-direcao');
   const msg = document.getElementById('radar-gatilho-msg');
+  const pctSpan = document.getElementById('radar-gatilho-pct');
   const val = (el.value || '').trim();
   const direcao = dirEl ? dirEl.value : 'abaixo';
   msg.innerHTML = '<span style="color:#9b9b98">salvando…</span>';
@@ -3083,7 +3088,8 @@ async function radarSalvarGatilhoPreco() {
     const r = radarData.find(x => x.id === window._radarModalId); if (r) { r.gatilho_preco = parseNum(val); r.gatilho_direcao = direcao; }
     if (typeof fcRenderAlertaPreco==='function') fcRenderAlertaPreco();
     const avisoBroker = (r && r.gatilho_no_broker) ? ' <span style="color:#d67328">⚠️ preço mudou — atualize a ordem no broker</span>' : '';
-    msg.innerHTML = '<span style="color:#1a7f4b">✓ salvo</span>'+fcPctDoAtual(parseNum(val))+avisoBroker;
+    if (pctSpan) pctSpan.innerHTML = fcPctDoAtual(parseNum(val));  // fica fixo, não some
+    msg.innerHTML = '<span style="color:#1a7f4b">✓ salvo</span>'+avisoBroker;
     setTimeout(()=>{ msg.innerHTML=''; }, 4000);
   } catch(e) {
     msg.innerHTML = '<span style="color:#c0392b">Erro: '+e.message.slice(0,60)+'</span>';
