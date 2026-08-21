@@ -2020,8 +2020,16 @@ function renderPosTable(rowsCalc) {
         return '<td style="text-align:center"><span style="display:inline-block;background:'+cfg[1]+';color:'+cfg[0]+';border-radius:4px;padding:1px 6px;font-size:9px;font-weight:700;letter-spacing:.2px" title="Gate do Fundamental Check">'+cfg[2]+' '+gateVal.slice(0,4)+'</span></td>';
       })();
       const subsetorTxt = classif(r.ticker,'subsetor',r.subsetor);
+      // Tooltip do ticker: motivo do alerta (se houver) + os níveis configurados, sempre.
+      const nivelParts = [];
+      if (stopCfg != null) nivelParts.push('stop '+num(stopCfg,2));
+      if (alvoCfg != null) nivelParts.push('alvo '+num(alvoCfg,2));
+      if (gatCfg != null) nivelParts.push('gatilho '+num(gatCfg,2)+' ('+(gatDir==='acima'?'rompimento':'pullback')+')');
+      const nivelTxt = nivelParts.length ? nivelParts.join(' · ') : 'sem stop/alvo/gatilho configurado';
+      const motivoTxt = alertaTipo==='stop'?'furou o stop configurado':alvoOK?'atingiu o alvo de saída':gatOK?'atingiu o gatilho de entrada':alerta?'queda ≥ 8% (sem stop configurado)':'';
+      const tickerTitle = (motivoTxt ? motivoTxt+' — ' : '') + nivelTxt;
       return '<tr style="' + (corAlerta?'background:'+bgAlerta+';box-shadow:inset 3px 0 0 '+corAlerta:'') + '">' +
-        '<td class="ticker" style="cursor:pointer;text-decoration:underline dotted' + (corAlerta?';background:'+bgAlerta:'') + '" onclick="abrirModal(\'' + r.ticker + '\')" title="'+(alertaTipo==='stop'?'furou o stop configurado':alvoOK?'atingiu o alvo de saída':gatOK?'atingiu o gatilho de entrada':alerta?'queda ≥ 8% (sem stop configurado)':'')+'">' + marcador + r.ticker + evtBadge +
+        '<td class="ticker" style="cursor:pointer;text-decoration:underline dotted' + (corAlerta?';background:'+bgAlerta:'') + '" onclick="abrirModal(\'' + r.ticker + '\')" title="'+tickerTitle+'">' + marcador + r.ticker + evtBadge +
           (nomeDoAtivo(r.corretora, r.ticker) ? '<div style="font-size:10px;color:#9b9b98;font-weight:400;text-decoration:none;line-height:1.25;margin-top:1px">'+nomeDoAtivo(r.corretora, r.ticker)+'</div>' : '') + '</td>' +
         gateBadge +
         '<td class="tr" style="font-weight:500">' + (r.mercadoEur!=null?eur(r.mercadoEur):'—') + '</td>' +
