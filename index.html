@@ -2644,6 +2644,17 @@ function parseNum(v) {
   return Number.isFinite(n) ? n : null;
 }
 
+// Distância % de um preço-alvo (stop/alvo/gatilho) em relação ao preço atual da posição.
+// Usado só para feedback visual após salvar — não altera nenhuma lógica de alerta.
+function fcPctDoAtual(precoAlvo) {
+  const atual = window._fcPrecoAtual;
+  if (atual == null || precoAlvo == null || !Number.isFinite(precoAlvo)) return '';
+  const pct = ((precoAlvo - atual) / atual) * 100;
+  const cor = pct >= 0 ? '#1a7f4b' : '#c0392b';
+  const sinal = pct >= 0 ? '+' : '';
+  return ' <span style="color:'+cor+'">('+sinal+pct.toFixed(1)+'% do atual)</span>';
+}
+
 // Salva stop_preco (campo seu, à parte)
 async function fcSalvarStop() {
   const el = document.getElementById('fc-stop-preco');
@@ -2655,7 +2666,7 @@ async function fcSalvarStop() {
     const r = radarData.find(x => x.id === window._radarModalId); if (r) r.stop_preco = parseNum(val);
     if (typeof fcRenderAlertaPreco==='function') fcRenderAlertaPreco();
     const avisoBroker = (r && r.stop_no_broker) ? ' <span style="color:#d67328">⚠️ preço mudou — atualize a ordem no broker</span>' : '';
-    msg.innerHTML = '<span style="color:#1a7f4b">✓ salvo</span>'+avisoBroker;
+    msg.innerHTML = '<span style="color:#1a7f4b">✓ salvo</span>'+fcPctDoAtual(parseNum(val))+avisoBroker;
     setTimeout(()=>{ msg.innerHTML=''; }, 4000);
   } catch(e) { msg.innerHTML = '<span style="color:#c0392b">Erro: '+e.message.slice(0,60)+'</span>'; }
 }
@@ -2671,7 +2682,7 @@ async function fcSalvarAlvo() {
     const r = radarData.find(x => x.id === window._radarModalId); if (r) r.alvo_preco = parseNum(val);
     if (typeof fcRenderAlertaPreco==='function') fcRenderAlertaPreco();
     const avisoBroker = (r && r.alvo_no_broker) ? ' <span style="color:#d67328">⚠️ preço mudou — atualize a ordem no broker</span>' : '';
-    msg.innerHTML = '<span style="color:#1a7f4b">✓ salvo</span>'+avisoBroker;
+    msg.innerHTML = '<span style="color:#1a7f4b">✓ salvo</span>'+fcPctDoAtual(parseNum(val))+avisoBroker;
     setTimeout(()=>{ msg.innerHTML=''; }, 4000);
   } catch(e) { msg.innerHTML = '<span style="color:#c0392b">Erro: '+e.message.slice(0,60)+'</span>'; }
 }
@@ -3054,7 +3065,7 @@ async function radarSalvarGatilhoPreco() {
     const r = radarData.find(x => x.id === window._radarModalId); if (r) { r.gatilho_preco = parseNum(val); r.gatilho_direcao = direcao; }
     if (typeof fcRenderAlertaPreco==='function') fcRenderAlertaPreco();
     const avisoBroker = (r && r.gatilho_no_broker) ? ' <span style="color:#d67328">⚠️ preço mudou — atualize a ordem no broker</span>' : '';
-    msg.innerHTML = '<span style="color:#1a7f4b">✓ salvo</span>'+avisoBroker;
+    msg.innerHTML = '<span style="color:#1a7f4b">✓ salvo</span>'+fcPctDoAtual(parseNum(val))+avisoBroker;
     setTimeout(()=>{ msg.innerHTML=''; }, 4000);
   } catch(e) {
     msg.innerHTML = '<span style="color:#c0392b">Erro: '+e.message.slice(0,60)+'</span>';
