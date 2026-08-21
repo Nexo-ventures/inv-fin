@@ -1929,6 +1929,10 @@ function renderPosTable(rowsCalc) {
       vb = ordem[(classifRadar[(b.ticker||'').toUpperCase()]||{}).fc_gate] || 9;
     } else if (col === 'setor') {
       va = classif(a.ticker,'setor',a.setor); vb = classif(b.ticker,'setor',b.setor);
+    } else if (col === 'stop_col' || col === 'alvo_col' || col === 'gatilho_col') {
+      const campo = { stop_col:'stop_preco', alvo_col:'alvo_preco', gatilho_col:'gatilho_preco' }[col];
+      va = (classifRadar[(a.ticker||'').toUpperCase()]||{})[campo];
+      vb = (classifRadar[(b.ticker||'').toUpperCase()]||{})[campo];
     } else {
       va = a[col]; vb = b[col];
     }
@@ -1955,6 +1959,9 @@ function renderPosTable(rowsCalc) {
     {key:'quantidade', label:'Qtd', cls:'tr'},
     {key:'preco_entrada', label:'PM entrada', cls:'tr'},
     {key:'preco_atual', label:'Preço atual', cls:'tr'},
+    {key:'stop_col', label:'Stop', cls:'tr'},
+    {key:'alvo_col', label:'Alvo', cls:'tr'},
+    {key:'gatilho_col', label:'Gatilho', cls:'tr'},
     {key:'valorMercado', label:'V.mercado<br>moeda', cls:'tr'},
     {key:'moeda', label:'Moeda', cls:''},
     {key:'precoFech', label:'Preço<br>fech', cls:'tr'},
@@ -2044,6 +2051,9 @@ function renderPosTable(rowsCalc) {
         '<td class="tr">' + (r.quantidade?num(r.quantidade,3):'—') + '</td>' +
         '<td class="tr">' + (r.preco_entrada?num(r.preco_entrada,2):'—') + '</td>' +
         '<td class="tr" style="font-weight:500">' + (r.preco_atual?num(r.preco_atual,2):'—') + '</td>' +
+        '<td class="tr" style="font-size:11px' + (alertaTipo==='stop'?';color:#c0392b;font-weight:700':';color:#9b9b98') + '">' + (stopCfg!=null?num(stopCfg,2):'—') + '</td>' +
+        '<td class="tr" style="font-size:11px' + (alvoOK?';color:#1a7f4b;font-weight:700':';color:#9b9b98') + '">' + (alvoCfg!=null?num(alvoCfg,2):'—') + '</td>' +
+        '<td class="tr" style="font-size:11px' + (gatOK?';color:#1a7f4b;font-weight:700':';color:#9b9b98') + '">' + (gatCfg!=null?num(gatCfg,2)+(gatDir==='acima'?' ↑':' ↓'):'—') + '</td>' +
         '<td class="tr">' + (r.valorMercado!=null?num(r.valorMercado,0):'—') + '</td>' +
         '<td style="font-size:11px;color:#6b6b68">' + r.moeda + '</td>' +
         '<td class="tr" style="font-size:11px;color:#6b6b68">' + (r.precoFech!=null?num(r.precoFech,2):'—') + '</td>' +
