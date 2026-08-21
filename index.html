@@ -1982,14 +1982,14 @@ function renderPosTable(rowsCalc) {
     sorted.map(r => {
       const dias = r.data_entrada ? Math.floor((today - dLocal(r.data_entrada)) / 86400000) : null;
       const peso = (r.mercadoEur != null && totalMercadoEurAll > 0) ? (r.mercadoEur / totalMercadoEurAll * 100) : null;
-      // Alerta de stop: usa o stop_preco configurado (por posição); senão cai na regra -8%.
+      // Alerta de stop: SÓ dispara com stop_preco configurado (removido o fallback
+      // -8% automático — poluía a tabela com ações sem stop definido, sem ação real
+      // a tomar; agora silêncio visual até o usuário configurar um stop de verdade).
       const rc = classifRadar[(r.ticker||'').toUpperCase()] || {};
       const stopCfg = rc.stop_preco, gatCfg = rc.gatilho_preco, alvoCfg = rc.alvo_preco;
       let alerta = false, alertaTipo = '';
-      if (stopCfg != null && r.preco_atual != null) {
-        if (r.preco_atual <= stopCfg) { alerta = true; alertaTipo = 'stop'; }        // furou o stop
-      } else if (r.rentPctRow != null && r.rentPctRow <= -8) {
-        alerta = true; alertaTipo = 'perda';                                          // fallback -8%
+      if (stopCfg != null && r.preco_atual != null && r.preco_atual <= stopCfg) {
+        alerta = true; alertaTipo = 'stop';                                          // furou o stop
       }
       // 🎯 alvo atingido (só se não furou o stop)
       const alvoOK = (!alerta && alvoCfg != null && r.preco_atual != null && r.preco_atual >= alvoCfg);
@@ -1998,7 +1998,7 @@ function renderPosTable(rowsCalc) {
         (gatDir === 'acima' ? r.preco_atual >= gatCfg : r.preco_atual <= gatCfg));
       const corAlerta = alerta ? '#c0392b' : ((alvoOK||gatOK) ? '#1a7f4b' : '');
       const bgAlerta = alerta ? '#fdf3f1' : ((alvoOK||gatOK) ? '#f2faf5' : '');
-      const marcador = alerta ? (alertaTipo==='stop'?'🔴 ':'⚠ ') : (alvoOK ? '🎯 ' : (gatOK ? '🟢 ' : ''));
+      const marcador = alerta ? '🔴 ' : (alvoOK ? '🎯 ' : (gatOK ? '🟢 ' : ''));
       // Badge de evento: prazo_alerta manual tem PRIORIDADE sobre o earnings —
       // é uma decisão do usuário, não deve ficar escondida atrás da data automática
       // do earnings quando as duas ficam próximas (bug: antes pegava a mais próxima
@@ -2051,9 +2051,9 @@ function renderPosTable(rowsCalc) {
         '<td class="tr">' + (r.quantidade?num(r.quantidade,3):'—') + '</td>' +
         '<td class="tr">' + (r.preco_entrada?num(r.preco_entrada,2):'—') + '</td>' +
         '<td class="tr" style="font-weight:500">' + (r.preco_atual?num(r.preco_atual,2):'—') + '</td>' +
-        '<td class="tr" style="font-size:11px' + (alertaTipo==='stop'?';color:#c0392b;font-weight:700':';color:#9b9b98') + '">' + (stopCfg!=null?num(stopCfg,2):'—') + '</td>' +
-        '<td class="tr" style="font-size:11px' + (alvoOK?';color:#1a7f4b;font-weight:700':';color:#9b9b98') + '">' + (alvoCfg!=null?num(alvoCfg,2):'—') + '</td>' +
-        '<td class="tr" style="font-size:11px' + (gatOK?';color:#1a7f4b;font-weight:700':';color:#9b9b98') + '">' + (gatCfg!=null?num(gatCfg,2)+(gatDir==='acima'?' ↑':' ↓'):'—') + '</td>' +
+        '<td class="tr" style="font-size:11px' + (alertaTipo==='stop'?';color:#c0392b;font-weight:700':';color:#9b9b98') + (rc.stop_no_broker?';background:#eaf7ee':'') + '" title="'+(rc.stop_no_broker?'confirmado ativo no broker':'')+'">' + (stopCfg!=null?num(stopCfg,2):'—') + '</td>' +
+        '<td class="tr" style="font-size:11px' + (alvoOK?';color:#1a7f4b;font-weight:700':';color:#9b9b98') + (rc.alvo_no_broker?';background:#eaf7ee':'') + '" title="'+(rc.alvo_no_broker?'confirmado ativo no broker':'')+'">' + (alvoCfg!=null?num(alvoCfg,2):'—') + '</td>' +
+        '<td class="tr" style="font-size:11px' + (gatOK?';color:#1a7f4b;font-weight:700':';color:#9b9b98') + (rc.gatilho_no_broker?';background:#eaf7ee':'') + '" title="'+(rc.gatilho_no_broker?'confirmado ativo no broker':'')+'">' + (gatCfg!=null?num(gatCfg,2)+(gatDir==='acima'?' ↑':' ↓'):'—') + '</td>' +
         '<td class="tr">' + (r.valorMercado!=null?num(r.valorMercado,0):'—') + '</td>' +
         '<td style="font-size:11px;color:#6b6b68">' + r.moeda + '</td>' +
         '<td class="tr" style="font-size:11px;color:#6b6b68">' + (r.precoFech!=null?num(r.precoFech,2):'—') + '</td>' +
