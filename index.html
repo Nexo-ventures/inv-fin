@@ -1986,25 +1986,31 @@ function renderPosTable(rowsCalc) {
       }
       // 🎯 alvo atingido (só se não furou o stop)
       const alvoOK = (!alerta && alvoCfg != null && r.preco_atual != null && r.preco_atual >= alvoCfg);
-      const gatOK = (!alerta && !alvoOK && gatCfg != null && r.preco_atual != null && r.preco_atual <= gatCfg);
+      const gatDir = rc.gatilho_direcao || 'abaixo';
+      const gatOK = (!alerta && !alvoOK && gatCfg != null && r.preco_atual != null &&
+        (gatDir === 'acima' ? r.preco_atual >= gatCfg : r.preco_atual <= gatCfg));
       const corAlerta = alerta ? '#c0392b' : ((alvoOK||gatOK) ? '#1a7f4b' : '');
       const bgAlerta = alerta ? '#fdf3f1' : ((alvoOK||gatOK) ? '#f2faf5' : '');
       const marcador = alerta ? (alertaTipo==='stop'?'🔴 ':'⚠ ') : (alvoOK ? '🎯 ' : (gatOK ? '🟢 ' : ''));
-      // Badge de evento: prazo_alerta manual OU próximo earnings, o que vier antes
+      // Badge de evento: prazo_alerta manual tem PRIORIDADE sobre o earnings —
+      // é uma decisão do usuário, não deve ficar escondida atrás da data automática
+      // do earnings quando as duas ficam próximas (bug: antes pegava a mais próxima
+      // entre as duas, e earnings por 1 dia escondia o prazo configurado).
       const evtBadge = (() => {
-        const datas = [];
-        if (rc.prazo_alerta) datas.push({d:rc.prazo_alerta, t:'prazo'});
-        if (rc.fc_proximo_earnings) datas.push({d:rc.fc_proximo_earnings, t:'earnings'});
-        if (!datas.length) return '';
-        datas.sort((a,b)=>a.d.localeCompare(b.d));
-        const prox = datas[0];
+        const prox = rc.prazo_alerta
+          ? { d: rc.prazo_alerta, t: 'prazo' }
+          : (rc.fc_proximo_earnings ? { d: rc.fc_proximo_earnings, t: 'earnings' } : null);
+        if (!prox) return '';
         const diasFalta = Math.floor((dLocal(prox.d) - today) / 86400000);
         let cor = '#9b9b98', bg = '#f4f4f2';
         if (diasFalta < 0) { cor = '#c0392b'; bg = '#fdf3f1'; }
         else if (diasFalta <= 14) { cor = '#d67328'; bg = '#fdf9f2'; }
         const lbl = prox.d.slice(8,10)+'/'+prox.d.slice(5,7);
-        const tit = (prox.t==='prazo'?'prazo-limite':'próximo earnings')+' '+(diasFalta<0?'(vencido)':'('+diasFalta+'d)');
-        return ' <span style="display:inline-block;background:'+bg+';color:'+cor+';border-radius:4px;padding:1px 5px;font-size:9px;font-weight:600;vertical-align:middle" title="'+tit+'">⏰ '+lbl+'</span>';
+        const icone = prox.t === 'prazo' ? '⏰' : '📅';
+        const earnDiferente = (prox.t === 'prazo' && rc.fc_proximo_earnings && rc.fc_proximo_earnings !== rc.prazo_alerta)
+          ? ' · earnings '+rc.fc_proximo_earnings.slice(8,10)+'/'+rc.fc_proximo_earnings.slice(5,7) : '';
+        const tit = (prox.t==='prazo'?'prazo-limite':'próximo earnings')+' '+(diasFalta<0?'(vencido)':'('+diasFalta+'d)')+earnDiferente;
+        return ' <span style="display:inline-block;background:'+bg+';color:'+cor+';border-radius:4px;padding:1px 5px;font-size:9px;font-weight:600;vertical-align:middle" title="'+tit+'">'+icone+' '+lbl+'</span>';
       })();
       // #2 Coluna Gate: badge do fc_gate da posição (do radar)
       const gateVal = rc.fc_gate || null;
@@ -2152,7 +2158,7 @@ let classifRadar = {};
 async function carregarClassifRadar() {
   if (Object.keys(classifRadar).length) return classifRadar;
   try {
-    const r = await get('/radar_ativos?select=ticker,setor,subsetor,pais,regiao_macro,bolsa,tipo_ativo,stop_preco,gatilho_preco,alvo_preco,prazo_alerta,fc_proximo_earnings,fc_gate,stop_no_broker,alvo_no_broker,gatilho_no_broker');
+    const r = await get('/radar_ativos?select=ticker,setor,subsetor,pais,regiao_macro,bolsa,tipo_ativo,stop_preco,gatilho_preco,gatilho_direcao,alvo_preco,prazo_alerta,fc_proximo_earnings,fc_gate,stop_no_broker,alvo_no_broker,gatilho_no_broker');
     (r||[]).forEach(x => { classifRadar[(x.ticker||'').toUpperCase()] = x; });
   } catch(e) { console.warn('classificação do radar:', e.message); }
   return classifRadar;
@@ -2432,8 +2438,13 @@ function fcRenderAlertaPreco() {
   if (emCarteira && alvo != null && preco >= alvo && (stop==null || preco > stop)) {
     avisos.push(['#1a7f4b','#f2faf5','🎯 Preço '+sym+num(preco,2)+' atingiu o alvo de saída '+sym+num(alvo,2)+' — considere realizar']);
   }
-  if (gat != null && preco != null && preco <= gat && (stop==null || preco > stop)) {
-    avisos.push(['#1a7f4b','#f2faf5','🟢 Preço '+sym+num(preco,2)+' no/abaixo do gatilho de entrada '+sym+num(gat,2)+' — preço-alvo atingido']);
+  if (gat != null && preco != null && (stop==null || preco > stop)) {
+    const direcao = r.gatilho_direcao || 'abaixo';
+    const bateu = direcao === 'acima' ? (preco >= gat) : (preco <= gat);
+    if (bateu) {
+      const rel = direcao === 'acima' ? 'acima/no' : 'no/abaixo do';
+      avisos.push(['#1a7f4b','#f2faf5','🟢 Preço '+sym+num(preco,2)+' '+rel+' gatilho de entrada '+sym+num(gat,2)+' — preço-alvo atingido']);
+    }
   }
   if (emCarteira && stop == null) {
     avisos.push(['#9b9b98','#fafafa','⚠ Posição em carteira sem stop definido']);
@@ -2925,7 +2936,11 @@ function renderFundamentalCheck(r) {
     +     (r.alvo_preco!=null ? '<label style="display:flex;align-items:center;gap:5px;margin-top:5px;font-size:11px;cursor:pointer;color:'+(r.alvo_no_broker?'#1a7f4b':'#d67328')+'"><input type="checkbox" id="fc-alvo-broker" '+(r.alvo_no_broker?'checked':'')+' onchange="fcSalvarBrokerFlag(\'alvo\')" style="cursor:pointer">'+(r.alvo_no_broker?'✅ ativo no broker':'⚠️ só no sistema — configurar no broker')+'</label>' : '')
     +   '</div>'
     +   '<div><label style="display:block;font-size:9px;text-transform:uppercase;letter-spacing:.4px;color:#9b9b98;margin-bottom:3px">🟢 Gatilho (entrada)</label>'
-    +     '<div style="display:flex;gap:8px;align-items:center"><input id="radar-gatilho-preco" type="text" inputmode="decimal" placeholder="ex: 1650.00" value="'+(r.gatilho_preco!=null?r.gatilho_preco:'')+'" style="width:130px;padding:8px 10px;border:1px solid #e5e5e3;border-radius:6px;font-size:13px;font-family:inherit;background:#fff">'
+    +     '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><input id="radar-gatilho-preco" type="text" inputmode="decimal" placeholder="ex: 1650.00" value="'+(r.gatilho_preco!=null?r.gatilho_preco:'')+'" style="width:110px;padding:8px 10px;border:1px solid #e5e5e3;border-radius:6px;font-size:13px;font-family:inherit;background:#fff">'
+    +     '<select id="radar-gatilho-direcao" style="padding:8px 6px;border:1px solid #e5e5e3;border-radius:6px;font-size:11px;font-family:inherit;background:#fff" title="Rompimento: dispara quando o preço SOBE até o nível. Pullback: dispara quando o preço CAI até o nível.">'
+    +       '<option value="abaixo"'+((r.gatilho_direcao||'abaixo')==='abaixo'?' selected':'')+'>≤ pullback (cai até)</option>'
+    +       '<option value="acima"'+(r.gatilho_direcao==='acima'?' selected':'')+'>≥ rompimento (sobe até)</option>'
+    +     '</select>'
     +     '<button class="fbtn" onclick="radarSalvarGatilhoPreco()">Salvar</button><span id="radar-gatilho-msg" style="font-size:11px"></span></div>'
     +     (r.gatilho_preco!=null ? '<label style="display:flex;align-items:center;gap:5px;margin-top:5px;font-size:11px;cursor:pointer;color:'+(r.gatilho_no_broker?'#1a7f4b':'#d67328')+'"><input type="checkbox" id="fc-gatilho-broker" '+(r.gatilho_no_broker?'checked':'')+' onchange="fcSalvarBrokerFlag(\'gatilho\')" style="cursor:pointer">'+(r.gatilho_no_broker?'✅ ativo no broker':'⚠️ só no sistema — configurar no broker')+'</label>' : '')
     +   '</div>'
@@ -3029,12 +3044,14 @@ function renderRadarNotas(notas) {
 
 async function radarSalvarGatilhoPreco() {
   const el = document.getElementById('radar-gatilho-preco');
+  const dirEl = document.getElementById('radar-gatilho-direcao');
   const msg = document.getElementById('radar-gatilho-msg');
   const val = (el.value || '').trim();
+  const direcao = dirEl ? dirEl.value : 'abaixo';
   msg.innerHTML = '<span style="color:#9b9b98">salvando…</span>';
   try {
-    await patch('/radar_ativos?id=eq.'+encodeURIComponent(window._radarModalId), { gatilho_preco: parseNum(val) });
-    const r = radarData.find(x => x.id === window._radarModalId); if (r) r.gatilho_preco = parseNum(val);
+    await patch('/radar_ativos?id=eq.'+encodeURIComponent(window._radarModalId), { gatilho_preco: parseNum(val), gatilho_direcao: direcao });
+    const r = radarData.find(x => x.id === window._radarModalId); if (r) { r.gatilho_preco = parseNum(val); r.gatilho_direcao = direcao; }
     if (typeof fcRenderAlertaPreco==='function') fcRenderAlertaPreco();
     const avisoBroker = (r && r.gatilho_no_broker) ? ' <span style="color:#d67328">⚠️ preço mudou — atualize a ordem no broker</span>' : '';
     msg.innerHTML = '<span style="color:#1a7f4b">✓ salvo</span>'+avisoBroker;
