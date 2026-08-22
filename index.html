@@ -2071,16 +2071,25 @@ function renderPosTable(rowsCalc) {
       const tDelta = sorted.reduce((s,r)=>s+(r.deltaFechEur||0),0);
       const tResFech = sorted.reduce((s,r)=>s+(r.resultFechEur||0),0);
       return '<tfoot><tr style="background:#fafaf9;font-weight:600;border-top:2px solid #e5e5e3">' +
-        '<td style="padding:8px;background:#fafaf9">Total ('+sorted.length+')</td><td></td><td></td><td></td>' +
-        '<td class="tr" style="font-weight:600">'+eur(tMerc)+'</td>' +
-        '<td class="tr '+dc(tResFech)+'">'+(tResFech>=0?'+':'')+eur(tResFech)+'</td>' +
-        '<td></td>' +
+        // Alinhamento crítico: o rodapé DEVE ter exatamente as mesmas colunas da linha de
+        // dados, na mesma ordem. Ordem atual: ticker · gate · mercado · resultFech ·
+        // rentFech · [snaps] · delta · rentPct · peso · entrada · dias · qtd · pmEntrada ·
+        // precoAtual · stop · alvo · gatilho · vMercado · moeda · precoFech · vFechEur ·
+        // classe · setor · corretora  (23 fixas + snaps)
+        '<td style="padding:8px;background:#fafaf9">Total ('+sorted.length+')</td>' +  // 1 ticker
+        '<td></td>' +                                                                  // 2 gate
+        '<td class="tr" style="font-weight:600">'+eur(tMerc)+'</td>' +                 // 3 mercado
+        '<td class="tr '+dc(tResFech)+'">'+(tResFech>=0?'+':'')+eur(tResFech)+'</td>' +// 4 resultFech
+        '<td></td>' +                                                                  // 5 rentFech
         colsSnap.map(c => { const tv=sorted.reduce((a,r)=>a+((r.snapVar&&r.snapVar[c.snap])||0),0); return '<td class="tr '+dc(tv)+'" style="background:#fbfbfa">'+(tv>=0?'+':'')+eur(tv)+'</td>'; }).join('') +
-        '<td class="tr '+dc(tDelta)+'">'+(tDelta>=0?'+':'')+eur(tDelta)+'</td>' +
-        '<td></td>' +
-        '<td class="tr" style="font-size:11px;color:#6b6b68">100%</td>' +
-        '<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>' +
-        '<td class="tr" style="color:#6b6b68">'+eur(tValFech)+'</td>' +
+        '<td class="tr '+dc(tDelta)+'">'+(tDelta>=0?'+':'')+eur(tDelta)+'</td>' +      // delta
+        '<td></td>' +                                                                  // rentPct
+        '<td class="tr" style="font-size:11px;color:#6b6b68">100%</td>' +              // peso
+        '<td></td><td></td><td></td><td></td><td></td>' +          // entrada·dias·qtd·pm·precoAtual
+        '<td></td><td></td><td></td>' +                            // stop·alvo·gatilho
+        '<td></td><td></td><td></td>' +                            // vMercado·moeda·precoFech
+        '<td class="tr" style="color:#6b6b68">'+eur(tValFech)+'</td>' +                // vFechEur
+        '<td></td><td></td><td></td>' +                            // classe·setor·corretora
         '</tr></tfoot>';
     })() + '</table>';
 }
